@@ -32,6 +32,7 @@
     "@tiptap/starter-kit": "^3.26.1",
     "better-sqlite3": "^12.10.0",
     "busboy": "^1.6.0",
+    "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "drizzle-orm": "^0.45.2",
     "lowlight": "^3.3.0",
