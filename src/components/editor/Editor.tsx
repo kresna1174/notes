@@ -10,6 +10,7 @@ import { HorizontalRule } from '@tiptap/extension-horizontal-rule'
 import { Placeholder } from '@tiptap/extension-placeholder'
 import { SlashCommandExtension } from './SlashCommand'
 import { DiagramBlock } from './DiagramBlock'
+import { AttachmentBlockExtension } from './AttachmentBlock'
 import { useEffect, useRef, useState } from 'react'
 
 interface Note {
@@ -41,6 +42,7 @@ export function Editor({ note, onUpdate }: EditorProps) {
       Placeholder.configure({ placeholder: "Type '/' for commands..." }),
       SlashCommandExtension,
       DiagramBlock,
+      AttachmentBlockExtension,
     ],
     content: (() => {
       try { return JSON.parse(note.content) } catch { return {} }
