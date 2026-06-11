@@ -54,6 +54,10 @@ export function Editor({ note, onUpdate }: EditorProps) {
   })
 
   useEffect(() => {
+    return () => clearTimeout(saveTimer.current)
+  }, [])
+
+  useEffect(() => {
     if (editor) {
       ;(editor.storage as any).noteId = note.id
     }
