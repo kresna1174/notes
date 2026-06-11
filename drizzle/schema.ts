@@ -3,7 +3,7 @@ import { sqliteTable, text, integer } from 'drizzle-orm/sqlite-core'
 export const notes = sqliteTable('notes', {
   id: text('id').primaryKey(),
   title: text('title').notNull().default(''),
-  content: text('content').notNull().default('{}'),
+  content: text('content').notNull().default('{"type":"doc","content":[]}'),
   createdAt: integer('created_at').notNull(),
   updatedAt: integer('updated_at').notNull(),
 })

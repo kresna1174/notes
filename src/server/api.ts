@@ -55,9 +55,13 @@ export async function handleApiRequest(req: IncomingMessage, res: ServerResponse
     }
 
     if (method === 'PUT') {
-      const body = await readBody(req) as { title?: string; content?: string }
-      await db.update(notes).set({ ...body, updatedAt: Date.now() }).where(eq(notes.id, id))
+      const body = await readBody(req)
+      const { title, content } = body as { title?: string; content?: string }
+      await db.update(notes)
+        .set({ ...(title !== undefined && { title }), ...(content !== undefined && { content }), updatedAt: Date.now() })
+        .where(eq(notes.id, id))
       const [updated] = await db.select().from(notes).where(eq(notes.id, id))
+      if (!updated) return json(res, { error: 'not found' }, 404)
       json(res, updated)
       return true
     }
