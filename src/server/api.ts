@@ -146,10 +146,15 @@ export async function handleApiRequest(req: IncomingMessage, res: ServerResponse
       const filePath = getFilePath(att.storedAs)
       res.writeHead(200, {
         'Content-Type': att.mimeType,
-        'Content-Disposition': `inline; filename="${att.filename}"`,
+        'Content-Disposition': `attachment; filename="${att.filename.replace(/"/g, '\\"')}"`,
         'Content-Length': att.size,
       })
-      createReadStream(filePath).pipe(res)
+      const stream = createReadStream(filePath)
+      stream.on('error', () => {
+        res.writeHead(404)
+        res.end(JSON.stringify({ error: 'file not found on disk' }))
+      })
+      stream.pipe(res)
       return true
     }
 
