@@ -16,3 +16,28 @@ body {
   margin: 0;
 }
 
+/* Editor prose styles */
+.ProseMirror p.is-editor-empty:first-child::before {
+  color: var(--color-muted-foreground, #6b7280);
+  content: attr(data-placeholder);
+  float: left;
+  height: 0;
+  pointer-events: none;
+}
+
+.ProseMirror table {
+  border-collapse: collapse;
+  width: 100%;
+}
+
+.ProseMirror td, .ProseMirror th {
+  border: 1px solid var(--color-border, #e5e7eb);
+  padding: 4px 8px;
+}
+
+mark {
+  background-color: oklch(0.5 0.1 30 / 0.2);
+  border-radius: 2px;
+  padding: 0 2px;
+}
+
