@@ -1,6 +1,6 @@
 import { Node, mergeAttributes } from '@tiptap/core'
 import { ReactNodeViewRenderer, NodeViewWrapper } from '@tiptap/react'
-import { useRef } from 'react'
+import { useRef, useState } from 'react'
 import { Button } from '../ui/button'
 import { Paperclip, Download, Trash2, FileText } from 'lucide-react'
 
@@ -12,21 +12,30 @@ function formatBytes(bytes: number): string {
 
 function AttachmentNodeView({ node, updateAttributes, deleteNode, editor }: any) {
   const inputRef = useRef<HTMLInputElement>(null)
+  const [uploading, setUploading] = useState(false)
   const { attachmentId, filename, mimeType, size } = node.attrs
 
   async function upload(file: File) {
-    const noteId = (editor.storage as any).noteId
-    const form = new FormData()
-    form.append('file', file)
-    form.append('noteId', noteId)
-    const res = await fetch('/api/attachments', { method: 'POST', body: form })
-    const data = await res.json()
-    updateAttributes({
-      attachmentId: data.id,
-      filename: data.filename,
-      mimeType: data.mimeType,
-      size: data.size,
-    })
+    setUploading(true)
+    try {
+      const noteId = (editor.storage as any).noteId
+      const form = new FormData()
+      form.append('file', file)
+      form.append('noteId', noteId)
+      const res = await fetch('/api/attachments', { method: 'POST', body: form })
+      if (!res.ok) throw new Error(`Upload failed: ${res.status}`)
+      const data = await res.json()
+      updateAttributes({
+        attachmentId: data.id,
+        filename: data.filename,
+        mimeType: data.mimeType,
+        size: data.size,
+      })
+    } catch (err) {
+      alert(`Upload failed: ${err instanceof Error ? err.message : 'Unknown error'}`)
+    } finally {
+      setUploading(false)
+    }
   }
 
   async function remove() {
@@ -40,15 +49,18 @@ function AttachmentNodeView({ node, updateAttributes, deleteNode, editor }: any)
     return (
       <NodeViewWrapper>
         <div
-          className="border-2 border-dashed rounded-lg p-4 flex items-center gap-2 text-sm text-muted-foreground cursor-pointer hover:border-primary transition-colors"
-          onClick={() => inputRef.current?.click()}
+          className={`border-2 border-dashed rounded-lg p-4 flex items-center gap-2 text-sm text-muted-foreground transition-colors ${
+            uploading ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:border-primary'
+          }`}
+          onClick={() => !uploading && inputRef.current?.click()}
         >
           <Paperclip className="h-4 w-4 shrink-0" />
-          Click to attach a file
+          {uploading ? 'Uploading...' : 'Click to attach a file'}
           <input
             ref={inputRef}
             type="file"
             className="hidden"
+            disabled={uploading}
             onChange={e => { if (e.target.files?.[0]) upload(e.target.files[0]) }}
           />
         </div>
