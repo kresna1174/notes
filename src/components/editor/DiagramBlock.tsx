@@ -10,7 +10,7 @@ import ReactFlow, {
   type Connection,
 } from 'reactflow'
 import 'reactflow/dist/style.css'
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../ui/dialog'
 import { Button } from '../ui/button'
 import { ulid } from 'ulid'
@@ -26,10 +26,35 @@ function DiagramNodeView({ node, updateAttributes }: any) {
   const [nodes, setNodes, onNodesChange] = useNodesState(parsed.nodes)
   const [edges, setEdges, onEdgesChange] = useEdgesState(parsed.edges)
 
+  useEffect(() => {
+    if (open) {
+      try {
+        const fresh = JSON.parse(node.attrs.data)
+        setNodes(fresh.nodes || [])
+        setEdges(fresh.edges || [])
+      } catch {
+        setNodes([])
+        setEdges([])
+      }
+    }
+  }, [open])
+
   const onConnect = useCallback(
     (params: Connection) => setEdges(eds => addEdge(params, eds)),
     [setEdges]
   )
+
+  function handleCancel() {
+    try {
+      const fresh = JSON.parse(node.attrs.data)
+      setNodes(fresh.nodes || [])
+      setEdges(fresh.edges || [])
+    } catch {
+      setNodes([])
+      setEdges([])
+    }
+    setOpen(false)
+  }
 
   function save() {
     updateAttributes({ data: JSON.stringify({ nodes, edges }) })
@@ -73,7 +98,7 @@ function DiagramNodeView({ node, updateAttributes }: any) {
               </Button>
             ))}
           </div>
-          <div className="flex-1">
+          <div className="flex-1 h-full">
             <ReactFlow
               nodes={nodes}
               edges={edges}
@@ -88,7 +113,7 @@ function DiagramNodeView({ node, updateAttributes }: any) {
             </ReactFlow>
           </div>
           <div className="flex justify-end gap-2 px-4 py-3 border-t">
-            <Button variant="ghost" onClick={() => setOpen(false)}>Cancel</Button>
+            <Button variant="ghost" onClick={handleCancel}>Cancel</Button>
             <Button onClick={save}>Save</Button>
           </div>
         </DialogContent>
