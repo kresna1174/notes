@@ -1,8 +1,11 @@
 import type { IncomingMessage, ServerResponse } from 'node:http'
-import { db } from '../lib/db'
-import { notes } from '../../drizzle/schema'
-import { desc, eq, like, or } from 'drizzle-orm'
+import { createReadStream } from 'node:fs'
+import { db, sqlite } from '../lib/db'
+import { notes, attachments } from '../../drizzle/schema'
+import { desc, eq } from 'drizzle-orm'
 import { ulid } from 'ulid'
+import Busboy from 'busboy'
+import { saveFile, getFilePath, deleteFile } from '../lib/storage'
 
 function json(res: ServerResponse, data: unknown, status = 200) {
   res.writeHead(status, { 'Content-Type': 'application/json' })
@@ -24,6 +27,25 @@ export async function handleApiRequest(req: IncomingMessage, res: ServerResponse
   const url = new URL(req.url!, `http://localhost`)
   const path = url.pathname
   const method = req.method?.toUpperCase() ?? 'GET'
+
+  // GET /api/search?q=
+  if (method === 'GET' && path === '/api/search') {
+    const q = url.searchParams.get('q')?.trim()
+    if (!q) { json(res, []); return true }
+
+    const rows = sqlite.prepare(`
+      SELECT n.id, n.title, n.created_at as createdAt,
+        snippet(notes_fts, 2, '<mark>', '</mark>', '...', 10) as snippet
+      FROM notes_fts
+      JOIN notes n ON n.id = notes_fts.id
+      WHERE notes_fts MATCH ?
+      ORDER BY rank
+      LIMIT 50
+    `).all(`${q}*`)
+
+    json(res, rows)
+    return true
+  }
 
   // GET /api/notes
   if (path === '/api/notes' && method === 'GET') {
@@ -68,6 +90,74 @@ export async function handleApiRequest(req: IncomingMessage, res: ServerResponse
 
     if (method === 'DELETE') {
       await db.delete(notes).where(eq(notes.id, id))
+      json(res, { ok: true })
+      return true
+    }
+  }
+
+  // POST /api/attachments
+  if (method === 'POST' && path === '/api/attachments') {
+    const bb = Busboy({ headers: req.headers as Record<string, string | string[]> })
+    let fileBuffer: Buffer | null = null
+    let filename = ''
+    let mimetype = ''
+    let noteId = ''
+
+    await new Promise<void>((resolve, reject) => {
+      bb.on('file', (_name, file, info) => {
+        const chunks: Buffer[] = []
+        filename = info.filename
+        mimetype = info.mimeType
+        file.on('data', (chunk: Buffer) => chunks.push(chunk))
+        file.on('end', () => { fileBuffer = Buffer.concat(chunks) })
+      })
+      bb.on('field', (name, val) => {
+        if (name === 'noteId') noteId = val
+      })
+      bb.on('finish', resolve)
+      bb.on('error', reject)
+      req.pipe(bb)
+    })
+
+    if (!fileBuffer || !noteId) { json(res, { error: 'missing file or noteId' }, 400); return true }
+
+    const record = {
+      id: ulid(),
+      noteId,
+      filename,
+      storedAs: saveFile(fileBuffer, filename),
+      mimeType: mimetype || 'application/octet-stream',
+      size: (fileBuffer as Buffer).length,
+      createdAt: Date.now(),
+    }
+    await db.insert(attachments).values(record)
+    json(res, record, 201)
+    return true
+  }
+
+  // GET /api/attachments/:id
+  const attachMatch = path.match(/^\/api\/attachments\/([^/]+)$/)
+  if (attachMatch) {
+    const id = attachMatch[1]
+
+    if (method === 'GET') {
+      const [att] = await db.select().from(attachments).where(eq(attachments.id, id))
+      if (!att) { json(res, { error: 'not found' }, 404); return true }
+      const filePath = getFilePath(att.storedAs)
+      res.writeHead(200, {
+        'Content-Type': att.mimeType,
+        'Content-Disposition': `inline; filename="${att.filename}"`,
+        'Content-Length': att.size,
+      })
+      createReadStream(filePath).pipe(res)
+      return true
+    }
+
+    if (method === 'DELETE') {
+      const [att] = await db.select().from(attachments).where(eq(attachments.id, id))
+      if (!att) { json(res, { error: 'not found' }, 404); return true }
+      deleteFile(att.storedAs)
+      await db.delete(attachments).where(eq(attachments.id, id))
       json(res, { ok: true })
       return true
     }
