@@ -36,8 +36,8 @@ export const ABOUT_MARKDOWN = `# 📝 Homebrew Notes
     *   Bar tambah aktivitas dengan time picker jam & menit (default = jam sekarang) langsung append ke section Timeline.
     *   URL yang di-paste di aktivitas otomatis menjadi tautan klik.
 *   ✨ **Import Dokumen Office**:
-    *   Import file `.docx` langsung ke editor (heading, tabel, bold/italic preserved via mammoth).
-    *   Import file `.xlsx`/`.xls` — setiap sheet menjadi heading + tabel di catatan.
+    *   Import file \`.docx\` langsung ke editor (heading, tabel, bold/italic preserved via mammoth).
+    *   Import file \`.xlsx\`/\`.xls\` — setiap sheet menjadi heading + tabel di catatan.
 *   ✨ **Upload Multiple File & Foto**:
     *   Tombol "Upload File" di toolbar mendukung pilih banyak file sekaligus.
     *   Drag & drop beberapa file ke attachment block.
