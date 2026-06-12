@@ -13,6 +13,7 @@ interface SearchResult { id: string; title: string; createdAt: number; snippet: 
 interface SidebarProps {
   activeNoteId: string | null
   onShareNote?: (id: string) => void
+  notesUpdateTrigger?: number
 }
 
 function getDayLabel(ts: number): string {
@@ -37,7 +38,7 @@ function groupByDay(notes: Note[]) {
   return Array.from(map.entries()).map(([label, notes]) => ({ label, notes }))
 }
 
-export function Sidebar({ activeNoteId, onShareNote }: SidebarProps) {
+export function Sidebar({ activeNoteId, onShareNote, notesUpdateTrigger }: SidebarProps) {
   const [notes, setNotes] = useState<Note[]>([])
   const [teamNotes, setTeamNotes] = useState<Note[]>([])
   const [searchResults, setSearchResults] = useState<SearchResult[] | null>(null)
@@ -84,7 +85,7 @@ export function Sidebar({ activeNoteId, onShareNote }: SidebarProps) {
   useEffect(() => {
     loadNotes()
     loadTeamNotes()
-  }, [activeNoteId, user?.teamId])
+  }, [activeNoteId, user?.teamId, notesUpdateTrigger])
 
   // auto-switch tab based on active note
   useEffect(() => {
@@ -154,17 +155,6 @@ export function Sidebar({ activeNoteId, onShareNote }: SidebarProps) {
         <div className="flex items-center gap-1">
           <ThemeToggle />
           <FontPicker />
-          <button
-            ref={newBtnRef}
-            onClick={createNote}
-            title={activeTab === 'team' ? 'Catatan Tim Baru' : 'Catatan Baru'}
-            className="flex items-center justify-center w-7 h-7 rounded-md"
-            style={{ color: C.primary, background: 'transparent', border: 'none', cursor: 'pointer' }}
-            onMouseEnter={e => (e.currentTarget.style.background = C.accent)}
-            onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
-          >
-            <Plus className="h-4 w-4" />
-          </button>
         </div>
       </div>
 
@@ -193,6 +183,37 @@ export function Sidebar({ activeNoteId, onShareNote }: SidebarProps) {
           ))}
         </div>
       )}
+
+      {/* New Add Button */}
+      <div style={{ padding: '0 10px 4px' }}>
+        <button
+          ref={newBtnRef}
+          onClick={createNote}
+          style={{
+            width: '100%',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 6,
+            padding: '7px 0',
+            fontSize: '0.78rem',
+            fontWeight: 600,
+            borderRadius: 7,
+            border: 'none',
+            background: C.primary,
+            color: 'var(--primary-fg)',
+            cursor: 'pointer',
+            fontFamily: 'var(--font-body)',
+            boxShadow: '0 2px 6px rgba(0,0,0,0.06)',
+            transition: 'all 0.15s',
+          }}
+          onMouseEnter={e => (e.currentTarget.style.opacity = '0.9')}
+          onMouseLeave={e => (e.currentTarget.style.opacity = '1')}
+        >
+          <Plus size={13} strokeWidth={2.5} />
+          {activeTab === 'team' ? 'Catatan Tim Baru' : 'Catatan Baru'}
+        </button>
+      </div>
 
       <div style={{ height: '1px', background: C.border, margin: '4px 0' }} />
 

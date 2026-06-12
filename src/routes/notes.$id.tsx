@@ -43,6 +43,7 @@ function NotePageComponent() {
   const { id } = Route.useParams()
   const navigate = useNavigate()
   const [shareTrigger, setShareTrigger] = useState(0)
+  const [notesUpdateTrigger, setNotesUpdateTrigger] = useState(0)
   const [note, setNote] = useState<{ id: string; title: string; content: string; createdAt: number; updatedAt: number; isLocked?: boolean; shareToken?: string | null; hasPinProtection?: boolean; createdByUsername?: string | null; updatedByUsername?: string | null } | null>(null)
   const [loading, setLoading] = useState(true)
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('saved')
@@ -69,6 +70,7 @@ function NotePageComponent() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(fields),
     })
+    setNotesUpdateTrigger(prev => prev + 1)
   }
 
   async function handleUnlock(pin: string): Promise<boolean> {
@@ -89,6 +91,7 @@ function NotePageComponent() {
     <div className="flex h-screen overflow-hidden">
       <Sidebar
         activeNoteId={id}
+        notesUpdateTrigger={notesUpdateTrigger}
         onShareNote={(noteId) => {
           if (noteId === id) {
             setShareTrigger(prev => prev + 1)

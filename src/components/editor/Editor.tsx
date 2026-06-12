@@ -21,7 +21,8 @@ import { PreviewPanel } from './PreviewPanel'
 import { PinLockModal } from './PinLockModal'
 import { ShareModal } from './ShareModal'
 import { useEffect, useRef, useState } from 'react'
-import { Eye, EyeOff, Lock, LockOpen, Share2 } from 'lucide-react'
+import { Eye, EyeOff, Lock, LockOpen, Share2, FileUp } from 'lucide-react'
+import { marked } from 'marked'
 
 interface Note {
   id: string
@@ -54,6 +55,9 @@ type SaveStatus = 'saved' | 'saving' | 'unsaved'
 
 export function Editor({ note, onUpdate, onSaveStatusChange, onLockChange, shareTrigger }: EditorProps) {
   const [title, setTitle] = useState(note.title)
+  const titleValRef = useRef(title)
+  titleValRef.current = title
+
   const [updatedAt, setUpdatedAt] = useState(note.updatedAt)
   const [preview, setPreview] = useState(false)
   const [isLocked, setIsLocked] = useState(note.isLocked ?? false)
@@ -64,6 +68,7 @@ export function Editor({ note, onUpdate, onSaveStatusChange, onLockChange, share
   function setStatus(s: SaveStatus) { onSaveStatusChange?.(s) }
   const titleRef = useRef<HTMLInputElement>(null)
   const saveTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   const editor = useEditor({
     extensions: [
@@ -93,7 +98,21 @@ export function Editor({ note, onUpdate, onSaveStatusChange, onLockChange, share
       clearTimeout(saveTimer.current)
       saveTimer.current = setTimeout(() => {
         setStatus('saving')
-        onUpdate({ content: JSON.stringify(editor.getJSON()) })
+
+        const currentTitle = titleValRef.current
+        const isUntitled = !currentTitle || currentTitle.trim() === '' || currentTitle.trim() === 'Untitled' || currentTitle.trim() === 'Catatan Tanpa Judul'
+
+        let newTitle = currentTitle
+        if (isUntitled) {
+          const text = editor.getText().trim()
+          const firstLine = text.split('\n')[0]?.trim() || ''
+          if (firstLine && firstLine.length > 0) {
+            newTitle = firstLine.length > 50 ? firstLine.slice(0, 50) + '...' : firstLine
+            setTitle(newTitle)
+          }
+        }
+
+        onUpdate({ content: JSON.stringify(editor.getJSON()), title: newTitle })
           .then(() => { setUpdatedAt(Date.now()); setStatus('saved') })
       }, 1000)
     },
@@ -108,7 +127,21 @@ export function Editor({ note, onUpdate, onSaveStatusChange, onLockChange, share
         clearTimeout(saveTimer.current)
         if (!editor) return
         setStatus('saving')
-        onUpdate({ content: JSON.stringify(editor.getJSON()), title })
+
+        const currentTitle = titleValRef.current
+        const isUntitled = !currentTitle || currentTitle.trim() === '' || currentTitle.trim() === 'Untitled' || currentTitle.trim() === 'Catatan Tanpa Judul'
+
+        let newTitle = currentTitle
+        if (isUntitled) {
+          const text = editor.getText().trim()
+          const firstLine = text.split('\n')[0]?.trim() || ''
+          if (firstLine && firstLine.length > 0) {
+            newTitle = firstLine.length > 50 ? firstLine.slice(0, 50) + '...' : firstLine
+            setTitle(newTitle)
+          }
+        }
+
+        onUpdate({ content: JSON.stringify(editor.getJSON()), title: newTitle })
           .then(() => { setUpdatedAt(Date.now()); setStatus('saved') })
       }
       if ((e.ctrlKey || e.metaKey) && e.key === 'a') {
@@ -119,7 +152,7 @@ export function Editor({ note, onUpdate, onSaveStatusChange, onLockChange, share
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [editor, title])
+  }, [editor])
 
   useEffect(() => {
     if (editor) (editor.storage as any).noteId = note.id
@@ -191,6 +224,46 @@ export function Editor({ note, onUpdate, onSaveStatusChange, onLockChange, share
     }, 1000)
   }
 
+  function handleImportClick() {
+    fileInputRef.current?.click()
+  }
+
+  async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file || !editor) return
+
+    const reader = new FileReader()
+    reader.onload = async (event) => {
+      const text = event.target?.result as string
+      if (!text) return
+
+      try {
+        if (file.name.endsWith('.json')) {
+          const json = JSON.parse(text)
+          editor.commands.setContent(json)
+        } else if (file.name.endsWith('.md')) {
+          const html = await marked.parse(text, { breaks: true, gfm: true })
+          editor.commands.setContent(html)
+        } else {
+          editor.commands.setContent(text)
+        }
+
+        setStatus('unsaved')
+        clearTimeout(saveTimer.current)
+        saveTimer.current = setTimeout(() => {
+          setStatus('saving')
+          onUpdate({ content: JSON.stringify(editor.getJSON()) })
+            .then(() => { setUpdatedAt(Date.now()); setStatus('saved') })
+        }, 1000)
+      } catch (err) {
+        console.error('Error importing content:', err)
+        alert('Gagal mengimpor file: ' + String(err))
+      }
+    }
+    reader.readAsText(file)
+    e.target.value = ''
+  }
+
   return (
     <div style={{ display: 'flex', flex: 1, minWidth: 0, minHeight: 0 }}>
       {/* Editor pane */}
@@ -200,6 +273,32 @@ export function Editor({ note, onUpdate, onSaveStatusChange, onLockChange, share
       >
         {/* Top-right action buttons */}
         <div style={{ position: 'absolute', top: 20, right: 20, display: 'flex', gap: 8 }}>
+          <input
+            type="file"
+            ref={fileInputRef}
+            onChange={handleFileChange}
+            accept=".txt,.md,.json"
+            style={{ display: 'none' }}
+          />
+          <button
+            onClick={handleImportClick}
+            title="Impor Konten"
+            style={{
+              display: 'flex', alignItems: 'center', gap: 6,
+              padding: '5px 12px', fontSize: '0.75rem', fontWeight: 500,
+              fontFamily: 'var(--font-body)',
+              border: '1px solid var(--border)', borderRadius: 20,
+              background: 'var(--bg)',
+              color: 'var(--fg-muted)',
+              cursor: 'pointer', transition: 'all 0.15s',
+            }}
+            onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--primary)'; e.currentTarget.style.color = 'var(--primary)' }}
+            onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.color = 'var(--fg-muted)' }}
+          >
+            <FileUp size={13} />
+            Impor Konten
+          </button>
+
           <button
             onClick={() => setShowShare(true)}
             title="Bagikan catatan"
