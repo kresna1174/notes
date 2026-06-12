@@ -2,7 +2,8 @@ import { createFileRoute } from '@tanstack/react-router'
 import { useState, useEffect, useMemo } from 'react'
 import { PinLockModal } from '../components/editor/PinLockModal'
 import { docToSegments, DocContent } from '../components/editor/DocRenderer'
-import { Lock } from 'lucide-react'
+import { Lock, Sun, Moon } from 'lucide-react'
+import { useTheme } from '../lib/theme'
 
 export const Route = createFileRoute('/share/$token')({
   component: ShareViewComponent,
@@ -16,6 +17,7 @@ function fmt(ts: number) {
 
 function ShareViewComponent() {
   const { token } = Route.useParams()
+  const { theme, toggle } = useTheme()
   const [note, setNote] = useState<{ id: string; title: string; content: string; createdAt: number; updatedAt: number; hasPinProtection: boolean; createdByUsername?: string | null; updatedByUsername?: string | null } | null>(null)
   const [loading, setLoading] = useState(true)
   const [notFound, setNotFound] = useState(false)
@@ -83,20 +85,37 @@ function ShareViewComponent() {
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <div style={{ width: 26, height: 26, borderRadius: 6, background: '#e8edff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#3b5bdb" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <div style={{ width: 26, height: 26, borderRadius: 6, background: 'var(--accent, #e8edff)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--primary, #3b5bdb)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
               <polyline points="14,2 14,8 20,8"/>
             </svg>
           </div>
           <span style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--fg-muted, #6c757d)', fontFamily: 'var(--font-body, sans-serif)' }}>Shared Note</span>
         </div>
-        {note?.hasPinProtection && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: '0.75rem', color: 'var(--fg-muted, #6c757d)', fontFamily: 'var(--font-body, sans-serif)' }}>
-            <Lock size={12} />
-            {unlocked ? 'Dibuka' : 'Terkunci'}
-          </div>
-        )}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+          {note?.hasPinProtection && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: '0.75rem', color: 'var(--fg-muted, #6c757d)', fontFamily: 'var(--font-body, sans-serif)' }}>
+              <Lock size={12} />
+              {unlocked ? 'Dibuka' : 'Terkunci'}
+            </div>
+          )}
+          <button
+            onClick={toggle}
+            title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+            style={{
+              width: 28, height: 28,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              borderRadius: 6, border: 'none', cursor: 'pointer',
+              background: 'transparent', color: 'var(--fg-muted, #6c757d)',
+              transition: 'background 0.1s, color 0.1s',
+            }}
+            onMouseEnter={e => { e.currentTarget.style.background = 'var(--accent)'; e.currentTarget.style.color = 'var(--primary)' }}
+            onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--fg-muted, #6c757d)' }}
+          >
+            {theme === 'dark' ? <Sun size={14} /> : <Moon size={14} />}
+          </button>
+        </div>
       </div>
 
       {unlocked ? (
