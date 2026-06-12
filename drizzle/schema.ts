@@ -1,10 +1,18 @@
 import { sqliteTable, text, integer } from 'drizzle-orm/sqlite-core'
 
+export const teams = sqliteTable('teams', {
+  id: text('id').primaryKey(),
+  name: text('name').notNull(),
+  description: text('description'),
+  createdAt: integer('created_at').notNull(),
+})
+
 export const users = sqliteTable('users', {
   id: text('id').primaryKey(),
   username: text('username').notNull().unique(),
   passwordHash: text('password_hash').notNull(),
   role: text('role', { enum: ['admin', 'viewer'] }).notNull().default('viewer'),
+  teamId: text('team_id'),
   createdAt: integer('created_at').notNull(),
 })
 
@@ -13,6 +21,9 @@ export const notes = sqliteTable('notes', {
   userId: text('user_id').notNull().default(''),
   title: text('title').notNull().default(''),
   content: text('content').notNull().default('{"type":"doc","content":[]}'),
+  type: text('type', { enum: ['individual', 'team'] }).notNull().default('individual'),
+  teamId: text('team_id'),
+  copiedFromId: text('copied_from_id'),
   pinHash: text('pin_hash'),
   shareToken: text('share_token'),
   sharePinHash: text('share_pin_hash'),

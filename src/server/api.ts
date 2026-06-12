@@ -1,8 +1,8 @@
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { createReadStream } from 'node:fs'
 import { db, sqlite } from '../lib/db'
-import { notes, attachments, users } from '../../drizzle/schema'
-import { desc, eq, and } from 'drizzle-orm'
+import { notes, attachments, users, teams } from '../../drizzle/schema'
+import { desc, eq, and, inArray, sql } from 'drizzle-orm'
 import { ulid } from 'ulid'
 import Busboy from 'busboy'
 import { saveFile, getFilePath, deleteFile } from '../lib/storage'
@@ -46,6 +46,16 @@ function stripAndEnrich(note: Record<string, any>) {
   }
 }
 
+async function getOwnerFilter(id: string, userId: string, role: string) {
+  const [sessionUser] = await db.select({ teamId: users.teamId }).from(users).where(eq(users.id, userId))
+  const userTeamId = sessionUser?.teamId ?? null
+  return role === 'admin'
+    ? eq(notes.id, id)
+    : userTeamId
+      ? and(eq(notes.id, id), sql`(${notes.userId} = ${userId} OR (${notes.type} = 'team' AND ${notes.teamId} = ${userTeamId}))`)
+      : and(eq(notes.id, id), eq(notes.userId, userId))
+}
+
 async function readBody(req: IncomingMessage): Promise<unknown> {
   return new Promise((resolve, reject) => {
     let body = ''
@@ -74,7 +84,7 @@ export async function handleApiRequest(req: IncomingMessage, res: ServerResponse
     const token = ulid()
     sqlite.prepare('INSERT INTO sessions (token, user_id, username, role, created_at) VALUES (?, ?, ?, ?, ?)').run(token, user.id, user.username, user.role, Date.now())
     setSessionCookie(res, token)
-    json(res, { userId: user.id, username: user.username, role: user.role })
+    json(res, { userId: user.id, username: user.username, role: user.role, teamId: user.teamId })
     return true
   }
 
@@ -92,7 +102,8 @@ export async function handleApiRequest(req: IncomingMessage, res: ServerResponse
   if (method === 'GET' && path === '/api/auth/me') {
     const session = getSession(req)
     if (!session) { json(res, { error: 'unauthenticated' }, 401); return true }
-    json(res, session)
+    const [me] = await db.select({ teamId: users.teamId }).from(users).where(eq(users.id, session.userId))
+    json(res, { ...session, teamId: me?.teamId ?? null })
     return true
   }
 
@@ -117,8 +128,75 @@ export async function handleApiRequest(req: IncomingMessage, res: ServerResponse
   if (method === 'GET' && path === '/api/auth/users') {
     const session = getSession(req)
     if (!session || session.role !== 'admin') { json(res, { error: 'forbidden' }, 403); return true }
-    const all = await db.select({ id: users.id, username: users.username, role: users.role, createdAt: users.createdAt }).from(users)
+    const all = await db.select({ id: users.id, username: users.username, role: users.role, teamId: users.teamId, createdAt: users.createdAt }).from(users)
     json(res, all)
+    return true
+  }
+
+  // GET /api/teams
+  if (method === 'GET' && path === '/api/teams') {
+    const session = getSession(req)
+    if (!session) { json(res, { error: 'unauthenticated' }, 401); return true }
+    const all = await db.select().from(teams).orderBy(teams.name)
+    json(res, all)
+    return true
+  }
+
+  // POST /api/teams (admin only)
+  if (method === 'POST' && path === '/api/teams') {
+    const session = getSession(req)
+    if (!session || session.role !== 'admin') { json(res, { error: 'forbidden' }, 403); return true }
+    const body = await readBody(req)
+    const { name, description } = body as { name?: string; description?: string }
+    if (!name?.trim()) { json(res, { error: 'name required' }, 400); return true }
+    const id = ulid()
+    await db.insert(teams).values({ id, name: name.trim(), description: description?.trim() ?? null, createdAt: Date.now() })
+    json(res, { id, name, description }, 201)
+    return true
+  }
+
+  // team by id routes
+  const teamMatch = path.match(/^\/api\/teams\/([^/]+)$/)
+  if (teamMatch) {
+    const session = getSession(req)
+    if (!session || session.role !== 'admin') { json(res, { error: 'forbidden' }, 403); return true }
+    const teamId = teamMatch[1]
+
+    if (method === 'PUT') {
+      const body = await readBody(req)
+      const { name, description } = body as { name?: string; description?: string }
+      if (!name?.trim()) { json(res, { error: 'name required' }, 400); return true }
+      await db.update(teams).set({ name: name.trim(), description: description?.trim() ?? null }).where(eq(teams.id, teamId))
+      json(res, { ok: true })
+      return true
+    }
+
+    if (method === 'DELETE') {
+      await db.update(users).set({ teamId: null }).where(eq(users.teamId, teamId))
+      await db.delete(teams).where(eq(teams.id, teamId))
+      json(res, { ok: true })
+      return true
+    }
+  }
+
+  // PUT /api/teams/:id/members/:userId — assign user to team (admin only)
+  const teamMemberMatch = path.match(/^\/api\/teams\/([^/]+)\/members\/([^/]+)$/)
+  if (teamMemberMatch && method === 'PUT') {
+    const session = getSession(req)
+    if (!session || session.role !== 'admin') { json(res, { error: 'forbidden' }, 403); return true }
+    const [, teamId, userId] = teamMemberMatch
+    await db.update(users).set({ teamId }).where(eq(users.id, userId))
+    json(res, { ok: true })
+    return true
+  }
+
+  // DELETE /api/teams/:id/members/:userId — remove user from team (admin only)
+  if (teamMemberMatch && method === 'DELETE') {
+    const session = getSession(req)
+    if (!session || session.role !== 'admin') { json(res, { error: 'forbidden' }, 403); return true }
+    const [,, userId] = teamMemberMatch
+    await db.update(users).set({ teamId: null }).where(eq(users.id, userId))
+    json(res, { ok: true })
     return true
   }
 
@@ -165,21 +243,49 @@ export async function handleApiRequest(req: IncomingMessage, res: ServerResponse
   // GET /api/notes
   if (path === '/api/notes' && method === 'GET') {
     const session = getSession(req)!
-    const all = session.role === 'admin'
-      ? await db.select().from(notes).orderBy(desc(notes.createdAt))
-      : await db.select().from(notes).where(eq(notes.userId, session.userId)).orderBy(desc(notes.createdAt))
-    json(res, all.map(n => stripAndEnrich(n)))
+    const scope = url.searchParams.get('scope') // 'mine' | 'team' | null (all)
+
+    // get current user's teamId
+    const [me] = await db.select({ teamId: users.teamId }).from(users).where(eq(users.id, session.userId))
+    const myTeamId = me?.teamId ?? null
+
+    let allNotes;
+    if (session.role === 'admin') {
+      if (scope === 'mine') {
+        allNotes = await db.select().from(notes).where(eq(notes.type, 'individual')).orderBy(desc(notes.createdAt))
+      } else if (scope === 'team') {
+        allNotes = await db.select().from(notes).where(eq(notes.type, 'team')).orderBy(desc(notes.createdAt))
+      } else {
+        allNotes = await db.select().from(notes).orderBy(desc(notes.createdAt))
+      }
+    } else {
+      if (scope === 'mine') {
+        allNotes = await db.select().from(notes).where(and(eq(notes.userId, session.userId), eq(notes.type, 'individual'))).orderBy(desc(notes.createdAt))
+      } else if (scope === 'team' && myTeamId) {
+        allNotes = await db.select().from(notes).where(and(eq(notes.teamId, myTeamId), eq(notes.type, 'team'))).orderBy(desc(notes.createdAt))
+      } else if (scope === 'team') {
+        allNotes = []
+      } else {
+        // default: own individual notes only
+        allNotes = await db.select().from(notes).where(and(eq(notes.userId, session.userId), eq(notes.type, 'individual'))).orderBy(desc(notes.createdAt))
+      }
+    }
+
+    json(res, allNotes.map(n => stripAndEnrich(n)))
     return true
   }
 
   // POST /api/notes
   if (path === '/api/notes' && method === 'POST') {
     const session = getSession(req)!
+    const body = await readBody(req) as { teamId?: string | null; type?: 'individual' | 'team' | null } | null
+    const teamId = body?.teamId ?? null
+    const type = body?.type || (teamId ? 'team' : 'individual')
     const now = Date.now()
     const id = ulid()
-    const note = { id, userId: session.userId, title: '', content: '{"type":"doc","content":[]}', createdAt: now, updatedAt: now }
+    const note = { id, userId: session.userId, teamId, type, title: '', content: '{"type":"doc","content":[]}', createdAt: now, updatedAt: now }
     await db.insert(notes).values(note)
-    json(res, note, 201)
+    json(res, stripAndEnrich(note), 201)
     return true
   }
 
@@ -220,9 +326,7 @@ export async function handleApiRequest(req: IncomingMessage, res: ServerResponse
   if (shareManageMatch && method === 'POST') {
     const id = shareManageMatch[1]
     const session = getSession(req)!
-    const ownerFilter = session.role === 'admin'
-      ? eq(notes.id, id)
-      : and(eq(notes.id, id), eq(notes.userId, session.userId))
+    const ownerFilter = await getOwnerFilter(id, session.userId, session.role)
     const body = await readBody(req)
     const { pin } = body as { pin?: string }
     const token = ulid()
@@ -236,9 +340,7 @@ export async function handleApiRequest(req: IncomingMessage, res: ServerResponse
   if (shareManageMatch && method === 'DELETE') {
     const id = shareManageMatch[1]
     const session = getSession(req)!
-    const ownerFilter = session.role === 'admin'
-      ? eq(notes.id, id)
-      : and(eq(notes.id, id), eq(notes.userId, session.userId))
+    const ownerFilter = await getOwnerFilter(id, session.userId, session.role)
     await db.update(notes).set({ shareToken: null, sharePinHash: null }).where(ownerFilter)
     json(res, { ok: true })
     return true
@@ -248,9 +350,7 @@ export async function handleApiRequest(req: IncomingMessage, res: ServerResponse
   if (shareManageMatch && method === 'PATCH') {
     const id = shareManageMatch[1]
     const session = getSession(req)!
-    const ownerFilter = session.role === 'admin'
-      ? eq(notes.id, id)
-      : and(eq(notes.id, id), eq(notes.userId, session.userId))
+    const ownerFilter = await getOwnerFilter(id, session.userId, session.role)
     const body = await readBody(req)
     const { pin } = body as { pin?: string | null }
     const sharePinHash = pin ? bcrypt.hashSync(pin, 10) : null
@@ -264,9 +364,7 @@ export async function handleApiRequest(req: IncomingMessage, res: ServerResponse
   if (pinSetMatch && method === 'PUT') {
     const id = pinSetMatch[1]
     const session = getSession(req)!
-    const ownerFilter = session.role === 'admin'
-      ? eq(notes.id, id)
-      : and(eq(notes.id, id), eq(notes.userId, session.userId))
+    const ownerFilter = await getOwnerFilter(id, session.userId, session.role)
     const body = await readBody(req)
     const { pin } = body as { pin?: string }
     if (!pin || !/^\d{4}$/.test(pin)) { json(res, { error: 'pin must be 4 digits' }, 400); return true }
@@ -280,9 +378,7 @@ export async function handleApiRequest(req: IncomingMessage, res: ServerResponse
   if (pinSetMatch && method === 'DELETE') {
     const id = pinSetMatch[1]
     const session = getSession(req)!
-    const ownerFilter = session.role === 'admin'
-      ? eq(notes.id, id)
-      : and(eq(notes.id, id), eq(notes.userId, session.userId))
+    const ownerFilter = await getOwnerFilter(id, session.userId, session.role)
     const body = await readBody(req)
     const { pin } = body as { pin?: string }
     const [note] = await db.select().from(notes).where(ownerFilter)
@@ -300,9 +396,7 @@ export async function handleApiRequest(req: IncomingMessage, res: ServerResponse
   if (pinVerifyMatch && method === 'POST') {
     const id = pinVerifyMatch[1]
     const session = getSession(req)!
-    const ownerFilter = session.role === 'admin'
-      ? eq(notes.id, id)
-      : and(eq(notes.id, id), eq(notes.userId, session.userId))
+    const ownerFilter = await getOwnerFilter(id, session.userId, session.role)
     const body = await readBody(req)
     const { pin } = body as { pin?: string }
     const [note] = await db.select().from(notes).where(ownerFilter)
@@ -314,15 +408,206 @@ export async function handleApiRequest(req: IncomingMessage, res: ServerResponse
     return true
   }
 
+  // POST /api/notes/:id/copy-to-team
+  const copyTeamMatch = path.match(/^\/api\/notes\/([^/]+)\/copy-to-team$/)
+  if (copyTeamMatch && method === 'POST') {
+    const id = copyTeamMatch[1]
+    const session = getSession(req)!
+    
+    const [sessionUser] = await db.select({ teamId: users.teamId }).from(users).where(eq(users.id, session.userId))
+    const userTeamId = sessionUser?.teamId ?? null
+    if (!userTeamId) { json(res, { error: 'Anda belum tergabung dalam tim' }, 400); return true }
+
+    const ownerFilter = await getOwnerFilter(id, session.userId, session.role)
+    const [note] = await db.select().from(notes).where(ownerFilter)
+    if (!note) { json(res, { error: 'Catatan tidak ditemukan atau Anda tidak memiliki akses' }, 404); return true }
+
+    // Check if already copied to team (child copy exists in the target team)
+    const [existingChild] = await db.select().from(notes).where(
+      and(
+        eq(notes.copiedFromId, id),
+        eq(notes.teamId, userTeamId),
+        eq(notes.type, 'team')
+      )
+    )
+
+    // Check if this note was copied from a team note that still exists in the target team
+    let existingParent = null
+    if (note.copiedFromId) {
+      const [parent] = await db.select().from(notes).where(
+        and(
+          eq(notes.id, note.copiedFromId),
+          eq(notes.teamId, userTeamId),
+          eq(notes.type, 'team')
+        )
+      )
+      existingParent = parent
+    }
+
+    if (existingChild || existingParent) {
+      json(res, { error: 'Catatan ini sudah ada di ruang kerja Tim (sudah pernah disalin dan masih ada di target)' }, 400)
+      return true
+    }
+
+    const body = await readBody(req).catch(() => ({})) as { pin?: string | null }
+    const { pin } = body || {}
+    let customPinHash = note.pinHash
+    if (pin !== undefined) {
+      customPinHash = pin ? bcrypt.hashSync(pin, 10) : null
+    }
+
+    const now = Date.now()
+    const newId = ulid()
+    await db.insert(notes).values({
+      id: newId,
+      userId: session.userId,
+      teamId: userTeamId,
+      copiedFromId: id,
+      type: 'team',
+      title: `${session.username}: ${note.title || 'Catatan Tanpa Judul'}`,
+      content: note.content,
+      pinHash: customPinHash,
+      createdAt: now,
+      updatedAt: now
+    })
+
+    json(res, { ok: true, id: newId }, 201)
+    return true
+  }
+
+  // POST /api/notes/:id/move-to-team
+  const moveTeamMatch = path.match(/^\/api\/notes\/([^/]+)\/move-to-team$/)
+  if (moveTeamMatch && method === 'POST') {
+    const id = moveTeamMatch[1]
+    const session = getSession(req)!
+
+    const [sessionUser] = await db.select({ teamId: users.teamId }).from(users).where(eq(users.id, session.userId))
+    const userTeamId = sessionUser?.teamId ?? null
+    if (!userTeamId) { json(res, { error: 'Anda belum tergabung dalam tim' }, 400); return true }
+
+    const ownerFilter = await getOwnerFilter(id, session.userId, session.role)
+    const [note] = await db.select().from(notes).where(ownerFilter)
+    if (!note) { json(res, { error: 'Catatan tidak ditemukan atau Anda tidak memiliki akses' }, 404); return true }
+
+    const body = await readBody(req).catch(() => ({})) as { pin?: string | null }
+    const { pin } = body || {}
+    let customPinHash = note.pinHash
+    if (pin !== undefined) {
+      customPinHash = pin ? bcrypt.hashSync(pin, 10) : null
+    }
+
+    await db.update(notes)
+      .set({ 
+        type: 'team', 
+        teamId: userTeamId, 
+        title: `${session.username}: ${note.title || 'Catatan Tanpa Judul'}`,
+        pinHash: customPinHash,
+        updatedAt: Date.now() 
+      })
+      .where(eq(notes.id, id))
+
+    json(res, { ok: true })
+    return true
+  }
+
+  // POST /api/notes/:id/copy-to-personal
+  const copyPersonalMatch = path.match(/^\/api\/notes\/([^/]+)\/copy-to-personal$/)
+  if (copyPersonalMatch && method === 'POST') {
+    const id = copyPersonalMatch[1]
+    const session = getSession(req)!
+
+    const ownerFilter = await getOwnerFilter(id, session.userId, session.role)
+    const [note] = await db.select().from(notes).where(ownerFilter)
+    if (!note) { json(res, { error: 'Catatan tidak ditemukan atau Anda tidak memiliki akses' }, 404); return true }
+
+    // Check if already copied to personal (child copy exists in the target personal workspace)
+    const [existingChild] = await db.select().from(notes).where(
+      and(
+        eq(notes.copiedFromId, id),
+        eq(notes.userId, session.userId),
+        eq(notes.type, 'individual')
+      )
+    )
+
+    // Check if this note was copied from a personal note that still exists in the target personal workspace
+    let existingParent = null
+    if (note.copiedFromId) {
+      const [parent] = await db.select().from(notes).where(
+        and(
+          eq(notes.id, note.copiedFromId),
+          eq(notes.userId, session.userId),
+          eq(notes.type, 'individual')
+        )
+      )
+      existingParent = parent
+    }
+
+    if (existingChild || existingParent) {
+      json(res, { error: 'Catatan ini sudah ada di ruang kerja Saya (sudah pernah disalin dan masih ada di target)' }, 400)
+      return true
+    }
+
+    let teamName = 'Tim'
+    if (note.teamId) {
+      const [team] = await db.select({ name: teams.name }).from(teams).where(eq(teams.id, note.teamId))
+      if (team?.name) teamName = team.name
+    }
+
+    const now = Date.now()
+    const newId = ulid()
+    await db.insert(notes).values({
+      id: newId,
+      userId: session.userId,
+      teamId: null,
+      copiedFromId: id,
+      type: 'individual',
+      title: `${teamName}: ${note.title || 'Catatan Tanpa Judul'}`,
+      content: note.content,
+      pinHash: note.pinHash,
+      createdAt: now,
+      updatedAt: now
+    })
+
+    json(res, { ok: true, id: newId }, 201)
+    return true
+  }
+
+  // POST /api/notes/:id/move-to-personal
+  const movePersonalMatch = path.match(/^\/api\/notes\/([^/]+)\/move-to-personal$/)
+  if (movePersonalMatch && method === 'POST') {
+    const id = movePersonalMatch[1]
+    const session = getSession(req)!
+
+    const ownerFilter = await getOwnerFilter(id, session.userId, session.role)
+    const [note] = await db.select().from(notes).where(ownerFilter)
+    if (!note) { json(res, { error: 'Catatan tidak ditemukan atau Anda tidak memiliki akses' }, 404); return true }
+
+    let teamName = 'Tim'
+    if (note.teamId) {
+      const [team] = await db.select({ name: teams.name }).from(teams).where(eq(teams.id, note.teamId))
+      if (team?.name) teamName = team.name
+    }
+
+    await db.update(notes)
+      .set({ 
+        type: 'individual', 
+        teamId: null, 
+        userId: session.userId, 
+        title: `${teamName}: ${note.title || 'Catatan Tanpa Judul'}`,
+        updatedAt: Date.now() 
+      })
+      .where(eq(notes.id, id))
+
+    json(res, { ok: true })
+    return true
+  }
+
   // GET/PUT/DELETE /api/notes/:id
   const noteMatch = path.match(/^\/api\/notes\/([^/]+)$/)
   if (noteMatch) {
     const id = noteMatch[1]
     const session = getSession(req)!
-    // ownership check: admin bypasses, viewer must own the note
-    const ownerFilter = session.role === 'admin'
-      ? eq(notes.id, id)
-      : and(eq(notes.id, id), eq(notes.userId, session.userId))
+    const ownerFilter = await getOwnerFilter(id, session.userId, session.role)
 
     if (method === 'GET') {
       const [note] = await db.select().from(notes).where(ownerFilter)

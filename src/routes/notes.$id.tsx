@@ -1,4 +1,4 @@
-import { createFileRoute } from '@tanstack/react-router'
+import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { Sidebar } from '../components/sidebar/Sidebar'
 import { Editor } from '../components/editor/Editor'
 import { PinLockModal } from '../components/editor/PinLockModal'
@@ -41,6 +41,8 @@ function SaveIndicator({ status }: { status: SaveStatus }) {
 
 function NotePageComponent() {
   const { id } = Route.useParams()
+  const navigate = useNavigate()
+  const [shareTrigger, setShareTrigger] = useState(0)
   const [note, setNote] = useState<{ id: string; title: string; content: string; createdAt: number; updatedAt: number; isLocked?: boolean; shareToken?: string | null; hasPinProtection?: boolean; createdByUsername?: string | null; updatedByUsername?: string | null } | null>(null)
   const [loading, setLoading] = useState(true)
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('saved')
@@ -85,7 +87,20 @@ function NotePageComponent() {
 
   return (
     <div className="flex h-screen overflow-hidden">
-      <Sidebar activeNoteId={id} />
+      <Sidebar
+        activeNoteId={id}
+        onShareNote={(noteId) => {
+          if (noteId === id) {
+            setShareTrigger(prev => prev + 1)
+          } else {
+            navigate({ to: '/notes/$id', params: { id: noteId } }).then(() => {
+              setTimeout(() => {
+                setShareTrigger(prev => prev + 1)
+              }, 100)
+            })
+          }
+        }}
+      />
       <main className="flex-1 overflow-hidden flex flex-col" style={{ background: 'var(--bg)' }}>
         {loading ? (
           <div className="px-10 py-10">
@@ -110,6 +125,7 @@ function NotePageComponent() {
                 setNote(prev => prev ? { ...prev, isLocked: locked } : prev)
                 if (locked) setUnlocked(false)
               }}
+              shareTrigger={shareTrigger}
             />
           </div>
         ) : (

@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as UsersRouteImport } from './routes/users'
+import { Route as TeamsRouteImport } from './routes/teams'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ShareTokenRouteImport } from './routes/share.$token'
@@ -18,6 +19,11 @@ import { Route as NotesIdRouteImport } from './routes/notes.$id'
 const UsersRoute = UsersRouteImport.update({
   id: '/users',
   path: '/users',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TeamsRoute = TeamsRouteImport.update({
+  id: '/teams',
+  path: '/teams',
   getParentRoute: () => rootRouteImport,
 } as any)
 const LoginRoute = LoginRouteImport.update({
@@ -44,6 +50,7 @@ const NotesIdRoute = NotesIdRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
+  '/teams': typeof TeamsRoute
   '/users': typeof UsersRoute
   '/notes/$id': typeof NotesIdRoute
   '/share/$token': typeof ShareTokenRoute
@@ -51,6 +58,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
+  '/teams': typeof TeamsRoute
   '/users': typeof UsersRoute
   '/notes/$id': typeof NotesIdRoute
   '/share/$token': typeof ShareTokenRoute
@@ -59,21 +67,36 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
+  '/teams': typeof TeamsRoute
   '/users': typeof UsersRoute
   '/notes/$id': typeof NotesIdRoute
   '/share/$token': typeof ShareTokenRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/login' | '/users' | '/notes/$id' | '/share/$token'
+  fullPaths:
+    | '/'
+    | '/login'
+    | '/teams'
+    | '/users'
+    | '/notes/$id'
+    | '/share/$token'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/login' | '/users' | '/notes/$id' | '/share/$token'
-  id: '__root__' | '/' | '/login' | '/users' | '/notes/$id' | '/share/$token'
+  to: '/' | '/login' | '/teams' | '/users' | '/notes/$id' | '/share/$token'
+  id:
+    | '__root__'
+    | '/'
+    | '/login'
+    | '/teams'
+    | '/users'
+    | '/notes/$id'
+    | '/share/$token'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   LoginRoute: typeof LoginRoute
+  TeamsRoute: typeof TeamsRoute
   UsersRoute: typeof UsersRoute
   NotesIdRoute: typeof NotesIdRoute
   ShareTokenRoute: typeof ShareTokenRoute
@@ -86,6 +109,13 @@ declare module '@tanstack/react-router' {
       path: '/users'
       fullPath: '/users'
       preLoaderRoute: typeof UsersRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/teams': {
+      id: '/teams'
+      path: '/teams'
+      fullPath: '/teams'
+      preLoaderRoute: typeof TeamsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/login': {
@@ -122,6 +152,7 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   LoginRoute: LoginRoute,
+  TeamsRoute: TeamsRoute,
   UsersRoute: UsersRoute,
   NotesIdRoute: NotesIdRoute,
   ShareTokenRoute: ShareTokenRoute,

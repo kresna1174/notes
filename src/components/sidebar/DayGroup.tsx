@@ -13,14 +13,16 @@ interface DayGroupProps {
   onSelect: (id: string) => void
   onRename: (id: string, title: string) => void
   onDelete: (id: string) => void
+  onShare?: (id: string) => void
 }
 
-export function DayGroup({ label, notes, activeNoteId, onSelect, onRename, onDelete }: DayGroupProps) {
+export function DayGroup({ label, notes, activeNoteId, onSelect, onRename, onDelete, onShare }: DayGroupProps) {
   const [open, setOpen] = useState(true)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [hoverId, setHoverId] = useState<string | null>(null)
   const [editValue, setEditValue] = useState('')
   const [deleteTarget, setDeleteTarget] = useState<Note | null>(null)
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number; note: Note } | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -72,6 +74,10 @@ export function DayGroup({ label, notes, activeNoteId, onSelect, onRename, onDel
               if (e.currentTarget.contains(e.relatedTarget as Node)) return
               setHoverId(null)
               if (activeNoteId !== note.id) e.currentTarget.style.background = 'transparent'
+            }}
+            onContextMenu={e => {
+              e.preventDefault()
+              setContextMenu({ x: e.clientX, y: e.clientY, note })
             }}
           >
             <FileText className="h-3.5 w-3.5 shrink-0" style={{ color: activeNoteId === note.id ? 'var(--primary)' : 'var(--fg-subtle)' }} />
@@ -127,6 +133,83 @@ export function DayGroup({ label, notes, activeNoteId, onSelect, onRename, onDel
           </div>
         ))}
       </CollapsibleContent>
+
+      {contextMenu && (
+        <div
+          style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'transparent', cursor: 'default' }}
+          onClick={() => setContextMenu(null)}
+          onContextMenu={e => { e.preventDefault(); setContextMenu(null) }}
+        >
+          <div
+            style={{
+              position: 'fixed',
+              left: contextMenu.x,
+              top: contextMenu.y,
+              background: 'var(--card-bg)',
+              border: '1px solid var(--border)',
+              borderRadius: 8,
+              boxShadow: '0 4px 12px rgba(0,0,0,0.12)',
+              padding: '4px 0',
+              minWidth: 130,
+              display: 'flex',
+              flexDirection: 'column',
+              zIndex: 10000,
+            }}
+            onClick={e => e.stopPropagation()}
+          >
+            <button
+              onClick={() => {
+                setContextMenu(null)
+                onSelect(contextMenu.note.id)
+                onShare?.(contextMenu.note.id)
+              }}
+              style={{
+                border: 'none', background: 'transparent', color: 'var(--fg)',
+                padding: '7px 12px', fontSize: '0.75rem', fontWeight: 500,
+                textAlign: 'left', cursor: 'pointer', fontFamily: 'var(--font-body)',
+                width: '100%',
+              }}
+              onMouseEnter={e => (e.currentTarget.style.background = 'var(--accent)')}
+              onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+            >
+              Bagikan (Share)
+            </button>
+            <button
+              onClick={e => {
+                setContextMenu(null)
+                startEdit(contextMenu.note, e as any)
+              }}
+              style={{
+                border: 'none', background: 'transparent', color: 'var(--fg)',
+                padding: '7px 12px', fontSize: '0.75rem', fontWeight: 500,
+                textAlign: 'left', cursor: 'pointer', fontFamily: 'var(--font-body)',
+                width: '100%',
+              }}
+              onMouseEnter={e => (e.currentTarget.style.background = 'var(--accent)')}
+              onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+            >
+              Ubah Nama
+            </button>
+            <div style={{ height: '1px', background: 'var(--border)', margin: '4px 0' }} />
+            <button
+              onClick={() => {
+                setContextMenu(null)
+                setDeleteTarget(contextMenu.note)
+              }}
+              style={{
+                border: 'none', background: 'transparent', color: '#e03131',
+                padding: '7px 12px', fontSize: '0.75rem', fontWeight: 500,
+                textAlign: 'left', cursor: 'pointer', fontFamily: 'var(--font-body)',
+                width: '100%',
+              }}
+              onMouseEnter={e => (e.currentTarget.style.background = 'rgba(224,49,49,0.08)')}
+              onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+            >
+              Hapus
+            </button>
+          </div>
+        </div>
+      )}
 
       <Dialog open={!!deleteTarget} onOpenChange={open => { if (!open) setDeleteTarget(null) }}>
         <DialogContent showCloseButton={false} style={{ maxWidth: 380 }}>

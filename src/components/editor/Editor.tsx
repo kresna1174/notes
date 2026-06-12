@@ -41,6 +41,7 @@ interface EditorProps {
   onUpdate: (fields: { title?: string; content?: string }) => Promise<void>
   onSaveStatusChange?: (status: 'saved' | 'saving' | 'unsaved') => void
   onLockChange?: (isLocked: boolean) => void
+  shareTrigger?: number
 }
 
 function fmt(ts: number) {
@@ -51,7 +52,7 @@ function fmt(ts: number) {
 
 type SaveStatus = 'saved' | 'saving' | 'unsaved'
 
-export function Editor({ note, onUpdate, onSaveStatusChange, onLockChange }: EditorProps) {
+export function Editor({ note, onUpdate, onSaveStatusChange, onLockChange, shareTrigger }: EditorProps) {
   const [title, setTitle] = useState(note.title)
   const [updatedAt, setUpdatedAt] = useState(note.updatedAt)
   const [preview, setPreview] = useState(false)
@@ -134,6 +135,12 @@ export function Editor({ note, onUpdate, onSaveStatusChange, onLockChange }: Edi
       try { editor.commands.setContent(JSON.parse(note.content)) } catch {}
     }
   }, [note.id])
+
+  useEffect(() => {
+    if (shareTrigger && shareTrigger > 0) {
+      setShowShare(true)
+    }
+  }, [shareTrigger])
 
   async function handlePinSubmit(pin: string): Promise<boolean> {
     if (pinModal === 'set') {
@@ -312,6 +319,8 @@ export function Editor({ note, onUpdate, onSaveStatusChange, onLockChange }: Edi
           initialHasPin={hasPinProtection}
           onClose={() => setShowShare(false)}
           onShareChange={(t, p) => { setShareToken(t); setHasPinProtection(p) }}
+          onActionSuccess={() => window.location.reload()}
+          isTeamNote={note.teamId !== null && note.teamId !== ''}
         />
       )}
     </div>

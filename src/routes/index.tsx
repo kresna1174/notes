@@ -1,33 +1,59 @@
-import { createFileRoute, redirect } from '@tanstack/react-router'
+import { createFileRoute, redirect, useNavigate } from '@tanstack/react-router'
 import { Sidebar } from '../components/sidebar/Sidebar'
+import { Plus } from 'lucide-react'
 
 export const Route = createFileRoute('/')({
   loader: async () => {
-    const res = await fetch('/api/notes')
+    const res = await fetch('/api/notes?scope=mine')
     if (!res.ok) return
     const notes = await res.json()
     if (Array.isArray(notes) && notes.length > 0) {
       throw redirect({ to: '/notes/$id', params: { id: notes[0].id } })
     }
   },
-  component: () => (
+  component: EmptyPage,
+})
+
+function EmptyPage() {
+  const navigate = useNavigate()
+
+  async function createNote() {
+    const res = await fetch('/api/notes', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ teamId: null }),
+    })
+    if (!res.ok) return
+    const note = await res.json()
+    if (note?.id) navigate({ to: '/notes/$id', params: { id: note.id } })
+  }
+
+  return (
     <div className="flex h-screen overflow-hidden">
       <Sidebar activeNoteId={null} />
-      <main className="flex-1 flex items-center justify-center" style={{ background: '#ffffff' }}>
+      <main className="flex-1 flex items-center justify-center" style={{ background: 'var(--bg)' }}>
         <div className="text-center">
-          <div className="w-12 h-12 rounded-2xl flex items-center justify-center mx-auto mb-4" style={{ background: '#e8edff' }}>
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#3b5bdb" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-              <polyline points="14,2 14,8 20,8"/>
-              <line x1="16" y1="13" x2="8" y2="13"/>
-              <line x1="16" y1="17" x2="8" y2="17"/>
-              <polyline points="10,9 9,9 8,9"/>
-            </svg>
+          <div className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4" style={{ background: 'var(--accent)' }}>
+            <img src="/logo192.png" alt="Homebrew Notes Logo" className="w-10 h-10 object-contain" />
           </div>
-          <p className="font-semibold mb-1" style={{ color: '#1a1a2e', fontSize: '0.9375rem' }}>No notes yet</p>
-          <p className="text-sm" style={{ color: '#6c757d' }}>Click <strong style={{ color: '#3b5bdb' }}>+ New Note</strong> to get started</p>
+          <p className="font-semibold mb-1" style={{ color: 'var(--fg)', fontSize: '0.9375rem' }}>Belum ada catatan</p>
+          <p className="text-sm mb-5" style={{ color: 'var(--fg-muted)' }}>Buat catatan pertamamu sekarang</p>
+          <button
+            onClick={createNote}
+            style={{
+              display: 'inline-flex', alignItems: 'center', gap: 7,
+              padding: '9px 20px', fontSize: '0.875rem', fontWeight: 600,
+              fontFamily: 'var(--font-body)',
+              background: 'var(--primary)', color: 'var(--primary-fg)',
+              border: 'none', borderRadius: 10, cursor: 'pointer',
+            }}
+            onMouseEnter={e => (e.currentTarget.style.opacity = '0.9')}
+            onMouseLeave={e => (e.currentTarget.style.opacity = '1')}
+          >
+            <Plus size={15} /> Buat Catatan
+          </button>
         </div>
       </main>
     </div>
-  ),
-})
+  )
+}
