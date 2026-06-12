@@ -1,4 +1,4 @@
-import { Moon, Sun, Beer } from 'lucide-react'
+import { Moon, Sun, Beer, Atom } from 'lucide-react'
 import { useTheme } from '../../lib/theme'
 
 export function ThemeToggle() {
@@ -11,6 +11,9 @@ export function ThemeToggle() {
     icon = <Beer size={14} />
     title = 'Switch to Homebrew theme'
   } else if (theme === 'homebrew') {
+    icon = <Atom size={14} />
+    title = 'Switch to Reactor theme'
+  } else if (theme === 'reactor') {
     icon = <Sun size={14} />
     title = 'Switch to light mode'
   }

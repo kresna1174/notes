@@ -19,7 +19,7 @@ export const ActiveLineExtension = Extension.create({
             if ($anchor.depth < 1) return DecorationSet.empty
 
             const node = $anchor.node(1)
-            if (!node || node.isAtom) return DecorationSet.empty
+            if (!node || node.type.isAtom) return DecorationSet.empty
 
             const from = $anchor.before(1)
             const to = $anchor.after(1)

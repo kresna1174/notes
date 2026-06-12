@@ -171,6 +171,56 @@ body {
   --radius: 8px;
 }
 
+/* ── Reactor theme ─────────────────────────────────────────── */
+[data-theme="reactor"] {
+  --bg: #0d1117;
+  --bg-app: #090c10;
+  --fg: #e6edf3;
+  --fg-muted: #7d8590;
+  --fg-subtle: #3d444d;
+  --border: #21262d;
+  --border-focus: #00ff88;
+  --sidebar-bg: #090c10;
+  --input-bg: #161b22;
+  --card-bg: #0d1117;
+  --muted: #161b22;
+  --primary: #00ff88;
+  --primary-fg: #090c10;
+  --accent: #00ff8820;
+  --accent-fg: #00ff88;
+  --active-line-bg: rgba(0, 255, 136, 0.04);
+  --active-line-outline: rgba(0, 255, 136, 0.18);
+  --code-bg: #010409;
+  --code-fg: #00ff88;
+  --inline-code-bg: #161b22;
+  --inline-code-fg: #00e5ff;
+  --blockquote-border: #00ff88;
+  --table-header-bg: #161b22;
+  --scrollbar: #21262d;
+  --scrollbar-hover: #3d444d;
+  --save-bg: #0d1117;
+  --skeleton: #161b22;
+
+  --color-background: var(--bg);
+  --color-foreground: var(--fg);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--fg-muted);
+  --color-border: var(--border);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-fg);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-fg);
+  --color-card: var(--card-bg);
+  --color-card-foreground: var(--fg);
+  --color-popover: var(--card-bg);
+  --color-popover-foreground: var(--fg);
+  --color-destructive: #ff5555;
+  --color-destructive-foreground: #ffffff;
+  --color-input: var(--border);
+  --color-ring: var(--primary);
+  --radius: 8px;
+}
+
 /* ── Dialog / popover inherit font vars ────────────────────── */
 [role="dialog"], [data-radix-popper-content-wrapper] {
   font-family: var(--font-body);
@@ -273,6 +323,7 @@ body {
 mark { background-color: #fff3bf; color: #5c4400; border-radius: 2px; padding: 0 2px; }
 [data-theme="dark"] mark { background-color: #4a3800; color: #ffd43b; }
 [data-theme="homebrew"] mark { background-color: #f2d472; color: #593500; }
+[data-theme="reactor"] mark { background-color: #00ff8833; color: #00ff88; }
 
 /* ── Preview pane markdown ─────────────────────────────────── */
 .preview-content { color: var(--fg); font-family: var(--font-body); line-height: 1.75; }
@@ -297,3 +348,52 @@ mark { background-color: #fff3bf; color: #5c4400; border-radius: 2px; padding: 0
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: var(--scrollbar); border-radius: 3px; }
 ::-webkit-scrollbar-thumb:hover { background: var(--scrollbar-hover); }
+
+/* ── ReactFlow Theme-Aware Styling ────────────────────────── */
+.react-flow__node-default,
+.react-flow__node-input,
+.react-flow__node-output {
+  background: var(--bg-app) !important;
+  color: var(--fg) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: 8px !important;
+  font-family: var(--font-body) !important;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1) !important;
+}
+.react-flow__node-default.selected,
+.react-flow__node-input.selected,
+.react-flow__node-output.selected {
+  border-color: var(--primary) !important;
+  box-shadow: 0 0 0 1px var(--primary), 0 2px 12px var(--accent) !important;
+}
+.react-flow__controls-button {
+  background: var(--card-bg) !important;
+  color: var(--fg) !important;
+  border-bottom: 1px solid var(--border) !important;
+  fill: var(--fg) !important;
+}
+.react-flow__controls-button:hover {
+  background: var(--accent) !important;
+}
+.react-flow__minimap {
+  background: var(--card-bg) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: 8px !important;
+}
+.react-flow__minimap-mask {
+  fill: var(--accent) !important;
+  opacity: 0.3 !important;
+}
+.react-flow__handle {
+  background: var(--primary) !important;
+  border: 1.5px solid var(--bg) !important;
+}
+.react-flow__edge-path {
+  stroke: var(--fg-muted) !important;
+}
+.react-flow__edge.selected .react-flow__edge-path {
+  stroke: var(--primary) !important;
+}
+.react-flow__background pattern {
+  stroke: var(--border) !important;
+}

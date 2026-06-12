@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, useEffect, type ReactNode } from 'react'
 
-type Theme = 'light' | 'dark' | 'homebrew'
+type Theme = 'light' | 'dark' | 'homebrew' | 'reactor'
 
 interface ThemeContextValue {
   theme: Theme
@@ -27,6 +27,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   const toggle = () => setTheme(t => {
     if (t === 'light') return 'dark'
     if (t === 'dark') return 'homebrew'
+    if (t === 'homebrew') return 'reactor'
     return 'light'
   })
 

@@ -17,7 +17,8 @@ export function BubbleToolbar({ editor }: BubbleToolbarProps) {
     function update() {
       const { from, to } = editor!.state.selection
       const isTable = editor!.isActive('table')
-      const hasSelection = from !== to
+      const isNodeSelection = 'node' in editor!.state.selection
+      const hasSelection = from !== to && !isNodeSelection
 
       if (!isTable && !hasSelection) {
         setPos(null)

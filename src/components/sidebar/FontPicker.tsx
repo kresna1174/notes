@@ -52,12 +52,12 @@ export function FontPicker() {
           width: 28, height: 28,
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           borderRadius: 6, border: 'none', cursor: 'pointer',
-          background: open ? '#e8edff' : 'transparent',
-          color: open ? '#3b5bdb' : '#6c757d',
+          background: open ? 'var(--accent)' : 'transparent',
+          color: open ? 'var(--accent-fg)' : 'var(--fg-muted)',
           transition: 'background 0.1s',
         }}
-        onMouseEnter={e => { if (!open) e.currentTarget.style.background = '#f0f4ff' }}
-        onMouseLeave={e => { if (!open) e.currentTarget.style.background = 'transparent' }}
+        onMouseEnter={e => { if (!open) { e.currentTarget.style.background = 'var(--accent)'; e.currentTarget.style.color = 'var(--primary)' } }}
+        onMouseLeave={e => { if (!open) { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--fg-muted)' } }}
       >
         <Type size={14} />
       </button>
@@ -73,17 +73,17 @@ export function FontPicker() {
             style={{
               position: 'absolute',
               top: 34,
-              left: 0,
+              right: 0,
               zIndex: 999,
-              background: '#fff',
-              border: '1px solid #e9ecef',
+              background: 'var(--card-bg)',
+              border: '1px solid var(--border)',
               borderRadius: 10,
-              boxShadow: '0 8px 24px rgba(0,0,0,0.12)',
+              boxShadow: '0 8px 24px rgba(0,0,0,0.2)',
               padding: 6,
               width: 220,
             }}
           >
-            <p style={{ fontSize: '0.6875rem', color: '#6c757d', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', padding: '4px 8px 8px' }}>
+            <p style={{ fontSize: '0.6875rem', color: 'var(--fg-muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', padding: '4px 8px 8px' }}>
               Font Style
             </p>
             {PRESETS.map(p => (
@@ -96,24 +96,25 @@ export function FontPicker() {
                   borderRadius: 7,
                   border: 'none',
                   cursor: 'pointer',
-                  background: active === p.id ? '#e8edff' : 'transparent',
+                  background: active === p.id ? 'var(--accent)' : 'transparent',
                   display: 'flex', flexDirection: 'column', gap: 2,
                 }}
-                onMouseEnter={e => { if (active !== p.id) e.currentTarget.style.background = '#f8f9fa' }}
+                onMouseEnter={e => { if (active !== p.id) e.currentTarget.style.background = 'var(--accent)' }}
                 onMouseLeave={e => { if (active !== p.id) e.currentTarget.style.background = 'transparent' }}
               >
                 <span style={{
                   fontSize: '0.875rem',
                   fontWeight: 600,
                   fontFamily: `'${p.heading}', sans-serif`,
-                  color: active === p.id ? '#3b5bdb' : '#1a1a2e',
+                  color: active === p.id ? 'var(--accent-fg)' : 'var(--fg)',
                 }}>
                   {p.label}
                 </span>
                 <span style={{
                   fontSize: '0.75rem',
                   fontFamily: `'${p.body}', sans-serif`,
-                  color: active === p.id ? '#3b5bdb99' : '#6c757d',
+                  color: active === p.id ? 'var(--accent-fg)' : 'var(--fg-muted)',
+                  opacity: active === p.id ? 0.85 : 1,
                 }}>
                   {p.heading} · {p.body}
                 </span>

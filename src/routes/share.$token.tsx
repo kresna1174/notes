@@ -2,7 +2,7 @@ import { createFileRoute } from '@tanstack/react-router'
 import { useState, useEffect, useMemo } from 'react'
 import { PinLockModal } from '../components/editor/PinLockModal'
 import { docToSegments, DocContent } from '../components/editor/DocRenderer'
-import { Lock, Sun, Moon, Beer } from 'lucide-react'
+import { Lock, Sun, Moon, Beer, Atom } from 'lucide-react'
 import { useTheme } from '../lib/theme'
 
 export const Route = createFileRoute('/share/$token')({
@@ -102,7 +102,15 @@ function ShareViewComponent() {
           )}
           <button
             onClick={toggle}
-            title={theme === 'dark' ? 'Switch to Homebrew theme' : theme === 'homebrew' ? 'Switch to light mode' : 'Switch to dark mode'}
+            title={
+              theme === 'dark'
+                ? 'Switch to Homebrew theme'
+                : theme === 'homebrew'
+                ? 'Switch to Reactor theme'
+                : theme === 'reactor'
+                ? 'Switch to light mode'
+                : 'Switch to dark mode'
+            }
             style={{
               width: 28, height: 28,
               display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -113,7 +121,15 @@ function ShareViewComponent() {
             onMouseEnter={e => { e.currentTarget.style.background = 'var(--accent)'; e.currentTarget.style.color = 'var(--primary)' }}
             onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--fg-muted, #6c757d)' }}
           >
-            {theme === 'dark' ? <Beer size={14} /> : theme === 'homebrew' ? <Sun size={14} /> : <Moon size={14} />}
+            {theme === 'dark' ? (
+              <Beer size={14} />
+            ) : theme === 'homebrew' ? (
+              <Atom size={14} />
+            ) : theme === 'reactor' ? (
+              <Sun size={14} />
+            ) : (
+              <Moon size={14} />
+            )}
           </button>
         </div>
       </div>

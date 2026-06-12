@@ -34,10 +34,10 @@ const CommandList = forwardRef(({ items, command }: any, ref) => {
   return (
     <div
       style={{
-        background: '#ffffff',
-        border: '1px solid #e9ecef',
+        background: 'var(--card-bg)',
+        border: '1px solid var(--border)',
         borderRadius: '10px',
-        boxShadow: '0 4px 24px rgba(0,0,0,0.10)',
+        boxShadow: '0 4px 24px rgba(0,0,0,0.25)',
         padding: '4px',
         minWidth: '200px',
         zIndex: 9999,
@@ -54,8 +54,8 @@ const CommandList = forwardRef(({ items, command }: any, ref) => {
             fontSize: '0.875rem',
             textAlign: 'left',
             borderRadius: '6px',
-            color: i === selected ? '#3b5bdb' : '#1a1a2e',
-            background: i === selected ? '#e8edff' : 'transparent',
+            color: i === selected ? 'var(--accent-fg)' : 'var(--fg)',
+            background: i === selected ? 'var(--accent)' : 'transparent',
             border: 'none',
             cursor: 'pointer',
           }}

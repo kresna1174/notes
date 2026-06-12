@@ -29,7 +29,19 @@ export const ABOUT_MARKDOWN = `# 📝 Homebrew Notes
 
 ## 📅 Riwayat Perubahan (Changelog)
 
-### v1.3.0 (Terbaru - Juni 2026)
+### v1.3.1 (Terbaru - Juni 2026)
+*   🎨 **Tema Reactor Baru**:
+    *   Integrasi penuh tema gelap beraksen hijau neon "Reactor" ke sistem manajemen tema, termasuk menu *Theme Toggle* di halaman catatan pribadi maupun publik.
+*   🔧 **Penyempurnaan Picker Font & Menu Perintah**:
+    *   Pop-up Font Picker kini diposisikan dengan benar agar tidak terpotong oleh batas sidebar.
+    *   Seluruh pop-up (Font Picker dan Menu Perintah Slash \`/\`) kini secara dinamis mengikuti skema warna tema yang sedang aktif.
+*   📊 **Kanvas Diagram Interaktif**:
+    *   Visualisasi diagram alir langsung secara *live* (inline pratinjau) di dalam dokumen catatan dengan *hover overlay* "Klik untuk Edit".
+    *   Desain pop-up editor diagram baru yang diperbesar mendekati satu layar penuh untuk kenyamanan maksimal.
+    *   **Custom Node Types** (\`rectangle\`, \`circle\`, \`diamond\` belah ketupat) untuk mengatasi masalah koneksi garis dan teks terotasi.
+    *   Dukungan *double-click* langsung pada node diagram untuk mengganti label teks.
+
+### v1.3.0 (Juni 2026)
 *   ✨ **Daily Log Tracker**:
     *   Tombol "Daily Log Hari Ini" di sidebar untuk membuat/membuka catatan harian otomatis.
     *   Template terstruktur (Timeline + Catatan) dibuat otomatis per hari.
