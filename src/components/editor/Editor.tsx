@@ -23,7 +23,7 @@ import { PinLockModal } from './PinLockModal'
 import { ShareModal } from './ShareModal'
 import { DailyLogBar } from './DailyLogBar'
 import { useEffect, useRef, useState } from 'react'
-import { Eye, EyeOff, Lock, LockOpen, Share2, FileUp } from 'lucide-react'
+import { Eye, EyeOff, Lock, LockOpen, Share2, FileUp, Paperclip } from 'lucide-react'
 import { marked } from 'marked'
 import mammoth from 'mammoth'
 import * as XLSX from 'xlsx'
@@ -74,6 +74,7 @@ export function Editor({ note, onUpdate, onSaveStatusChange, onLockChange, share
   const titleRef = useRef<HTMLInputElement>(null)
   const saveTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const attachInputRef = useRef<HTMLInputElement>(null)
 
   const editor = useEditor({
     extensions: [
@@ -234,6 +235,32 @@ export function Editor({ note, onUpdate, onSaveStatusChange, onLockChange, share
     fileInputRef.current?.click()
   }
 
+  async function handleAttachFiles(e: React.ChangeEvent<HTMLInputElement>) {
+    const files = Array.from(e.target.files ?? [])
+    if (!editor || files.length === 0) return
+    const noteId = (editor.storage as any).noteId
+    for (const file of files) {
+      const form = new FormData()
+      form.append('file', file)
+      form.append('noteId', noteId)
+      const res = await fetch('/api/attachments', { method: 'POST', body: form })
+      if (!res.ok) continue
+      const data = await res.json()
+      editor.chain().focus().insertContentAt(editor.state.doc.content.size, {
+        type: 'attachment',
+        attrs: { attachmentId: data.id, filename: data.filename, mimeType: data.mimeType, size: data.size },
+      }).run()
+    }
+    setStatus('unsaved')
+    clearTimeout(saveTimer.current)
+    saveTimer.current = setTimeout(() => {
+      setStatus('saving')
+      onUpdate({ content: JSON.stringify(editor.getJSON()) })
+        .then(() => { setUpdatedAt(Date.now()); setStatus('saved') })
+    }, 1000)
+    e.target.value = ''
+  }
+
   async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
     if (!file || !editor) return
@@ -330,6 +357,32 @@ export function Editor({ note, onUpdate, onSaveStatusChange, onLockChange, share
           >
             <FileUp size={13} />
             Impor Konten
+          </button>
+
+          <input
+            ref={attachInputRef}
+            type="file"
+            multiple
+            style={{ display: 'none' }}
+            onChange={handleAttachFiles}
+          />
+          <button
+            onClick={() => attachInputRef.current?.click()}
+            title="Upload file & foto"
+            style={{
+              display: 'flex', alignItems: 'center', gap: 6,
+              padding: '5px 12px', fontSize: '0.75rem', fontWeight: 500,
+              fontFamily: 'var(--font-body)',
+              border: '1px solid var(--border)', borderRadius: 20,
+              background: 'var(--bg)',
+              color: 'var(--fg-muted)',
+              cursor: 'pointer', transition: 'all 0.15s',
+            }}
+            onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--primary)'; e.currentTarget.style.color = 'var(--primary)' }}
+            onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.color = 'var(--fg-muted)' }}
+          >
+            <Paperclip size={13} />
+            Upload File
           </button>
 
           <button

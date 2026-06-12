@@ -1,12 +1,16 @@
 import { Node, mergeAttributes } from '@tiptap/core'
 import { ReactNodeViewRenderer, NodeViewWrapper } from '@tiptap/react'
 import { useRef, useState } from 'react'
-import { Paperclip, Download, Trash2, FileText } from 'lucide-react'
+import { Paperclip, Download, Trash2, FileText, Image as ImageIcon } from 'lucide-react'
 
 function formatBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+}
+
+function isImage(mimeType: string) {
+  return mimeType.startsWith('image/')
 }
 
 function AttachmentNodeView({ node, updateAttributes, deleteNode, editor }: any) {
@@ -34,6 +38,54 @@ function AttachmentNodeView({ node, updateAttributes, deleteNode, editor }: any)
     }
   }
 
+  async function handleDrop(e: React.DragEvent) {
+    e.preventDefault()
+    setDragging(false)
+    const files = Array.from(e.dataTransfer.files)
+    if (files.length === 0) return
+    await upload(files[0])
+    if (files.length > 1) {
+      const noteId = (editor.storage as any).noteId
+      for (let i = 1; i < files.length; i++) {
+        editor.commands.insertContentAt(editor.state.selection.to, {
+          type: 'attachment',
+          attrs: { attachmentId: null, filename: '', mimeType: '', size: 0 },
+        })
+        const form = new FormData()
+        form.append('file', files[i])
+        form.append('noteId', noteId)
+        const res = await fetch('/api/attachments', { method: 'POST', body: form })
+        if (res.ok) {
+          const data = await res.json()
+          updateAttributes({ attachmentId: data.id, filename: data.filename, mimeType: data.mimeType, size: data.size })
+        }
+      }
+    }
+  }
+
+  async function handleInputChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const files = Array.from(e.target.files ?? [])
+    if (files.length === 0) return
+    await upload(files[0])
+    if (files.length > 1) {
+      const noteId = (editor.storage as any).noteId
+      for (let i = 1; i < files.length; i++) {
+        const form = new FormData()
+        form.append('file', files[i])
+        form.append('noteId', noteId)
+        const res = await fetch('/api/attachments', { method: 'POST', body: form })
+        if (res.ok) {
+          const data = await res.json()
+          editor.chain().focus().insertContentAt(editor.state.doc.content.size, {
+            type: 'attachment',
+            attrs: { attachmentId: data.id, filename: data.filename, mimeType: data.mimeType, size: data.size },
+          }).run()
+        }
+      }
+    }
+    e.target.value = ''
+  }
+
   async function remove() {
     if (attachmentId) await fetch(`/api/attachments/${attachmentId}`, { method: 'DELETE' })
     deleteNode()
@@ -46,11 +98,7 @@ function AttachmentNodeView({ node, updateAttributes, deleteNode, editor }: any)
           <div
             onDragOver={e => { e.preventDefault(); setDragging(true) }}
             onDragLeave={() => setDragging(false)}
-            onDrop={e => {
-              e.preventDefault(); setDragging(false)
-              const file = e.dataTransfer.files?.[0]
-              if (file) upload(file)
-            }}
+            onDrop={handleDrop}
             onClick={() => !uploading && inputRef.current?.click()}
             style={{
               border: `2px dashed ${dragging ? 'var(--primary)' : 'var(--border)'}`,
@@ -65,10 +113,10 @@ function AttachmentNodeView({ node, updateAttributes, deleteNode, editor }: any)
           >
             <Paperclip size={16} style={{ color: 'var(--fg-muted)', flexShrink: 0 }} />
             <span style={{ fontSize: '0.875rem', color: 'var(--fg-muted)' }}>
-              {uploading ? 'Uploading…' : dragging ? 'Drop file here' : 'Click or drag & drop a file'}
+              {uploading ? 'Uploading…' : dragging ? 'Drop files here' : 'Click or drag & drop files (multiple OK)'}
             </span>
-            <input ref={inputRef} type="file" style={{ display: 'none' }} disabled={uploading}
-              onChange={e => { if (e.target.files?.[0]) upload(e.target.files[0]) }} />
+            <input ref={inputRef} type="file" multiple style={{ display: 'none' }} disabled={uploading}
+              onChange={handleInputChange} />
           </div>
           {!uploading && (
             <button
@@ -92,6 +140,48 @@ function AttachmentNodeView({ node, updateAttributes, deleteNode, editor }: any)
     )
   }
 
+  if (isImage(mimeType)) {
+    return (
+      <NodeViewWrapper>
+        <div style={{ position: 'relative', display: 'inline-block', maxWidth: '100%' }}>
+          <img
+            src={`/api/attachments/${attachmentId}/inline`}
+            alt={filename}
+            style={{ maxWidth: '100%', borderRadius: 8, display: 'block', border: '1px solid var(--border)' }}
+          />
+          <div style={{
+            position: 'absolute', top: 6, right: 6,
+            display: 'flex', gap: 4,
+          }}>
+            <a
+              href={`/api/attachments/${attachmentId}`}
+              download={filename}
+              style={{
+                width: 28, height: 28, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                borderRadius: 6, color: 'var(--fg-muted)', textDecoration: 'none',
+                background: 'rgba(0,0,0,0.45)', backdropFilter: 'blur(4px)',
+              }}
+            >
+              <Download size={13} color="white" />
+            </a>
+            <button onClick={remove}
+              style={{
+                width: 28, height: 28, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                borderRadius: 6, border: 'none', cursor: 'pointer',
+                background: 'rgba(224,49,49,0.7)', backdropFilter: 'blur(4px)',
+              }}
+            >
+              <Trash2 size={13} color="white" />
+            </button>
+          </div>
+          <div style={{ fontSize: '0.72rem', color: 'var(--fg-subtle)', marginTop: 4, fontFamily: 'var(--font-body)' }}>
+            {filename} · {formatBytes(size)}
+          </div>
+        </div>
+      </NodeViewWrapper>
+    )
+  }
+
   return (
     <NodeViewWrapper>
       <div style={{
@@ -100,7 +190,10 @@ function AttachmentNodeView({ node, updateAttributes, deleteNode, editor }: any)
         background: 'var(--muted)',
         fontFamily: 'var(--font-body)',
       }}>
-        <FileText size={28} style={{ color: 'var(--fg-muted)', flexShrink: 0 }} />
+        {isImage(mimeType)
+          ? <ImageIcon size={28} style={{ color: 'var(--fg-muted)', flexShrink: 0 }} />
+          : <FileText size={28} style={{ color: 'var(--fg-muted)', flexShrink: 0 }} />
+        }
         <div style={{ flex: 1, minWidth: 0 }}>
           <p style={{ margin: 0, fontSize: '0.875rem', fontWeight: 500, color: 'var(--fg)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{filename}</p>
           <p style={{ margin: 0, fontSize: '0.75rem', color: 'var(--fg-muted)' }}>{formatBytes(size)} · {mimeType}</p>

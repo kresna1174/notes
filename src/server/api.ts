@@ -755,6 +755,20 @@ export async function handleApiRequest(req: IncomingMessage, res: ServerResponse
     return true
   }
 
+  // GET /api/attachments/:id/inline — serve image inline (no download)
+  const attachInlineMatch = path.match(/^\/api\/attachments\/([^/]+)\/inline$/)
+  if (attachInlineMatch && method === 'GET') {
+    const id = attachInlineMatch[1]
+    const [att] = await db.select().from(attachments).where(eq(attachments.id, id))
+    if (!att) { json(res, { error: 'not found' }, 404); return true }
+    const filePath = getFilePath(att.storedAs)
+    res.writeHead(200, { 'Content-Type': att.mimeType, 'Content-Length': att.size })
+    const stream = createReadStream(filePath)
+    stream.on('error', () => { res.writeHead(404); res.end() })
+    stream.pipe(res)
+    return true
+  }
+
   // GET /api/attachments/:id
   const attachMatch = path.match(/^\/api\/attachments\/([^/]+)$/)
   if (attachMatch) {
