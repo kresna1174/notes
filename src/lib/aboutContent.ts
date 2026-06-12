@@ -29,7 +29,25 @@ export const ABOUT_MARKDOWN = `# 📝 Homebrew Notes
 
 ## 📅 Riwayat Perubahan (Changelog)
 
-### v1.2.0 (Terbaru - Juni 2026)
+### v1.3.0 (Terbaru - Juni 2026)
+*   ✨ **Daily Log Tracker**:
+    *   Tombol "Daily Log Hari Ini" di sidebar untuk membuat/membuka catatan harian otomatis.
+    *   Template terstruktur (Timeline + Catatan) dibuat otomatis per hari.
+    *   Bar tambah aktivitas dengan time picker jam & menit (default = jam sekarang) langsung append ke section Timeline.
+    *   URL yang di-paste di aktivitas otomatis menjadi tautan klik.
+*   ✨ **Import Dokumen Office**:
+    *   Import file `.docx` langsung ke editor (heading, tabel, bold/italic preserved via mammoth).
+    *   Import file `.xlsx`/`.xls` — setiap sheet menjadi heading + tabel di catatan.
+*   ✨ **Upload Multiple File & Foto**:
+    *   Tombol "Upload File" di toolbar mendukung pilih banyak file sekaligus.
+    *   Drag & drop beberapa file ke attachment block.
+    *   Foto/gambar tampil sebagai preview inline langsung di catatan.
+*   ✨ **Sidebar Hide/Show**:
+    *   Tombol toggle di kiri atas editor untuk menyembunyikan/menampilkan sidebar dengan animasi smooth.
+*   🔗 **Autolink**:
+    *   URL yang di-paste di editor otomatis menjadi tautan yang bisa diklik.
+
+### v1.2.0 (Juni 2026)
 *   ✨ **Sistem Pendaftaran Antrean Admin (Approval-based Registration)**:
     *   Form pendaftaran mandiri (Register) ditambahkan di halaman masuk.
     *   Status default akun baru diatur sebagai **Pending Approval** (antrean).
