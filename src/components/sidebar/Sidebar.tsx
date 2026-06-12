@@ -8,7 +8,7 @@ import { FontPicker } from './FontPicker'
 import { ThemeToggle } from './ThemeToggle'
 import { useAuth } from '../../lib/auth'
 
-interface Note { id: string; title: string; createdAt: number }
+interface Note { id: string; title: string; createdAt: number; shareToken?: string | null }
 interface SearchResult { id: string; title: string; createdAt: number; snippet: string }
 interface SidebarProps {
   activeNoteId: string | null

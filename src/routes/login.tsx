@@ -10,10 +10,12 @@ export const Route = createFileRoute('/login')({
 function LoginPage() {
   const { login, user } = useAuth()
   const navigate = useNavigate()
+  const [isRegister, setIsRegister] = useState(false)
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [showPw, setShowPw] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [successMsg, setSuccessMsg] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
 
   if (user) {
@@ -24,11 +26,39 @@ function LoginPage() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setError(null)
+    setSuccessMsg(null)
     setLoading(true)
     const err = await login(username, password)
     setLoading(false)
     if (err) { setError(err); return }
     navigate({ to: '/' })
+  }
+
+  async function handleRegister(e: React.FormEvent) {
+    e.preventDefault()
+    setError(null)
+    setSuccessMsg(null)
+    setLoading(true)
+    try {
+      const res = await fetch('/api/auth/public-register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password }),
+      })
+      const data = await res.json()
+      setLoading(false)
+      if (!res.ok) {
+        setError(data.error || 'Gagal mendaftar')
+        return
+      }
+      setSuccessMsg('Pendaftaran berhasil! Akun Anda kini menunggu persetujuan admin.')
+      setUsername('')
+      setPassword('')
+      setIsRegister(false)
+    } catch {
+      setLoading(false)
+      setError('Terjadi kesalahan jaringan')
+    }
   }
 
   const inputBase: React.CSSProperties = {
@@ -53,7 +83,7 @@ function LoginPage() {
         width: '100%', maxWidth: 400,
         boxShadow: '0 8px 32px rgba(0,0,0,0.1)',
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 28 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 24 }}>
           <img
             src="/logo192.png"
             alt="Homebrew Notes Logo"
@@ -64,14 +94,55 @@ function LoginPage() {
           </span>
         </div>
 
+        {/* Tab Switcher */}
+        <div style={{ display: 'flex', gap: 4, background: 'var(--muted)', borderRadius: 8, padding: 3, marginBottom: 24 }}>
+          <button
+            onClick={() => { setIsRegister(false); setError(null); setSuccessMsg(null) }}
+            style={{
+              flex: 1, padding: '6px 0', fontSize: '0.8rem', fontWeight: !isRegister ? 600 : 400,
+              border: 'none', borderRadius: 6, cursor: 'pointer', fontFamily: 'var(--font-body)',
+              background: !isRegister ? 'var(--bg)' : 'transparent',
+              color: !isRegister ? 'var(--fg)' : 'var(--fg-muted)',
+              boxShadow: !isRegister ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
+              transition: 'all 0.15s',
+            }}
+          >
+            Masuk (Sign in)
+          </button>
+          <button
+            onClick={() => { setIsRegister(true); setError(null); setSuccessMsg(null) }}
+            style={{
+              flex: 1, padding: '6px 0', fontSize: '0.8rem', fontWeight: isRegister ? 600 : 400,
+              border: 'none', borderRadius: 6, cursor: 'pointer', fontFamily: 'var(--font-body)',
+              background: isRegister ? 'var(--bg)' : 'transparent',
+              color: isRegister ? 'var(--fg)' : 'var(--fg-muted)',
+              boxShadow: isRegister ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
+              transition: 'all 0.15s',
+            }}
+          >
+            Daftar (Register)
+          </button>
+        </div>
+
         <h1 style={{ fontFamily: 'var(--font-heading)', fontWeight: 700, fontSize: '1.375rem', color: 'var(--fg)', margin: '0 0 6px' }}>
-          Welcome back
+          {isRegister ? 'Daftar Akun Baru' : 'Welcome back'}
         </h1>
         <p style={{ fontSize: '0.875rem', color: 'var(--fg-muted)', margin: '0 0 28px' }}>
-          Sign in to your account
+          {isRegister ? 'Pendaftaran memerlukan persetujuan admin' : 'Sign in to your account'}
         </p>
 
-        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+        {successMsg && (
+          <div style={{
+            padding: '9px 13px', background: 'rgba(43,138,62,0.08)',
+            border: '1px solid rgba(43,138,62,0.25)',
+            borderRadius: 8, fontSize: '0.8375rem', color: '#2b8a3e',
+            marginBottom: 16
+          }}>
+            {successMsg}
+          </div>
+        )}
+
+        <form onSubmit={isRegister ? handleRegister : handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           <div>
             <label style={{ display: 'block', fontSize: '0.8125rem', fontWeight: 500, color: 'var(--fg-muted)', marginBottom: 6 }}>
               Username
@@ -135,13 +206,9 @@ function LoginPage() {
               transition: 'opacity 0.15s',
             }}
           >
-            {loading ? 'Signing in…' : 'Sign in'}
+            {isRegister ? (loading ? 'Mendaftar…' : 'Daftar') : (loading ? 'Signing in…' : 'Sign in')}
           </button>
         </form>
-
-        <p style={{ marginTop: 24, fontSize: '0.8rem', color: 'var(--fg-subtle)', textAlign: 'center' }}>
-          Default: <code style={{ color: 'var(--fg-muted)' }}>admin</code> / <code style={{ color: 'var(--fg-muted)' }}>admin123</code>
-        </p>
       </div>
     </div>
   )

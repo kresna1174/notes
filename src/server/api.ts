@@ -3,7 +3,7 @@ import { createReadStream } from 'node:fs'
 import { db, sqlite } from '../lib/db'
 import { notes, attachments, users, teams } from '../../drizzle/schema'
 import { desc, eq, and, inArray, sql } from 'drizzle-orm'
-import { ulid } from 'ulid'
+import { randomUUID } from 'crypto'
 import Busboy from 'busboy'
 import { saveFile, getFilePath, deleteFile } from '../lib/storage'
 import bcrypt from 'bcryptjs'
@@ -81,7 +81,13 @@ export async function handleApiRequest(req: IncomingMessage, res: ServerResponse
     if (!user || !bcrypt.compareSync(password, user.passwordHash)) {
       json(res, { error: 'Invalid username or password' }, 401); return true
     }
-    const token = ulid()
+    if (user.status === 'pending') {
+      json(res, { error: 'Akun Anda sedang menunggu persetujuan admin.' }, 403); return true
+    }
+    if (user.status === 'rejected') {
+      json(res, { error: 'Pendaftaran akun Anda ditolak oleh admin.' }, 403); return true
+    }
+    const token = randomUUID()
     sqlite.prepare('INSERT INTO sessions (token, user_id, username, role, created_at) VALUES (?, ?, ?, ?, ?)').run(token, user.id, user.username, user.role, Date.now())
     setSessionCookie(res, token)
     json(res, { userId: user.id, username: user.username, role: user.role, teamId: user.teamId })
@@ -115,12 +121,29 @@ export async function handleApiRequest(req: IncomingMessage, res: ServerResponse
     const { username, password, role } = body as { username?: string; password?: string; role?: string }
     if (!username || !password) { json(res, { error: 'username and password required' }, 400); return true }
     const validRole = role === 'admin' ? 'admin' : 'viewer'
-    const existing = sqlite.prepare('SELECT id FROM users WHERE username = ?').get(username)
+    const cleanUsername = username.trim()
+    const existing = sqlite.prepare('SELECT id FROM users WHERE username = ?').get(cleanUsername)
     if (existing) { json(res, { error: 'username already exists' }, 409); return true }
     const hash = bcrypt.hashSync(password, 10)
-    const id = ulid()
-    await db.insert(users).values({ id, username, passwordHash: hash, role: validRole, createdAt: Date.now() })
-    json(res, { id, username, role: validRole }, 201)
+    const id = randomUUID()
+    await db.insert(users).values({ id, username: cleanUsername, passwordHash: hash, role: validRole, status: 'approved', createdAt: Date.now() })
+    json(res, { id, username: cleanUsername, role: validRole }, 201)
+    return true
+  }
+
+  // POST /api/auth/public-register (public registration)
+  if (method === 'POST' && path === '/api/auth/public-register') {
+    const body = await readBody(req)
+    const { username, password } = body as { username?: string; password?: string }
+    if (!username || !password) { json(res, { error: 'username and password required' }, 400); return true }
+    const cleanUsername = username.trim()
+    if (!cleanUsername) { json(res, { error: 'username cannot be empty' }, 400); return true }
+    const existing = sqlite.prepare('SELECT id FROM users WHERE username = ?').get(cleanUsername)
+    if (existing) { json(res, { error: 'Username sudah digunakan' }, 409); return true }
+    const hash = bcrypt.hashSync(password, 10)
+    const id = randomUUID()
+    await db.insert(users).values({ id, username: cleanUsername, passwordHash: hash, role: 'viewer', status: 'pending', createdAt: Date.now() })
+    json(res, { id, username: cleanUsername, status: 'pending' }, 201)
     return true
   }
 
@@ -128,8 +151,37 @@ export async function handleApiRequest(req: IncomingMessage, res: ServerResponse
   if (method === 'GET' && path === '/api/auth/users') {
     const session = getSession(req)
     if (!session || session.role !== 'admin') { json(res, { error: 'forbidden' }, 403); return true }
-    const all = await db.select({ id: users.id, username: users.username, role: users.role, teamId: users.teamId, createdAt: users.createdAt }).from(users)
+    const all = await db.select({ 
+      id: users.id, 
+      username: users.username, 
+      role: users.role, 
+      teamId: users.teamId, 
+      status: users.status, 
+      createdAt: users.createdAt 
+    }).from(users)
     json(res, all)
+    return true
+  }
+
+  // PUT /api/auth/users/:id/approve (admin only)
+  const approveMatch = path.match(/^\/api\/auth\/users\/([^/]+)\/approve$/)
+  if (approveMatch && method === 'PUT') {
+    const session = getSession(req)
+    if (!session || session.role !== 'admin') { json(res, { error: 'forbidden' }, 403); return true }
+    const userId = approveMatch[1]
+    await db.update(users).set({ status: 'approved' }).where(eq(users.id, userId))
+    json(res, { ok: true })
+    return true
+  }
+
+  // PUT /api/auth/users/:id/reject (admin only)
+  const rejectMatch = path.match(/^\/api\/auth\/users\/([^/]+)\/reject$/)
+  if (rejectMatch && method === 'PUT') {
+    const session = getSession(req)
+    if (!session || session.role !== 'admin') { json(res, { error: 'forbidden' }, 403); return true }
+    const userId = rejectMatch[1]
+    await db.update(users).set({ status: 'rejected' }).where(eq(users.id, userId))
+    json(res, { ok: true })
     return true
   }
 
@@ -149,7 +201,7 @@ export async function handleApiRequest(req: IncomingMessage, res: ServerResponse
     const body = await readBody(req)
     const { name, description } = body as { name?: string; description?: string }
     if (!name?.trim()) { json(res, { error: 'name required' }, 400); return true }
-    const id = ulid()
+    const id = randomUUID()
     await db.insert(teams).values({ id, name: name.trim(), description: description?.trim() ?? null, createdAt: Date.now() })
     json(res, { id, name, description }, 201)
     return true
@@ -282,7 +334,7 @@ export async function handleApiRequest(req: IncomingMessage, res: ServerResponse
     const teamId = body?.teamId ?? null
     const type = body?.type || (teamId ? 'team' : 'individual')
     const now = Date.now()
-    const id = ulid()
+    const id = randomUUID()
     const note = { id, userId: session.userId, teamId, type, title: '', content: '{"type":"doc","content":[]}', createdAt: now, updatedAt: now }
     await db.insert(notes).values(note)
     json(res, stripAndEnrich(note), 201)
@@ -329,7 +381,7 @@ export async function handleApiRequest(req: IncomingMessage, res: ServerResponse
     const ownerFilter = await getOwnerFilter(id, session.userId, session.role)
     const body = await readBody(req)
     const { pin } = body as { pin?: string }
-    const token = ulid()
+    const token = randomUUID()
     const sharePinHash = pin ? bcrypt.hashSync(pin, 10) : null
     await db.update(notes).set({ shareToken: token, sharePinHash }).where(ownerFilter)
     json(res, { token, hasPinProtection: !!sharePinHash })
@@ -457,7 +509,7 @@ export async function handleApiRequest(req: IncomingMessage, res: ServerResponse
     }
 
     const now = Date.now()
-    const newId = ulid()
+    const newId = randomUUID()
     await db.insert(notes).values({
       id: newId,
       userId: session.userId,
@@ -554,7 +606,7 @@ export async function handleApiRequest(req: IncomingMessage, res: ServerResponse
     }
 
     const now = Date.now()
-    const newId = ulid()
+    const newId = randomUUID()
     await db.insert(notes).values({
       id: newId,
       userId: session.userId,
@@ -662,7 +714,7 @@ export async function handleApiRequest(req: IncomingMessage, res: ServerResponse
     if (!fileBuffer || !noteId) { json(res, { error: 'missing file or noteId' }, 400); return true }
 
     const record = {
-      id: ulid(),
+      id: randomUUID(),
       noteId,
       filename,
       storedAs: saveFile(fileBuffer, filename),

@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach } from 'vitest'
 import { db } from '../lib/db'
 import { notes, users, teams } from '../../drizzle/schema'
 import { eq, and } from 'drizzle-orm'
-import { ulid } from 'ulid'
+import { randomUUID } from 'crypto'
 
 describe('Copy Note Two-Way Duplicate Verification', () => {
   let userId: string
@@ -15,9 +15,9 @@ describe('Copy Note Two-Way Duplicate Verification', () => {
     await db.delete(users)
     await db.delete(teams)
 
-    userId = ulid()
-    teamId = ulid()
-    adminId = ulid()
+    userId = randomUUID()
+    teamId = randomUUID()
+    adminId = randomUUID()
 
     // Insert dummy team and users
     await db.insert(teams).values({
@@ -46,7 +46,7 @@ describe('Copy Note Two-Way Duplicate Verification', () => {
   })
 
   it('should handle copying individual notes to team and prevent duplicates', async () => {
-    const noteId = ulid()
+    const noteId = randomUUID()
     // 1. Create individual note A
     await db.insert(notes).values({
       id: noteId,
@@ -90,7 +90,7 @@ describe('Copy Note Two-Way Duplicate Verification', () => {
     expect(allowed).toBe(true)
 
     // Perform copy
-    const teamNoteId = ulid()
+    const teamNoteId = randomUUID()
     await db.insert(notes).values({
       id: teamNoteId,
       userId: userId,
@@ -116,8 +116,8 @@ describe('Copy Note Two-Way Duplicate Verification', () => {
   })
 
   it('should handle copying team notes back to personal workspace and prevent duplicates', async () => {
-    const teamNoteId = ulid()
-    const originalIndividualId = ulid()
+    const teamNoteId = randomUUID()
+    const originalIndividualId = randomUUID()
 
     // 1. Create individual note A
     await db.insert(notes).values({
@@ -183,7 +183,7 @@ describe('Copy Note Two-Way Duplicate Verification', () => {
     expect(allowed).toBe(true)
 
     // Perform copy to create individual note C
-    const newIndividualId = ulid()
+    const newIndividualId = randomUUID()
     await db.insert(notes).values({
       id: newIndividualId,
       userId: userId,

@@ -13,7 +13,6 @@ import 'reactflow/dist/style.css'
 import { useState, useCallback, useEffect } from 'react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../ui/dialog'
 import { Trash2 } from 'lucide-react'
-import { ulid } from 'ulid'
 
 const NODE_TYPES_AVAILABLE = ['rectangle', 'circle', 'diamond'] as const
 
@@ -64,7 +63,7 @@ function DiagramNodeView({ node, updateAttributes, deleteNode }: any) {
   }
 
   function addNode(type: string) {
-    const id = ulid()
+    const id = crypto.randomUUID()
     setNodes(ns => [...ns, {
       id,
       type: 'default',

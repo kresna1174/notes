@@ -1,10 +1,10 @@
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '../ui/collapsible'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '../ui/dialog'
-import { ChevronDown, ChevronRight, FileText, Trash2, AlertTriangle } from 'lucide-react'
+import { ChevronDown, ChevronRight, FileText, Trash2, AlertTriangle, Globe } from 'lucide-react'
 import { useState, useRef, useEffect } from 'react'
 import { cn } from '../../lib/utils'
 
-interface Note { id: string; title: string; createdAt: number }
+interface Note { id: string; title: string; createdAt: number; shareToken?: string | null }
 
 interface DayGroupProps {
   label: string
@@ -112,6 +112,25 @@ export function DayGroup({ label, notes, activeNoteId, onSelect, onRename, onDel
                 >
                   {(note.title || 'Untitled').length > 20 ? (note.title || 'Untitled').slice(0, 20) + '…' : (note.title || 'Untitled')}
                 </span>
+                {note.shareToken && (
+                  <span style={{
+                    fontSize: '0.675rem',
+                    fontWeight: 600,
+                    padding: '1px 5px',
+                    borderRadius: '10px',
+                    background: 'rgba(26,115,232,0.08)',
+                    color: 'var(--primary)',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '3px',
+                    border: '1px solid rgba(26,115,232,0.15)',
+                    flexShrink: 0,
+                    marginRight: hoverId === note.id ? 4 : 0,
+                  }}>
+                    <Globe size={10} />
+                    Public
+                  </span>
+                )}
                 {hoverId === note.id && (
                   <button
                     onClick={e => { e.stopPropagation(); setDeleteTarget(note) }}

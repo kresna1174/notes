@@ -8,7 +8,7 @@ export const Route = createFileRoute('/users')({
   component: UsersPage,
 })
 
-interface User { id: string; username: string; role: 'admin' | 'viewer'; createdAt: number }
+interface User { id: string; username: string; role: 'admin' | 'viewer'; status: 'approved' | 'rejected' | 'pending'; createdAt: number }
 
 function UsersPage() {
   const { user } = useAuth()
@@ -43,6 +43,16 @@ function UsersPage() {
     if (!res.ok) { setError(data.error); return }
     setForm({ username: '', password: '', role: 'viewer' })
     setShowForm(false)
+    load()
+  }
+
+  async function handleApprove(id: string) {
+    await fetch(`/api/auth/users/${id}/approve`, { method: 'PUT' })
+    load()
+  }
+
+  async function handleReject(id: string) {
+    await fetch(`/api/auth/users/${id}/reject`, { method: 'PUT' })
     load()
   }
 
@@ -161,63 +171,159 @@ function UsersPage() {
             </form>
           )}
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {users.map(u => (
-              <div key={u.id} style={{
-                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                padding: '12px 16px',
-                border: '1px solid var(--border)', borderRadius: 10,
-                background: u.id === user?.userId ? 'var(--accent)' : 'var(--card-bg)',
-              }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                  <div style={{
-                    width: 36, height: 36, borderRadius: 8,
-                    background: u.role === 'admin' ? 'var(--accent)' : 'var(--muted)',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    color: u.role === 'admin' ? 'var(--primary)' : 'var(--fg-subtle)',
+          {/* Pending Approval Section */}
+          {users.some(u => u.status === 'pending') && (
+            <div style={{ marginBottom: 32 }}>
+              <h2 style={{ fontFamily: 'var(--font-heading)', fontWeight: 600, fontSize: '1.1rem', color: 'var(--fg)', marginBottom: 12 }}>
+                Permintaan Pendaftaran (Pending Approval)
+              </h2>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {users.filter(u => u.status === 'pending').map(u => (
+                  <div key={u.id} style={{
+                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                    padding: '12px 16px',
+                    border: '1px solid var(--border)', borderRadius: 10,
+                    background: 'var(--card-bg)',
                   }}>
-                    {u.role === 'admin' ? <Shield size={16} /> : <Eye size={16} />}
-                  </div>
-                  <div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <span style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--fg)', fontFamily: 'var(--font-body)' }}>
-                        {u.username}
-                      </span>
-                      {u.id === user?.userId && (
-                        <span style={{
-                          fontSize: '0.7rem', padding: '1px 7px',
-                          background: 'var(--primary)', color: 'var(--primary-fg)',
-                          borderRadius: 20, fontWeight: 500,
-                        }}>
-                          Kamu
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                      <div style={{
+                        width: 36, height: 36, borderRadius: 8,
+                        background: 'var(--muted)',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        color: 'var(--fg-subtle)',
+                      }}>
+                        <Eye size={16} />
+                      </div>
+                      <div>
+                        <span style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--fg)', fontFamily: 'var(--font-body)' }}>
+                          {u.username}
                         </span>
-                      )}
+                        <div style={{ fontSize: '0.72rem', color: 'var(--fg-subtle)', marginTop: 2 }}>
+                          Mendaftar pada {new Date(u.createdAt).toLocaleDateString('id-ID')}
+                        </div>
+                      </div>
                     </div>
-                    <span style={{
-                      fontSize: '0.75rem', fontWeight: 500, textTransform: 'capitalize',
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <button
+                        onClick={() => handleApprove(u.id)}
+                        style={{
+                          padding: '6px 14px', fontSize: '0.8rem', fontWeight: 600,
+                          background: 'var(--primary)', color: 'var(--primary-fg)',
+                          border: 'none', borderRadius: 6, cursor: 'pointer',
+                          fontFamily: 'var(--font-body)',
+                        }}
+                        onMouseEnter={e => (e.currentTarget.style.opacity = '0.9')}
+                        onMouseLeave={e => (e.currentTarget.style.opacity = '1')}
+                      >
+                        Setujui
+                      </button>
+                      <button
+                        onClick={() => handleReject(u.id)}
+                        style={{
+                          padding: '6px 14px', fontSize: '0.8rem', fontWeight: 600,
+                          background: 'rgba(224,49,49,0.05)', color: '#e03131',
+                          border: '1px solid rgba(224,49,49,0.3)', borderRadius: 6, cursor: 'pointer',
+                          fontFamily: 'var(--font-body)',
+                        }}
+                        onMouseEnter={e => (e.currentTarget.style.background = 'rgba(224,49,49,0.12)')}
+                        onMouseLeave={e => (e.currentTarget.style.background = 'rgba(224,49,49,0.05)')}
+                      >
+                        Tolak
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Active Users Section */}
+          <div>
+            <h2 style={{ fontFamily: 'var(--font-heading)', fontWeight: 600, fontSize: '1.1rem', color: 'var(--fg)', marginBottom: 12 }}>
+              Daftar Pengguna
+            </h2>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {users.filter(u => u.status !== 'pending').map(u => (
+                <div key={u.id} style={{
+                  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                  padding: '12px 16px',
+                  border: '1px solid var(--border)', borderRadius: 10,
+                  background: u.id === user?.userId ? 'var(--accent)' : 'var(--card-bg)',
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                    <div style={{
+                      width: 36, height: 36, borderRadius: 8,
+                      background: u.role === 'admin' ? 'var(--accent)' : 'var(--muted)',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
                       color: u.role === 'admin' ? 'var(--primary)' : 'var(--fg-subtle)',
                     }}>
-                      {u.role}
-                    </span>
+                      {u.role === 'admin' ? <Shield size={16} /> : <Eye size={16} />}
+                    </div>
+                    <div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <span style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--fg)', fontFamily: 'var(--font-body)' }}>
+                          {u.username}
+                        </span>
+                        {u.status === 'rejected' && (
+                          <span style={{
+                            fontSize: '0.7rem', padding: '1px 7px',
+                            background: 'rgba(224,49,49,0.1)', color: '#e03131',
+                            borderRadius: 20, fontWeight: 500,
+                          }}>
+                            Ditolak
+                          </span>
+                        )}
+                        {u.id === user?.userId && (
+                          <span style={{
+                            fontSize: '0.7rem', padding: '1px 7px',
+                            background: 'var(--primary)', color: 'var(--primary-fg)',
+                            borderRadius: 20, fontWeight: 500,
+                          }}>
+                            Kamu
+                          </span>
+                        )}
+                      </div>
+                      <span style={{
+                        fontSize: '0.75rem', fontWeight: 500, textTransform: 'capitalize',
+                        color: u.role === 'admin' ? 'var(--primary)' : 'var(--fg-subtle)',
+                      }}>
+                        {u.role}
+                      </span>
+                    </div>
                   </div>
+                  {u.id !== user?.userId && (
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      {u.status === 'rejected' && (
+                        <button
+                          onClick={() => handleApprove(u.id)}
+                          style={{
+                            padding: '4px 10px', fontSize: '0.75rem', fontWeight: 600,
+                            background: 'transparent', color: 'var(--primary)',
+                            border: '1.5px solid var(--primary)', borderRadius: 6, cursor: 'pointer',
+                            fontFamily: 'var(--font-body)',
+                          }}
+                        >
+                          Aktifkan
+                        </button>
+                      )}
+                      <button
+                        onClick={() => handleDelete(u.id, u.username)}
+                        style={{
+                          width: 32, height: 32,
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          background: 'transparent', border: 'none',
+                          borderRadius: 6, cursor: 'pointer', color: 'var(--fg-subtle)',
+                        }}
+                        onMouseEnter={e => { e.currentTarget.style.background = 'rgba(224,49,49,0.1)'; e.currentTarget.style.color = '#e03131' }}
+                        onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--fg-subtle)' }}
+                      >
+                        <Trash2 size={15} />
+                      </button>
+                    </div>
+                  )}
                 </div>
-                {u.id !== user?.userId && (
-                  <button
-                    onClick={() => handleDelete(u.id, u.username)}
-                    style={{
-                      width: 32, height: 32,
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      background: 'transparent', border: 'none',
-                      borderRadius: 6, cursor: 'pointer', color: 'var(--fg-subtle)',
-                    }}
-                    onMouseEnter={e => { e.currentTarget.style.background = 'rgba(224,49,49,0.1)'; e.currentTarget.style.color = '#e03131' }}
-                    onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--fg-subtle)' }}
-                  >
-                    <Trash2 size={15} />
-                  </button>
-                )}
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
         </div>
       </main>

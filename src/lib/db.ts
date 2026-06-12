@@ -5,7 +5,7 @@ import { mkdirSync } from 'fs'
 import { join, dirname } from 'path'
 import { fileURLToPath } from 'url'
 import bcrypt from 'bcryptjs'
-import { ulid } from 'ulid'
+import { randomUUID } from 'crypto'
 
 declare global {
   // eslint-disable-next-line no-var
@@ -73,7 +73,7 @@ if (!globalThis.__notesSqlite) {
   if (count === 0) {
     const hash = bcrypt.hashSync('admin123', 10)
     _sqlite.prepare('INSERT INTO users (id, username, password_hash, role, created_at) VALUES (?, ?, ?, ?, ?)')
-      .run(ulid(), 'admin', hash, 'admin', Date.now())
+      .run(randomUUID(), 'admin', hash, 'admin', Date.now())
   }
 
   globalThis.__notesSqlite = _sqlite
@@ -112,6 +112,9 @@ if (!notesCols.includes('copied_from_id')) {
 const usersCols = (sqlite.pragma('table_info(users)') as { name: string }[]).map(c => c.name)
 if (!usersCols.includes('team_id')) {
   sqlite.exec(`ALTER TABLE users ADD COLUMN team_id TEXT`)
+}
+if (!usersCols.includes('status')) {
+  sqlite.exec(`ALTER TABLE users ADD COLUMN status TEXT NOT NULL DEFAULT 'approved'`)
 }
 
 export const db = drizzle(sqlite, { schema })
