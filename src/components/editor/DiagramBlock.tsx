@@ -12,13 +12,15 @@ import ReactFlow, {
 import 'reactflow/dist/style.css'
 import { useState, useCallback, useEffect } from 'react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../ui/dialog'
-import { Button } from '../ui/button'
+import { Trash2 } from 'lucide-react'
 import { ulid } from 'ulid'
 
 const NODE_TYPES_AVAILABLE = ['rectangle', 'circle', 'diamond'] as const
 
-function DiagramNodeView({ node, updateAttributes }: any) {
+function DiagramNodeView({ node, updateAttributes, deleteNode }: any) {
   const [open, setOpen] = useState(false)
+  const [hovered, setHovered] = useState(false)
+
   const parsed = (() => {
     try { return JSON.parse(node.attrs.data) } catch { return { nodes: [], edges: [] } }
   })()
@@ -79,42 +81,119 @@ function DiagramNodeView({ node, updateAttributes }: any) {
   return (
     <NodeViewWrapper>
       <div
-        className="border rounded-lg bg-muted/30 flex items-center justify-center cursor-pointer h-40 text-sm text-muted-foreground hover:bg-muted/50 select-none"
-        onClick={() => setOpen(true)}
+        className="relative"
+        onMouseEnter={() => setHovered(true)}
+        onMouseLeave={() => setHovered(false)}
       >
-        {nodes.length === 0
-          ? 'Click to add diagram'
-          : `Diagram · ${nodes.length} node${nodes.length !== 1 ? 's' : ''}, ${edges.length} edge${edges.length !== 1 ? 's' : ''}`}
+        {hovered && (
+          <button
+            onClick={e => { e.stopPropagation(); deleteNode() }}
+            title="Delete diagram"
+            style={{
+              position: 'absolute', top: 8, right: 8, zIndex: 10,
+              background: 'var(--card-bg)', border: '1px solid var(--border)',
+              borderRadius: 6, padding: '4px 6px', cursor: 'pointer',
+              color: '#e03131', display: 'flex', alignItems: 'center',
+            }}
+          >
+            <Trash2 size={14} />
+          </button>
+        )}
+
+        <div
+          onClick={() => setOpen(true)}
+          style={{
+            border: '1px solid var(--border)', borderRadius: 10,
+            background: 'var(--muted)', height: 120,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            cursor: 'pointer', fontSize: '0.875rem',
+            fontFamily: 'var(--font-body)', color: 'var(--fg-muted)',
+            userSelect: 'none', transition: 'background 0.15s',
+          }}
+          onMouseEnter={e => (e.currentTarget.style.background = 'var(--accent)')}
+          onMouseLeave={e => (e.currentTarget.style.background = 'var(--muted)')}
+        >
+          {nodes.length === 0
+            ? '+ Click to create diagram'
+            : `Diagram · ${nodes.length} node${nodes.length !== 1 ? 's' : ''}, ${edges.length} edge${edges.length !== 1 ? 's' : ''}`}
+        </div>
       </div>
-      <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="max-w-5xl h-[80vh] flex flex-col p-0">
-          <DialogHeader className="px-4 pt-4 pb-2">
-            <DialogTitle>Edit Diagram</DialogTitle>
+
+      <Dialog open={open} onOpenChange={(v) => { if (!v) handleCancel() }}>
+        <DialogContent
+          style={{
+            maxWidth: '90vw', width: 900, height: '85vh',
+            display: 'flex', flexDirection: 'column',
+            padding: 0, gap: 0, overflow: 'hidden',
+            background: 'var(--card-bg)', color: 'var(--fg)',
+          }}
+        >
+          <DialogHeader style={{ padding: '16px 20px 12px', borderBottom: '1px solid var(--border)', flexShrink: 0 }}>
+            <DialogTitle style={{ fontSize: '0.9375rem', color: 'var(--fg)', fontFamily: 'var(--font-heading)' }}>
+              Edit Diagram
+            </DialogTitle>
           </DialogHeader>
-          <div className="flex gap-2 px-4 pb-2 border-b">
+
+          <div style={{ display: 'flex', gap: 8, padding: '10px 20px', borderBottom: '1px solid var(--border)', flexShrink: 0 }}>
             {NODE_TYPES_AVAILABLE.map(t => (
-              <Button key={t} variant="outline" size="sm" onClick={() => addNode(t)}>
+              <button
+                key={t}
+                onClick={() => addNode(t)}
+                style={{
+                  padding: '4px 12px', fontSize: '0.8125rem',
+                  fontFamily: 'var(--font-body)',
+                  border: '1px solid var(--border)', borderRadius: 6,
+                  background: 'var(--bg)', cursor: 'pointer', color: 'var(--fg)',
+                }}
+                onMouseEnter={e => (e.currentTarget.style.background = 'var(--accent)')}
+                onMouseLeave={e => (e.currentTarget.style.background = 'var(--bg)')}
+              >
                 + {t}
-              </Button>
+              </button>
             ))}
           </div>
-          <div className="flex-1 h-full">
-            <ReactFlow
-              nodes={nodes}
-              edges={edges}
-              onNodesChange={onNodesChange}
-              onEdgesChange={onEdgesChange}
-              onConnect={onConnect}
-              fitView
-            >
-              <Controls />
-              <MiniMap />
-              <Background />
-            </ReactFlow>
+
+          <div style={{ flex: 1, minHeight: 0 }}>
+            <div style={{ width: '100%', height: '100%' }}>
+              <ReactFlow
+                nodes={nodes}
+                edges={edges}
+                onNodesChange={onNodesChange}
+                onEdgesChange={onEdgesChange}
+                onConnect={onConnect}
+                fitView
+              >
+                <Controls />
+                <MiniMap />
+                <Background />
+              </ReactFlow>
+            </div>
           </div>
-          <div className="flex justify-end gap-2 px-4 py-3 border-t">
-            <Button variant="ghost" onClick={handleCancel}>Cancel</Button>
-            <Button onClick={save}>Save</Button>
+
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, padding: '12px 20px', borderTop: '1px solid var(--border)', flexShrink: 0 }}>
+            <button
+              onClick={handleCancel}
+              style={{
+                padding: '6px 16px', fontSize: '0.875rem',
+                fontFamily: 'var(--font-body)',
+                border: '1px solid var(--border)', borderRadius: 6,
+                background: 'var(--bg)', cursor: 'pointer', color: 'var(--fg-muted)',
+              }}
+            >
+              Cancel
+            </button>
+            <button
+              onClick={save}
+              style={{
+                padding: '6px 16px', fontSize: '0.875rem',
+                fontFamily: 'var(--font-body)',
+                border: 'none', borderRadius: 6,
+                background: 'var(--primary)', cursor: 'pointer',
+                color: 'var(--primary-fg)', fontWeight: 500,
+              }}
+            >
+              Save
+            </button>
           </div>
         </DialogContent>
       </Dialog>
@@ -129,13 +208,9 @@ export const DiagramBlock = Node.create({
   addAttributes() {
     return { data: { default: JSON.stringify({ nodes: [], edges: [] }) } }
   },
-  parseHTML() {
-    return [{ tag: 'div[data-type="diagram"]' }]
-  },
+  parseHTML() { return [{ tag: 'div[data-type="diagram"]' }] },
   renderHTML({ HTMLAttributes }) {
     return ['div', mergeAttributes(HTMLAttributes, { 'data-type': 'diagram' })]
   },
-  addNodeView() {
-    return ReactNodeViewRenderer(DiagramNodeView)
-  },
+  addNodeView() { return ReactNodeViewRenderer(DiagramNodeView) },
 })

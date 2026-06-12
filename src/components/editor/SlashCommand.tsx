@@ -32,12 +32,33 @@ const CommandList = forwardRef(({ items, command }: any, ref) => {
   }))
 
   return (
-    <div className="bg-background border rounded-md shadow-lg py-1 min-w-[180px] z-50">
+    <div
+      style={{
+        background: '#ffffff',
+        border: '1px solid #e9ecef',
+        borderRadius: '10px',
+        boxShadow: '0 4px 24px rgba(0,0,0,0.10)',
+        padding: '4px',
+        minWidth: '200px',
+        zIndex: 9999,
+      }}
+    >
       {items.map((item: any, i: number) => (
         <button
           key={item.title}
           onClick={() => command(item)}
-          className={`flex w-full px-3 py-1.5 text-sm text-left hover:bg-accent ${i === selected ? 'bg-accent' : ''}`}
+          style={{
+            display: 'flex',
+            width: '100%',
+            padding: '6px 10px',
+            fontSize: '0.875rem',
+            textAlign: 'left',
+            borderRadius: '6px',
+            color: i === selected ? '#3b5bdb' : '#1a1a2e',
+            background: i === selected ? '#e8edff' : 'transparent',
+            border: 'none',
+            cursor: 'pointer',
+          }}
         >
           {item.title}
         </button>
@@ -73,15 +94,19 @@ export const SlashCommandExtension = Extension.create({
               document.body.appendChild(popup)
               popup.appendChild(component.element)
 
-              const rect = props.getReferenceClientRect()
-              popup.style.top = `${rect.bottom + 8}px`
-              popup.style.left = `${rect.left}px`
+              const rect = typeof props.clientRect === 'function' ? props.clientRect() : null
+              if (rect) {
+                popup.style.top = `${rect.bottom + 8}px`
+                popup.style.left = `${rect.left}px`
+              }
             },
             onUpdate: (props: any) => {
               component.updateProps(props)
-              const rect = props.getReferenceClientRect()
-              popup.style.top = `${rect.bottom + 8}px`
-              popup.style.left = `${rect.left}px`
+              const rect = typeof props.clientRect === 'function' ? props.clientRect() : null
+              if (rect) {
+                popup.style.top = `${rect.bottom + 8}px`
+                popup.style.left = `${rect.left}px`
+              }
             },
             onKeyDown: (props: any) => (component.ref as any)?.onKeyDown(props),
             onExit: () => {

@@ -5,6 +5,21 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>notes-app</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700;800&family=Inter:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&family=Lora:ital,wght@0,400;0,500;0,600;1,400&family=Space+Grotesk:wght@400;500;600;700&family=Plus+Jakarta+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet" />
+    <script>
+      (function () {
+        var map = {
+          '1': { h: 'Outfit', b: 'Inter' },
+          '2': { h: 'Playfair Display', b: 'Lora' },
+          '3': { h: 'Space Grotesk', b: 'Plus Jakarta Sans' }
+        };
+        var p = map[localStorage.getItem('font-preset')] || map['1'];
+        document.documentElement.style.setProperty('--font-heading', "'" + p.h + "', sans-serif");
+        document.documentElement.style.setProperty('--font-body', "'" + p.b + "', sans-serif");
+      })();
+    </script>
   </head>
   <body>
     <div id="app"></div>

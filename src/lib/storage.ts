@@ -1,4 +1,4 @@
-import { writeFileSync, readFileSync, unlinkSync, existsSync } from 'fs'
+import { writeFileSync, unlinkSync, existsSync } from 'fs'
 import { join, extname, dirname } from 'path'
 import { fileURLToPath } from 'url'
 import { ulid } from 'ulid'

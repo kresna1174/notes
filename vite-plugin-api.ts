@@ -7,7 +7,7 @@ export function apiPlugin(): Plugin {
       server.middlewares.use(async (req, res, next) => {
         if (!req.url?.startsWith('/api/')) return next()
         try {
-          const { handleApiRequest } = await import('./src/server/api.js')
+          const { handleApiRequest } = await server.ssrLoadModule('/src/server/api.ts')
           const handled = await handleApiRequest(req, res)
           if (!handled) next()
         } catch (err) {

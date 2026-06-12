@@ -1,45 +1,178 @@
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '../ui/collapsible'
-import { ChevronDown, ChevronRight, FileText } from 'lucide-react'
-import { useState } from 'react'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '../ui/dialog'
+import { ChevronDown, ChevronRight, FileText, Trash2, AlertTriangle } from 'lucide-react'
+import { useState, useRef, useEffect } from 'react'
 import { cn } from '../../lib/utils'
 
-interface Note {
-  id: string
-  title: string
-  createdAt: number
-}
+interface Note { id: string; title: string; createdAt: number }
 
 interface DayGroupProps {
   label: string
   notes: Note[]
   activeNoteId: string | null
   onSelect: (id: string) => void
+  onRename: (id: string, title: string) => void
+  onDelete: (id: string) => void
 }
 
-export function DayGroup({ label, notes, activeNoteId, onSelect }: DayGroupProps) {
+export function DayGroup({ label, notes, activeNoteId, onSelect, onRename, onDelete }: DayGroupProps) {
   const [open, setOpen] = useState(true)
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [hoverId, setHoverId] = useState<string | null>(null)
+  const [editValue, setEditValue] = useState('')
+  const [deleteTarget, setDeleteTarget] = useState<Note | null>(null)
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    if (editingId && inputRef.current) {
+      inputRef.current.focus()
+      inputRef.current.select()
+    }
+  }, [editingId])
+
+  function startEdit(note: Note, e: React.MouseEvent) {
+    e.stopPropagation()
+    setEditingId(note.id)
+    setEditValue(note.title || '')
+  }
+
+  function commitEdit() {
+    if (editingId) {
+      onRename(editingId, editValue.trim() || 'Untitled')
+      setEditingId(null)
+    }
+  }
 
   return (
-    <Collapsible open={open} onOpenChange={setOpen}>
-      <CollapsibleTrigger className="flex items-center gap-1 w-full px-3 py-1 text-xs font-semibold text-muted-foreground hover:text-foreground select-none">
+    <Collapsible open={open} onOpenChange={setOpen} className="mb-2">
+      <CollapsibleTrigger
+        className="flex items-center gap-1.5 w-full px-2 py-1 rounded-md select-none transition-colors"
+        style={{ color: 'var(--fg-subtle)' }}
+        onMouseEnter={e => (e.currentTarget.style.color = 'var(--fg)')}
+        onMouseLeave={e => (e.currentTarget.style.color = 'var(--fg-subtle)')}
+      >
         {open ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
-        {label}
+        <span className="text-xs font-semibold uppercase tracking-wider">{label}</span>
       </CollapsibleTrigger>
       <CollapsibleContent>
         {notes.map(note => (
-          <button
+          <div
             key={note.id}
-            onClick={() => onSelect(note.id)}
-            className={cn(
-              'flex items-center gap-2 w-full px-4 py-1.5 text-sm text-left truncate hover:bg-accent rounded-sm',
-              activeNoteId === note.id && 'bg-accent font-medium'
-            )}
+            className={cn('flex items-center gap-2 w-full px-3 py-1.5 text-sm rounded-lg mb-0.5', activeNoteId === note.id ? 'font-medium' : '')}
+            style={activeNoteId === note.id
+              ? { background: 'var(--accent)', color: 'var(--primary)', cursor: 'pointer' }
+              : { color: 'var(--fg)', cursor: 'pointer' }
+            }
+            onClick={() => { if (editingId !== note.id) onSelect(note.id) }}
+            onMouseEnter={e => {
+              setHoverId(note.id)
+              if (activeNoteId !== note.id) e.currentTarget.style.background = 'var(--accent)'
+            }}
+            onMouseLeave={e => {
+              if (e.currentTarget.contains(e.relatedTarget as Node)) return
+              setHoverId(null)
+              if (activeNoteId !== note.id) e.currentTarget.style.background = 'transparent'
+            }}
           >
-            <FileText className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-            <span className="truncate">{note.title || 'Untitled'}</span>
-          </button>
+            <FileText className="h-3.5 w-3.5 shrink-0" style={{ color: activeNoteId === note.id ? 'var(--primary)' : 'var(--fg-subtle)' }} />
+            {editingId === note.id ? (
+              <input
+                ref={inputRef}
+                value={editValue}
+                onChange={e => setEditValue(e.target.value)}
+                onBlur={commitEdit}
+                onKeyDown={e => {
+                  if (e.key === 'Enter') commitEdit()
+                  if (e.key === 'Escape') setEditingId(null)
+                }}
+                onClick={e => e.stopPropagation()}
+                style={{
+                  flex: 1, minWidth: 0,
+                  background: 'var(--input-bg)',
+                  border: '1px solid var(--primary)',
+                  borderRadius: 4,
+                  padding: '1px 5px',
+                  fontSize: '0.875rem',
+                  color: 'var(--fg)',
+                  outline: 'none',
+                }}
+              />
+            ) : (
+              <>
+                <span
+                  style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+                  onDoubleClick={e => startEdit(note, e)}
+                  title={note.title || 'Untitled'}
+                >
+                  {(note.title || 'Untitled').length > 20 ? (note.title || 'Untitled').slice(0, 20) + '…' : (note.title || 'Untitled')}
+                </span>
+                {hoverId === note.id && (
+                  <button
+                    onClick={e => { e.stopPropagation(); setDeleteTarget(note) }}
+                    title="Hapus note"
+                    style={{
+                      flexShrink: 0, width: 20, height: 20,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      borderRadius: 4, border: 'none', cursor: 'pointer',
+                      background: 'transparent', color: '#e03131', padding: 0,
+                    }}
+                    onMouseEnter={e => (e.currentTarget.style.background = 'rgba(224,49,49,0.12)')}
+                    onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+                  >
+                    <Trash2 size={12} />
+                  </button>
+                )}
+              </>
+            )}
+          </div>
         ))}
       </CollapsibleContent>
+
+      <Dialog open={!!deleteTarget} onOpenChange={open => { if (!open) setDeleteTarget(null) }}>
+        <DialogContent showCloseButton={false} style={{ maxWidth: 380 }}>
+          <DialogHeader>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
+              <div style={{ width: 36, height: 36, borderRadius: 8, background: 'rgba(224,49,49,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <AlertTriangle size={18} color="#e03131" />
+              </div>
+              <DialogTitle style={{ fontFamily: 'var(--font-heading)', fontSize: '1rem' }}>Hapus Catatan</DialogTitle>
+            </div>
+            <DialogDescription style={{ fontFamily: 'var(--font-body)', fontSize: '0.85rem', lineHeight: 1.5 }}>
+              Yakin ingin menghapus{' '}
+              <strong style={{ color: 'var(--fg)' }}>"{deleteTarget?.title || 'Untitled'}"</strong>?
+              {' '}Tindakan ini tidak bisa dibatalkan.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter style={{ marginTop: 4 }}>
+            <button
+              onClick={() => setDeleteTarget(null)}
+              style={{
+                padding: '7px 16px', fontSize: '0.8rem', fontWeight: 500,
+                border: '1px solid var(--border)', borderRadius: 7,
+                background: 'var(--bg)', color: 'var(--fg-muted)',
+                cursor: 'pointer', fontFamily: 'var(--font-body)',
+              }}
+              onMouseEnter={e => { e.currentTarget.style.background = 'var(--muted)' }}
+              onMouseLeave={e => { e.currentTarget.style.background = 'var(--bg)' }}
+            >
+              Batal
+            </button>
+            <button
+              onClick={() => { if (deleteTarget) { onDelete(deleteTarget.id); setDeleteTarget(null) } }}
+              style={{
+                padding: '7px 16px', fontSize: '0.8rem', fontWeight: 600,
+                border: 'none', borderRadius: 7,
+                background: '#e03131', color: '#fff',
+                cursor: 'pointer', fontFamily: 'var(--font-body)',
+              }}
+              onMouseEnter={e => { e.currentTarget.style.background = '#c92a2a' }}
+              onMouseLeave={e => { e.currentTarget.style.background = '#e03131' }}
+            >
+              Hapus
+            </button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Collapsible>
   )
 }
