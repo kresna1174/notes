@@ -1,0 +1,15 @@
+services:
+  notes-app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: homebrew-notes
+    restart: always
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./data:/app/data
+      - ./uploads:/app/uploads
+    environment:
+      - PORT=3000
+      - NODE_ENV=production
