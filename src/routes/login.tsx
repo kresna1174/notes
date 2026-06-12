@@ -2,6 +2,7 @@ import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { useState } from 'react'
 import { useAuth } from '../lib/auth'
 import { Eye, EyeOff } from 'lucide-react'
+import { AboutModal } from '../components/ui/AboutModal'
 
 export const Route = createFileRoute('/login')({
   component: LoginPage,
@@ -17,6 +18,7 @@ function LoginPage() {
   const [error, setError] = useState<string | null>(null)
   const [successMsg, setSuccessMsg] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
+  const [showAbout, setShowAbout] = useState(false)
 
   if (user) {
     navigate({ to: '/' })
@@ -209,7 +211,26 @@ function LoginPage() {
             {isRegister ? (loading ? 'Mendaftar…' : 'Daftar') : (loading ? 'Signing in…' : 'Sign in')}
           </button>
         </form>
+
+        <div style={{ marginTop: 24, textAlign: 'center' }}>
+          <button
+            type="button"
+            onClick={() => setShowAbout(true)}
+            style={{
+              background: 'none', border: 'none',
+              fontSize: '0.75rem', color: 'var(--fg-muted)',
+              cursor: 'pointer', textDecoration: 'underline',
+              fontFamily: 'var(--font-body)'
+            }}
+            onMouseEnter={e => (e.currentTarget.style.color = 'var(--primary)')}
+            onMouseLeave={e => (e.currentTarget.style.color = 'var(--fg-muted)')}
+          >
+            Tentang & Catatan Rilis
+          </button>
+        </div>
       </div>
+
+      <AboutModal open={showAbout} onOpenChange={setShowAbout} />
     </div>
   )
 }

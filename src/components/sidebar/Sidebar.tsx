@@ -3,10 +3,11 @@ import { useNavigate } from '@tanstack/react-router'
 import { ScrollArea } from '../ui/scroll-area'
 import { DayGroup } from './DayGroup'
 import { SearchBar } from './SearchBar'
-import { Plus, LogOut, Users, Shield, Eye, UsersRound } from 'lucide-react'
+import { Plus, LogOut, Users, Shield, Eye, UsersRound, Info } from 'lucide-react'
 import { FontPicker } from './FontPicker'
 import { ThemeToggle } from './ThemeToggle'
 import { useAuth } from '../../lib/auth'
+import { AboutModal } from '../ui/AboutModal'
 
 interface Note { id: string; title: string; createdAt: number; shareToken?: string | null }
 interface SearchResult { id: string; title: string; createdAt: number; snippet: string }
@@ -49,6 +50,7 @@ export function Sidebar({ activeNoteId, onShareNote, notesUpdateTrigger }: Sideb
   const startW = useRef(0)
   const navigate = useNavigate()
   const { user, logout } = useAuth()
+  const [showAbout, setShowAbout] = useState(false)
 
   useEffect(() => {
     function onMove(e: MouseEvent) {
@@ -345,6 +347,20 @@ export function Sidebar({ activeNoteId, onShareNote, notesUpdateTrigger }: Sideb
           </button>
           </>
         )}
+
+        <button
+          onClick={() => setShowAbout(true)}
+          style={{
+            display: 'flex', alignItems: 'center', gap: 8, width: '100%',
+            padding: '7px 10px', borderRadius: 7, border: 'none',
+            background: 'transparent', cursor: 'pointer', marginBottom: 4,
+            fontSize: '0.8125rem', color: C.fgMuted, fontFamily: 'var(--font-body)',
+          }}
+          onMouseEnter={e => { e.currentTarget.style.background = C.accent; e.currentTarget.style.color = C.primary }}
+          onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = C.fgMuted }}
+        >
+          <Info size={14} /> Info & Changelog
+        </button>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 10px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
             <div style={{
@@ -398,6 +414,7 @@ export function Sidebar({ activeNoteId, onShareNote, notesUpdateTrigger }: Sideb
         onMouseEnter={e => (e.currentTarget.style.background = 'var(--primary)')}
         onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
       />
+      <AboutModal open={showAbout} onOpenChange={setShowAbout} />
     </div>
   )
 }
