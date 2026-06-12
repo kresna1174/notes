@@ -1,12 +1,24 @@
-import { Moon, Sun } from 'lucide-react'
+import { Moon, Sun, Beer } from 'lucide-react'
 import { useTheme } from '../../lib/theme'
 
 export function ThemeToggle() {
   const { theme, toggle } = useTheme()
+
+  let icon = <Moon size={14} />
+  let title = 'Switch to dark mode'
+
+  if (theme === 'dark') {
+    icon = <Beer size={14} />
+    title = 'Switch to Homebrew theme'
+  } else if (theme === 'homebrew') {
+    icon = <Sun size={14} />
+    title = 'Switch to light mode'
+  }
+
   return (
     <button
       onClick={toggle}
-      title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+      title={title}
       style={{
         width: 28, height: 28,
         display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -17,7 +29,7 @@ export function ThemeToggle() {
       onMouseEnter={e => { e.currentTarget.style.background = 'var(--accent)'; e.currentTarget.style.color = 'var(--primary)' }}
       onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--fg-muted)' }}
     >
-      {theme === 'dark' ? <Sun size={14} /> : <Moon size={14} />}
+      {icon}
     </button>
   )
 }

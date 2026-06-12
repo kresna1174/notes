@@ -120,6 +120,57 @@ body {
   --radius: 8px;
 }
 
+/* ── Homebrew theme ────────────────────────────────────────── */
+[data-theme="homebrew"] {
+  --bg: #f9f5eb;          /* Faded/pale warm cream-yellow background */
+  --bg-app: #f2ece0;      /* Slightly darker warm tone for the app outer shell */
+  --fg: #2c1e11;          /* Deep dark malt/stout brown for primary text */
+  --fg-muted: #735f4b;    /* Warm medium brown for secondary text */
+  --fg-subtle: #a6927d;   /* Light warm tan for hints and helper text */
+  --border: #ebdcb9;      /* Golden tan border */
+  --border-focus: #c27d0c; /* Rich warm beer amber/gold when active */
+  --sidebar-bg: #f2ece0;  /* Styled matching background for sidebars */
+  --input-bg: #e5dac2;    /* Cozy background for input elements */
+  --card-bg: #fcf9f2;     /* Pure warm cream card background */
+  --muted: #e5dac2;       /* General muted element background */
+  --primary: #c27d0c;     /* True golden/amber brew primary color */
+  --primary-fg: #ffffff;
+  --accent: #f2e1bb;      /* Soft beer-gold highlight */
+  --accent-fg: #945a03;   /* Rich amber text highlight */
+  --active-line-bg: rgba(194, 125, 12, 0.05);
+  --active-line-outline: rgba(194, 125, 12, 0.2);
+  --code-bg: #22170d;     /* Deep dark stout code background */
+  --code-fg: #ebdcb9;     /* Creamy colored code text */
+  --inline-code-bg: #e5dac2;
+  --inline-code-fg: #945a03;
+  --blockquote-border: #c27d0c;
+  --table-header-bg: #e5dac2;
+  --scrollbar: #ebdcb9;
+  --scrollbar-hover: #d6c59d;
+  --save-bg: #fcf9f2;
+  --skeleton: #ebdcb9;
+
+  /* shadcn compat */
+  --color-background: var(--bg);
+  --color-foreground: var(--fg);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--fg-muted);
+  --color-border: var(--border);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-fg);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-fg);
+  --color-card: var(--card-bg);
+  --color-card-foreground: var(--fg);
+  --color-popover: var(--card-bg);
+  --color-popover-foreground: var(--fg);
+  --color-destructive: #cc3b3b;
+  --color-destructive-foreground: #ffffff;
+  --color-input: var(--border);
+  --color-ring: var(--primary);
+  --radius: 8px;
+}
+
 /* ── Dialog / popover inherit font vars ────────────────────── */
 [role="dialog"], [data-radix-popper-content-wrapper] {
   font-family: var(--font-body);
@@ -221,6 +272,7 @@ body {
 /* ── Search highlight mark ─────────────────────────────────── */
 mark { background-color: #fff3bf; color: #5c4400; border-radius: 2px; padding: 0 2px; }
 [data-theme="dark"] mark { background-color: #4a3800; color: #ffd43b; }
+[data-theme="homebrew"] mark { background-color: #f2d472; color: #593500; }
 
 /* ── Preview pane markdown ─────────────────────────────────── */
 .preview-content { color: var(--fg); font-family: var(--font-body); line-height: 1.75; }
