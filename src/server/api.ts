@@ -327,6 +327,34 @@ export async function handleApiRequest(req: IncomingMessage, res: ServerResponse
     return true
   }
 
+  // GET /api/daily-log?date=YYYY-MM-DD
+  if (path === '/api/daily-log' && method === 'GET') {
+    const session = getSession(req)!
+    const dateStr = url.searchParams.get('date')
+    if (!dateStr) { json(res, { error: 'date required' }, 400); return true }
+    const title = `[Daily] ${dateStr}`
+    const [existing] = await db.select().from(notes).where(and(eq(notes.userId, session.userId), eq(notes.title, title)))
+    if (existing) { json(res, stripAndEnrich(existing)); return true }
+    const d = new Date(`${dateStr}T00:00:00`)
+    const formatted = d.toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
+    const content = JSON.stringify({
+      type: 'doc',
+      content: [
+        { type: 'heading', attrs: { level: 1 }, content: [{ type: 'text', text: `Daily Log - ${formatted}` }] },
+        { type: 'heading', attrs: { level: 2 }, content: [{ type: 'text', text: 'Timeline' }] },
+        { type: 'bulletList', content: [{ type: 'listItem', content: [{ type: 'paragraph', content: [] }] }] },
+        { type: 'heading', attrs: { level: 2 }, content: [{ type: 'text', text: 'Catatan' }] },
+        { type: 'paragraph', content: [] },
+      ],
+    })
+    const id = randomUUID()
+    const now = Date.now()
+    const note = { id, userId: session.userId, teamId: null, type: 'individual' as const, title, content, createdAt: now, updatedAt: now }
+    await db.insert(notes).values(note)
+    json(res, stripAndEnrich(note), 201)
+    return true
+  }
+
   // POST /api/notes
   if (path === '/api/notes' && method === 'POST') {
     const session = getSession(req)!

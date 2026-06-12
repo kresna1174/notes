@@ -1,4 +1,5 @@
 import { useEditor, EditorContent } from '@tiptap/react'
+import Link from '@tiptap/extension-link'
 import StarterKit from '@tiptap/starter-kit'
 import Heading from '@tiptap/extension-heading'
 import { Table } from '@tiptap/extension-table'
@@ -20,9 +21,12 @@ import { ActiveLineExtension } from './ActiveLine'
 import { PreviewPanel } from './PreviewPanel'
 import { PinLockModal } from './PinLockModal'
 import { ShareModal } from './ShareModal'
+import { DailyLogBar } from './DailyLogBar'
 import { useEffect, useRef, useState } from 'react'
 import { Eye, EyeOff, Lock, LockOpen, Share2, FileUp } from 'lucide-react'
 import { marked } from 'marked'
+import mammoth from 'mammoth'
+import * as XLSX from 'xlsx'
 
 interface Note {
   id: string
@@ -35,6 +39,7 @@ interface Note {
   hasPinProtection?: boolean
   createdByUsername?: string | null
   updatedByUsername?: string | null
+  teamId?: string | null
 }
 
 interface EditorProps {
@@ -89,6 +94,7 @@ export function Editor({ note, onUpdate, onSaveStatusChange, onLockChange, share
       DiagramBlock,
       AttachmentBlockExtension,
       ActiveLineExtension,
+      Link.configure({ autolink: true, openOnClick: true, HTMLAttributes: { target: '_blank', rel: 'noopener noreferrer' } }),
     ],
     content: (() => {
       try { return JSON.parse(note.content) } catch { return {} }
@@ -232,40 +238,67 @@ export function Editor({ note, onUpdate, onSaveStatusChange, onLockChange, share
     const file = e.target.files?.[0]
     if (!file || !editor) return
 
-    const reader = new FileReader()
-    reader.onload = async (event) => {
-      const text = event.target?.result as string
-      if (!text) return
+    try {
+      let html = ''
 
-      try {
+      if (file.name.endsWith('.docx')) {
+        const arrayBuffer = await file.arrayBuffer()
+        const result = await mammoth.convertToHtml({ arrayBuffer })
+        html = result.value
+      } else if (file.name.endsWith('.xlsx') || file.name.endsWith('.xls')) {
+        const arrayBuffer = await file.arrayBuffer()
+        const workbook = XLSX.read(arrayBuffer, { type: 'array' })
+        const parts: string[] = []
+        for (const sheetName of workbook.SheetNames) {
+          const sheet = workbook.Sheets[sheetName]
+          const rows = XLSX.utils.sheet_to_json<string[]>(sheet, { header: 1 })
+          if (rows.length === 0) continue
+          parts.push(`<h2>${sheetName}</h2>`)
+          const tableRows = rows.map((row: string[]) =>
+            `<tr>${row.map((cell: string) => `<td>${cell ?? ''}</td>`).join('')}</tr>`
+          )
+          parts.push(`<table><tbody>${tableRows.join('')}</tbody></table>`)
+        }
+        html = parts.join('')
+      } else if (file.name.endsWith('.pptx')) {
+        alert('Format PPTX belum didukung. Gunakan .docx atau .xlsx')
+        e.target.value = ''
+        return
+      } else {
+        const text = await file.text()
         if (file.name.endsWith('.json')) {
           const json = JSON.parse(text)
           editor.commands.setContent(json)
         } else if (file.name.endsWith('.md')) {
-          const html = await marked.parse(text, { breaks: true, gfm: true })
-          editor.commands.setContent(html)
+          html = await marked.parse(text, { breaks: true, gfm: true })
         } else {
-          editor.commands.setContent(text)
+          html = `<p>${text.replace(/\n/g, '</p><p>')}</p>`
         }
-
-        setStatus('unsaved')
-        clearTimeout(saveTimer.current)
-        saveTimer.current = setTimeout(() => {
-          setStatus('saving')
-          onUpdate({ content: JSON.stringify(editor.getJSON()) })
-            .then(() => { setUpdatedAt(Date.now()); setStatus('saved') })
-        }, 1000)
-      } catch (err) {
-        console.error('Error importing content:', err)
-        alert('Gagal mengimpor file: ' + String(err))
       }
+
+      if (html) editor.commands.setContent(html)
+
+      setStatus('unsaved')
+      clearTimeout(saveTimer.current)
+      saveTimer.current = setTimeout(() => {
+        setStatus('saving')
+        onUpdate({ content: JSON.stringify(editor.getJSON()) })
+          .then(() => { setUpdatedAt(Date.now()); setStatus('saved') })
+      }, 1000)
+    } catch (err) {
+      console.error('Error importing content:', err)
+      alert('Gagal mengimpor file: ' + String(err))
     }
-    reader.readAsText(file)
+
     e.target.value = ''
   }
 
+  const isDailyLog = note.title.startsWith('[Daily]')
+
   return (
-    <div style={{ display: 'flex', flex: 1, minWidth: 0, minHeight: 0 }}>
+    <div style={{ display: 'flex', flex: 1, minWidth: 0, minHeight: 0, flexDirection: 'column' }}>
+      {isDailyLog && <DailyLogBar editor={editor} />}
+      <div style={{ display: 'flex', flex: 1, minWidth: 0, minHeight: 0 }}>
       {/* Editor pane */}
       <div
         style={{ flex: 1, overflowY: 'auto', padding: '40px 40px', background: 'var(--bg)', position: 'relative', cursor: 'text', minWidth: 0 }}
@@ -277,7 +310,7 @@ export function Editor({ note, onUpdate, onSaveStatusChange, onLockChange, share
             type="file"
             ref={fileInputRef}
             onChange={handleFileChange}
-            accept=".txt,.md,.json"
+            accept=".txt,.md,.json,.docx,.xlsx,.xls"
             style={{ display: 'none' }}
           />
           <button
@@ -402,6 +435,7 @@ export function Editor({ note, onUpdate, onSaveStatusChange, onLockChange, share
 
       {/* Preview pane */}
       {preview && <PreviewPanel editor={editor} title={title} />}
+      </div>
 
       {pinModal && (
         <PinLockModal

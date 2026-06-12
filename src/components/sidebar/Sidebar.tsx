@@ -3,7 +3,7 @@ import { useNavigate } from '@tanstack/react-router'
 import { ScrollArea } from '../ui/scroll-area'
 import { DayGroup } from './DayGroup'
 import { SearchBar } from './SearchBar'
-import { Plus, LogOut, Users, Shield, Eye, UsersRound, Info } from 'lucide-react'
+import { Plus, LogOut, Users, Shield, Eye, UsersRound, Info, CalendarDays } from 'lucide-react'
 import { FontPicker } from './FontPicker'
 import { ThemeToggle } from './ThemeToggle'
 import { useAuth } from '../../lib/auth'
@@ -121,6 +121,15 @@ export function Sidebar({ activeNoteId, onShareNote, notesUpdateTrigger }: Sideb
   const [activeTab, setActiveTab] = useState<'mine' | 'team'>('mine')
   const newBtnRef = useRef<HTMLButtonElement>(null)
 
+  async function openDailyLog() {
+    const today = new Date().toISOString().slice(0, 10)
+    const res = await fetch(`/api/daily-log?date=${today}`)
+    if (!res.ok) return
+    const note = await res.json()
+    await loadNotes()
+    navigate({ to: '/notes/$id', params: { id: note.id } })
+  }
+
   async function createNote() {
     const type = activeTab === 'team' ? 'team' : 'individual'
     const teamId = activeTab === 'team' ? (user?.teamId ?? null) : null
@@ -187,7 +196,7 @@ export function Sidebar({ activeNoteId, onShareNote, notesUpdateTrigger }: Sideb
       )}
 
       {/* New Add Button */}
-      <div style={{ padding: '0 10px 4px' }}>
+      <div style={{ padding: '0 10px 4px', display: 'flex', flexDirection: 'column', gap: 4 }}>
         <button
           ref={newBtnRef}
           onClick={createNote}
@@ -215,6 +224,33 @@ export function Sidebar({ activeNoteId, onShareNote, notesUpdateTrigger }: Sideb
           <Plus size={13} strokeWidth={2.5} />
           {activeTab === 'team' ? 'Catatan Tim Baru' : 'Catatan Baru'}
         </button>
+        {activeTab === 'mine' && (
+          <button
+            onClick={openDailyLog}
+            style={{
+              width: '100%',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 6,
+              padding: '7px 0',
+              fontSize: '0.78rem',
+              fontWeight: 600,
+              borderRadius: 7,
+              border: `1px solid ${C.border}`,
+              background: 'transparent',
+              color: C.fg,
+              cursor: 'pointer',
+              fontFamily: 'var(--font-body)',
+              transition: 'all 0.15s',
+            }}
+            onMouseEnter={e => { e.currentTarget.style.background = C.accent; e.currentTarget.style.borderColor = C.primary; e.currentTarget.style.color = C.primary }}
+            onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.borderColor = C.border; e.currentTarget.style.color = C.fg }}
+          >
+            <CalendarDays size={13} strokeWidth={2.5} />
+            Daily Log Hari Ini
+          </button>
+        )}
       </div>
 
       <div style={{ height: '1px', background: C.border, margin: '4px 0' }} />
