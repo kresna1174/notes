@@ -23,7 +23,7 @@ import { PinLockModal } from './PinLockModal'
 import { ShareModal } from './ShareModal'
 import { DailyLogBar } from './DailyLogBar'
 import { useEffect, useRef, useState } from 'react'
-import { Eye, EyeOff, Lock, LockOpen, Share2, FileUp, Paperclip } from 'lucide-react'
+import { Eye, EyeOff, Lock, LockOpen, Share2, FileUp, Paperclip, Pencil } from 'lucide-react'
 import { marked } from 'marked'
 import mammoth from 'mammoth'
 import * as XLSX from 'xlsx'
@@ -62,6 +62,17 @@ export function Editor({ note, onUpdate, onSaveStatusChange, onLockChange, share
   const [title, setTitle] = useState(note.title)
   const titleValRef = useRef(title)
   titleValRef.current = title
+
+  const [isMobile, setIsMobile] = useState(false)
+
+  useEffect(() => {
+    function checkMobile() {
+      setIsMobile(window.innerWidth < 768)
+    }
+    checkMobile()
+    window.addEventListener('resize', checkMobile)
+    return () => window.removeEventListener('resize', checkMobile)
+  }, [])
 
   const [updatedAt, setUpdatedAt] = useState(note.updatedAt)
   const [preview, setPreview] = useState(false)
@@ -327,167 +338,176 @@ export function Editor({ note, onUpdate, onSaveStatusChange, onLockChange, share
       {isDailyLog && <DailyLogBar editor={editor} />}
       <div style={{ display: 'flex', flex: 1, minWidth: 0, minHeight: 0 }}>
       {/* Editor pane */}
-      <div
-        style={{ flex: 1, overflowY: 'auto', padding: '40px 40px', background: 'var(--bg)', position: 'relative', cursor: 'text', minWidth: 0 }}
-        onClick={e => { if (e.target === e.currentTarget) editor?.commands.focus('end') }}
-      >
-        {/* Top-right action buttons */}
-        <div style={{ position: 'absolute', top: 20, right: 20, display: 'flex', gap: 8 }}>
-          <input
-            type="file"
-            ref={fileInputRef}
-            onChange={handleFileChange}
-            accept=".txt,.md,.json,.docx,.xlsx,.xls"
-            style={{ display: 'none' }}
-          />
-          <button
-            onClick={handleImportClick}
-            title="Impor Konten"
-            style={{
-              display: 'flex', alignItems: 'center', gap: 6,
-              padding: '5px 12px', fontSize: '0.75rem', fontWeight: 500,
-              fontFamily: 'var(--font-body)',
-              border: '1px solid var(--border)', borderRadius: 20,
-              background: 'var(--bg)',
-              color: 'var(--fg-muted)',
-              cursor: 'pointer', transition: 'all 0.15s',
-            }}
-            onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--primary)'; e.currentTarget.style.color = 'var(--primary)' }}
-            onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.color = 'var(--fg-muted)' }}
-          >
-            <FileUp size={13} />
-            Impor Konten
-          </button>
-
-          <input
-            ref={attachInputRef}
-            type="file"
-            multiple
-            style={{ display: 'none' }}
-            onChange={handleAttachFiles}
-          />
-          <button
-            onClick={() => attachInputRef.current?.click()}
-            title="Upload file & foto"
-            style={{
-              display: 'flex', alignItems: 'center', gap: 6,
-              padding: '5px 12px', fontSize: '0.75rem', fontWeight: 500,
-              fontFamily: 'var(--font-body)',
-              border: '1px solid var(--border)', borderRadius: 20,
-              background: 'var(--bg)',
-              color: 'var(--fg-muted)',
-              cursor: 'pointer', transition: 'all 0.15s',
-            }}
-            onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--primary)'; e.currentTarget.style.color = 'var(--primary)' }}
-            onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.color = 'var(--fg-muted)' }}
-          >
-            <Paperclip size={13} />
-            Upload File
-          </button>
-
-          <button
-            onClick={() => setShowShare(true)}
-            title="Bagikan catatan"
-            style={{
-              display: 'flex', alignItems: 'center', gap: 6,
-              padding: '5px 12px', fontSize: '0.75rem', fontWeight: 500,
-              fontFamily: 'var(--font-body)',
-              border: `1px solid ${shareToken ? 'var(--primary)' : 'var(--border)'}`, borderRadius: 20,
-              background: shareToken ? 'var(--accent)' : 'var(--bg)',
-              color: shareToken ? 'var(--primary)' : 'var(--fg-muted)',
-              cursor: 'pointer', transition: 'all 0.15s',
-            }}
-            onMouseEnter={e => { if (!shareToken) { e.currentTarget.style.borderColor = 'var(--primary)'; e.currentTarget.style.color = 'var(--primary)' } }}
-            onMouseLeave={e => { if (!shareToken) { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.color = 'var(--fg-muted)' } }}
-          >
-            <Share2 size={13} />
-            {shareToken ? 'Dibagikan' : 'Bagikan'}
-          </button>
-
-          <button
-            onClick={() => setPinModal(isLocked ? 'remove' : 'set')}
-            title={isLocked ? 'Hapus PIN' : 'Kunci dengan PIN'}
-            style={{
-              display: 'flex', alignItems: 'center', gap: 6,
-              padding: '5px 12px', fontSize: '0.75rem', fontWeight: 500,
-              fontFamily: 'var(--font-body)',
-              border: `1px solid ${isLocked ? 'var(--primary)' : 'var(--border)'}`, borderRadius: 20,
-              background: isLocked ? 'var(--accent)' : 'var(--bg)',
-              color: isLocked ? 'var(--primary)' : 'var(--fg-muted)',
-              cursor: 'pointer', transition: 'all 0.15s',
-            }}
-            onMouseEnter={e => { if (!isLocked) { e.currentTarget.style.borderColor = 'var(--primary)'; e.currentTarget.style.color = 'var(--primary)' } }}
-            onMouseLeave={e => { if (!isLocked) { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.color = 'var(--fg-muted)' } }}
-          >
-            {isLocked ? <Lock size={13} /> : <LockOpen size={13} />}
-            {isLocked ? 'Terkunci' : 'Kunci'}
-          </button>
-
-          <button
-            onClick={() => setPreview(v => !v)}
-            title={preview ? 'Hide preview' : 'Show preview'}
-            style={{
-              display: 'flex', alignItems: 'center', gap: 6,
-              padding: '5px 12px', fontSize: '0.75rem', fontWeight: 500,
-              fontFamily: 'var(--font-body)',
-              border: '1px solid var(--border)', borderRadius: 20,
-              background: preview ? 'var(--accent)' : 'var(--bg)',
-              color: preview ? 'var(--primary)' : 'var(--fg-muted)',
-              cursor: 'pointer', transition: 'all 0.15s',
-            }}
-            onMouseEnter={e => { if (!preview) { e.currentTarget.style.borderColor = 'var(--primary)'; e.currentTarget.style.color = 'var(--primary)' } }}
-            onMouseLeave={e => { if (!preview) { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.color = 'var(--fg-muted)' } }}
-          >
-            {preview ? <EyeOff size={13} /> : <Eye size={13} />}
-            {preview ? 'Hide Preview' : 'Preview'}
-          </button>
-        </div>
-
-        {/* metadata bar */}
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px 16px', marginBottom: 20, fontSize: '0.75rem', color: 'var(--fg-subtle)', fontFamily: 'var(--font-body)' }}>
-          <span>
-            Dibuat <span style={{ color: 'var(--fg-muted)' }}>{fmt(note.createdAt)}</span>
-            {note.createdByUsername && <> oleh <span style={{ color: 'var(--fg-muted)', fontWeight: 500 }}>{note.createdByUsername}</span></>}
-          </span>
-          <span>·</span>
-          <span>
-            Diperbarui <span style={{ color: 'var(--fg-muted)' }}>{fmt(updatedAt)}</span>
-            {note.updatedByUsername && <> oleh <span style={{ color: 'var(--fg-muted)', fontWeight: 500 }}>{note.updatedByUsername}</span></>}
-          </span>
-        </div>
-
-        <input
-          ref={titleRef}
-          value={title}
-          onChange={handleTitleChange}
-          placeholder="Untitled"
-          style={{
-            display: 'block', width: '100%',
-            outline: 'none', background: 'transparent', border: 'none',
-            marginBottom: 24, fontSize: '2rem', fontWeight: 700,
-            color: 'var(--fg)', letterSpacing: '-0.02em', lineHeight: 1.2,
-            fontFamily: 'var(--font-heading)',
-          }}
-          onFocus={e => (e.currentTarget.style.caretColor = 'var(--primary)')}
-        />
-
-        <BubbleToolbar editor={editor} />
-        <div className="editor-content-wrapper">
-          <EditorContent
-            editor={editor}
-            style={{ outline: 'none' }}
-            className="max-w-none [&_.ProseMirror]:outline-none"
-          />
-        </div>
+      {(!isMobile || !preview) && (
         <div
-          style={{ minHeight: '50vh', cursor: 'text' }}
-          onClick={() => editor?.commands.focus('end')}
-        />
-        <div style={{ borderBottom: '1px solid var(--border)', opacity: 0.5 }} />
-      </div>
+          style={{ flex: 1, overflowY: 'auto', padding: isMobile ? '64px 16px 20px' : '40px 40px', background: 'var(--bg)', position: 'relative', cursor: 'text', minWidth: 0 }}
+          onClick={e => { if (e.target === e.currentTarget) editor?.commands.focus('end') }}
+        >
+          {/* Top-right action buttons */}
+          <div style={{ position: 'absolute', top: isMobile ? 12 : 20, right: isMobile ? 12 : 20, display: 'flex', gap: isMobile ? 6 : 8 }}>
+            <input
+              type="file"
+              ref={fileInputRef}
+              onChange={handleFileChange}
+              accept=".txt,.md,.json,.docx,.xlsx,.xls"
+              style={{ display: 'none' }}
+            />
+            <button
+              onClick={handleImportClick}
+              title="Impor Konten"
+              style={{
+                display: 'flex', alignItems: 'center', gap: isMobile ? 0 : 6,
+                padding: isMobile ? '8px' : '5px 12px', fontSize: '0.75rem', fontWeight: 500,
+                fontFamily: 'var(--font-body)',
+                border: '1px solid var(--border)', borderRadius: 20,
+                background: 'var(--bg)',
+                color: 'var(--fg-muted)',
+                cursor: 'pointer', transition: 'all 0.15s',
+              }}
+              onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--primary)'; e.currentTarget.style.color = 'var(--primary)' }}
+              onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.color = 'var(--fg-muted)' }}
+            >
+              <FileUp size={14} />
+              {!isMobile && 'Impor Konten'}
+            </button>
+
+            <input
+              ref={attachInputRef}
+              type="file"
+              multiple
+              style={{ display: 'none' }}
+              onChange={handleAttachFiles}
+            />
+            <button
+              onClick={() => attachInputRef.current?.click()}
+              title="Upload file & foto"
+              style={{
+                display: 'flex', alignItems: 'center', gap: isMobile ? 0 : 6,
+                padding: isMobile ? '8px' : '5px 12px', fontSize: '0.75rem', fontWeight: 500,
+                fontFamily: 'var(--font-body)',
+                border: '1px solid var(--border)', borderRadius: 20,
+                background: 'var(--bg)',
+                color: 'var(--fg-muted)',
+                cursor: 'pointer', transition: 'all 0.15s',
+              }}
+              onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--primary)'; e.currentTarget.style.color = 'var(--primary)' }}
+              onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.color = 'var(--fg-muted)' }}
+            >
+              <Paperclip size={14} />
+              {!isMobile && 'Upload File'}
+            </button>
+
+            <button
+              onClick={() => setShowShare(true)}
+              title="Bagikan catatan"
+              style={{
+                display: 'flex', alignItems: 'center', gap: isMobile ? 0 : 6,
+                padding: isMobile ? '8px' : '5px 12px', fontSize: '0.75rem', fontWeight: 500,
+                fontFamily: 'var(--font-body)',
+                border: `1px solid ${shareToken ? 'var(--primary)' : 'var(--border)'}`, borderRadius: 20,
+                background: shareToken ? 'var(--accent)' : 'var(--bg)',
+                color: shareToken ? 'var(--primary)' : 'var(--fg-muted)',
+                cursor: 'pointer', transition: 'all 0.15s',
+              }}
+              onMouseEnter={e => { if (!shareToken) { e.currentTarget.style.borderColor = 'var(--primary)'; e.currentTarget.style.color = 'var(--primary)' } }}
+              onMouseLeave={e => { if (!shareToken) { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.color = 'var(--fg-muted)' } }}
+            >
+              <Share2 size={14} />
+              {!isMobile && (shareToken ? 'Dibagikan' : 'Bagikan')}
+            </button>
+
+            <button
+              onClick={() => setPinModal(isLocked ? 'remove' : 'set')}
+              title={isLocked ? 'Hapus PIN' : 'Kunci dengan PIN'}
+              style={{
+                display: 'flex', alignItems: 'center', gap: isMobile ? 0 : 6,
+                padding: isMobile ? '8px' : '5px 12px', fontSize: '0.75rem', fontWeight: 500,
+                fontFamily: 'var(--font-body)',
+                border: `1px solid ${isLocked ? 'var(--primary)' : 'var(--border)'}`, borderRadius: 20,
+                background: isLocked ? 'var(--accent)' : 'var(--bg)',
+                color: isLocked ? 'var(--primary)' : 'var(--fg-muted)',
+                cursor: 'pointer', transition: 'all 0.15s',
+              }}
+              onMouseEnter={e => { if (!isLocked) { e.currentTarget.style.borderColor = 'var(--primary)'; e.currentTarget.style.color = 'var(--primary)' } }}
+              onMouseLeave={e => { if (!isLocked) { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.color = 'var(--fg-muted)' } }}
+            >
+              {isLocked ? <Lock size={14} /> : <LockOpen size={14} />}
+              {!isMobile && (isLocked ? 'Terkunci' : 'Kunci')}
+            </button>
+
+            <button
+              onClick={() => setPreview(v => !v)}
+              title={preview ? 'Hide preview' : 'Show preview'}
+              style={{
+                display: 'flex', alignItems: 'center', gap: isMobile ? 0 : 6,
+                padding: isMobile ? '8px' : '5px 12px', fontSize: '0.75rem', fontWeight: 500,
+                fontFamily: 'var(--font-body)',
+                border: '1px solid var(--border)', borderRadius: 20,
+                background: preview ? 'var(--accent)' : 'var(--bg)',
+                color: preview ? 'var(--primary)' : 'var(--fg-muted)',
+                cursor: 'pointer', transition: 'all 0.15s',
+              }}
+              onMouseEnter={e => { if (!preview) { e.currentTarget.style.borderColor = 'var(--primary)'; e.currentTarget.style.color = 'var(--primary)' } }}
+              onMouseLeave={e => { if (!preview) { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.color = 'var(--fg-muted)' } }}
+            >
+              {preview ? <EyeOff size={14} /> : <Eye size={14} />}
+              {!isMobile && (preview ? 'Hide Preview' : 'Preview')}
+            </button>
+          </div>
+
+          {/* metadata bar */}
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px 16px', marginBottom: 20, fontSize: '0.75rem', color: 'var(--fg-subtle)', fontFamily: 'var(--font-body)', marginTop: isMobile ? 8 : 0 }}>
+            <span>
+              Dibuat <span style={{ color: 'var(--fg-muted)' }}>{fmt(note.createdAt)}</span>
+              {note.createdByUsername && <> oleh <span style={{ color: 'var(--fg-muted)', fontWeight: 500 }}>{note.createdByUsername}</span></>}
+            </span>
+            <span className="hidden sm:inline">·</span>
+            <span>
+              Diperbarui <span style={{ color: 'var(--fg-muted)' }}>{fmt(updatedAt)}</span>
+              {note.updatedByUsername && <> oleh <span style={{ color: 'var(--fg-muted)', fontWeight: 500 }}>{note.updatedByUsername}</span></>}
+            </span>
+          </div>
+
+          <input
+            ref={titleRef}
+            value={title}
+            onChange={handleTitleChange}
+            placeholder="Untitled"
+            style={{
+              display: 'block', width: '100%',
+              outline: 'none', background: 'transparent', border: 'none',
+              marginBottom: 24, fontSize: '2rem', fontWeight: 700,
+              color: 'var(--fg)', letterSpacing: '-0.02em', lineHeight: 1.2,
+              fontFamily: 'var(--font-heading)',
+            }}
+            onFocus={e => (e.currentTarget.style.caretColor = 'var(--primary)')}
+          />
+
+          <BubbleToolbar editor={editor} />
+          <div className="editor-content-wrapper">
+            <EditorContent
+              editor={editor}
+              style={{ outline: 'none' }}
+              className="max-w-none [&_.ProseMirror]:outline-none"
+            />
+          </div>
+          <div
+            style={{ minHeight: '50vh', cursor: 'text' }}
+            onClick={() => editor?.commands.focus('end')}
+          />
+          <div style={{ borderBottom: '1px solid var(--border)', opacity: 0.5 }} />
+        </div>
+      )}
 
       {/* Preview pane */}
-      {preview && <PreviewPanel editor={editor} title={title} />}
+      {preview && (
+        <PreviewPanel
+          editor={editor}
+          title={title}
+          isMobile={isMobile}
+          onCloseMobile={() => setPreview(false)}
+        />
+      )}
       </div>
 
       {pinModal && (

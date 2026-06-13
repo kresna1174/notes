@@ -31,6 +31,17 @@ function TeamsPage() {
   const [editForm, setEditForm] = useState({ name: '', description: '' })
   const [expandedTeam, setExpandedTeam] = useState<string | null>(null)
 
+  const [isMobile, setIsMobile] = useState(false)
+
+  useEffect(() => {
+    function checkMobile() {
+      setIsMobile(window.innerWidth < 768)
+    }
+    checkMobile()
+    window.addEventListener('resize', checkMobile)
+    return () => window.removeEventListener('resize', checkMobile)
+  }, [])
+
   useEffect(() => {
     if (!user || user.role !== 'admin') { navigate({ to: '/' }); return }
     load()
@@ -93,10 +104,10 @@ function TeamsPage() {
     <div className="flex h-screen overflow-hidden">
       <Sidebar activeNoteId={null} />
       <main className="flex-1 overflow-y-auto" style={{ background: 'var(--bg)' }}>
-        <div style={{ padding: '40px 40px', maxWidth: 720 }}>
+        <div style={{ padding: isMobile ? '64px 16px 24px' : '40px 40px', maxWidth: 720 }}>
 
           {/* Header */}
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 28 }}>
+          <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', alignItems: isMobile ? 'flex-start' : 'center', justifyContent: 'space-between', gap: isMobile ? 12 : 8, marginBottom: 28 }}>
             <div>
               <h1 style={{ fontFamily: 'var(--font-heading)', fontWeight: 700, fontSize: '1.5rem', color: 'var(--fg)', margin: 0 }}>
                 Kelola Tim
@@ -177,43 +188,45 @@ function TeamsPage() {
               return (
                 <div key={team.id} style={{ border: '1px solid var(--border)', borderRadius: 12, background: 'var(--card-bg)', overflow: 'hidden' }}>
                   {/* Team header */}
-                  <div style={{ padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 12 }}>
-                    <div style={{ width: 38, height: 38, borderRadius: 9, background: 'var(--accent)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                      <UsersRound size={18} color="var(--primary)" />
+                  <div style={{ padding: '14px 16px', display: 'flex', flexDirection: isMobile ? 'column' : 'row', alignItems: isMobile ? 'stretch' : 'center', gap: 12 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 12, flex: 1 }}>
+                      <div style={{ width: 38, height: 38, borderRadius: 9, background: 'var(--accent)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                        <UsersRound size={18} color="var(--primary)" />
+                      </div>
+
+                      {isEditing ? (
+                        <form onSubmit={handleEdit} style={{ flex: 1, display: 'flex', gap: 8, alignItems: 'center' }}>
+                          <input
+                            style={{ ...inputBase, flex: 1 }} placeholder="Nama tim" required
+                            value={editForm.name} onChange={e => setEditForm(f => ({ ...f, name: e.target.value }))}
+                            onFocus={e => (e.currentTarget.style.borderColor = 'var(--primary)')}
+                            onBlur={e => (e.currentTarget.style.borderColor = 'var(--border)')}
+                            autoFocus
+                          />
+                          <input
+                            style={{ ...inputBase, flex: 1 }} placeholder="Deskripsi"
+                            value={editForm.description} onChange={e => setEditForm(f => ({ ...f, description: e.target.value }))}
+                            onFocus={e => (e.currentTarget.style.borderColor = 'var(--primary)')}
+                            onBlur={e => (e.currentTarget.style.borderColor = 'var(--border)')}
+                          />
+                          <button type="submit" style={{ padding: '6px', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--primary)' }}>
+                            <Check size={16} />
+                          </button>
+                          <button type="button" onClick={() => setEditingTeam(null)} style={{ padding: '6px', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--fg-muted)' }}>
+                            <X size={16} />
+                          </button>
+                        </form>
+                      ) : (
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontWeight: 600, fontSize: '0.9rem', color: 'var(--fg)', fontFamily: 'var(--font-body)' }}>{team.name}</div>
+                          {team.description && <div style={{ fontSize: '0.75rem', color: 'var(--fg-muted)', marginTop: 2 }}>{team.description}</div>}
+                          <div style={{ fontSize: '0.72rem', color: 'var(--fg-subtle)', marginTop: 2 }}>{members.length} anggota</div>
+                        </div>
+                      )}
                     </div>
 
-                    {isEditing ? (
-                      <form onSubmit={handleEdit} style={{ flex: 1, display: 'flex', gap: 8, alignItems: 'center' }}>
-                        <input
-                          style={{ ...inputBase, flex: 1 }} placeholder="Nama tim" required
-                          value={editForm.name} onChange={e => setEditForm(f => ({ ...f, name: e.target.value }))}
-                          onFocus={e => (e.currentTarget.style.borderColor = 'var(--primary)')}
-                          onBlur={e => (e.currentTarget.style.borderColor = 'var(--border)')}
-                          autoFocus
-                        />
-                        <input
-                          style={{ ...inputBase, flex: 1 }} placeholder="Deskripsi"
-                          value={editForm.description} onChange={e => setEditForm(f => ({ ...f, description: e.target.value }))}
-                          onFocus={e => (e.currentTarget.style.borderColor = 'var(--primary)')}
-                          onBlur={e => (e.currentTarget.style.borderColor = 'var(--border)')}
-                        />
-                        <button type="submit" style={{ padding: '6px', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--primary)' }}>
-                          <Check size={16} />
-                        </button>
-                        <button type="button" onClick={() => setEditingTeam(null)} style={{ padding: '6px', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--fg-muted)' }}>
-                          <X size={16} />
-                        </button>
-                      </form>
-                    ) : (
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontWeight: 600, fontSize: '0.9rem', color: 'var(--fg)', fontFamily: 'var(--font-body)' }}>{team.name}</div>
-                        {team.description && <div style={{ fontSize: '0.75rem', color: 'var(--fg-muted)', marginTop: 2 }}>{team.description}</div>}
-                        <div style={{ fontSize: '0.72rem', color: 'var(--fg-subtle)', marginTop: 2 }}>{members.length} anggota</div>
-                      </div>
-                    )}
-
                     {!isEditing && (
-                      <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
+                      <div style={{ display: 'flex', gap: 4, flexShrink: 0, justifyContent: isMobile ? 'flex-end' : 'flex-start', marginTop: isMobile ? 8 : 0 }}>
                         <button
                           onClick={() => { setExpandedTeam(isExpanded ? null : team.id) }}
                           style={{ padding: '6px 10px', fontSize: '0.75rem', fontWeight: 500, display: 'flex', alignItems: 'center', gap: 4, background: isExpanded ? 'var(--accent)' : 'var(--muted)', border: '1px solid var(--border)', borderRadius: 7, cursor: 'pointer', color: isExpanded ? 'var(--primary)' : 'var(--fg-muted)', fontFamily: 'var(--font-body)' }}
@@ -242,7 +255,7 @@ function TeamsPage() {
 
                   {/* Members panel */}
                   {isExpanded && (
-                    <div style={{ borderTop: '1px solid var(--border)', padding: '14px 16px', display: 'flex', gap: 16 }}>
+                    <div style={{ borderTop: '1px solid var(--border)', padding: '14px 16px', display: 'flex', flexDirection: isMobile ? 'column' : 'row', gap: 16 }}>
                       {/* Current members */}
                       <div style={{ flex: 1 }}>
                         <p style={{ margin: '0 0 10px', fontSize: '0.75rem', fontWeight: 700, color: 'var(--fg-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>

@@ -19,6 +19,17 @@ function UsersPage() {
   const [adding, setAdding] = useState(false)
   const [showForm, setShowForm] = useState(false)
 
+  const [isMobile, setIsMobile] = useState(false)
+
+  useEffect(() => {
+    function checkMobile() {
+      setIsMobile(window.innerWidth < 768)
+    }
+    checkMobile()
+    window.addEventListener('resize', checkMobile)
+    return () => window.removeEventListener('resize', checkMobile)
+  }, [])
+
   useEffect(() => {
     if (!user || user.role !== 'admin') { navigate({ to: '/' }); return }
     load()
@@ -74,8 +85,8 @@ function UsersPage() {
     <div className="flex h-screen overflow-hidden">
       <Sidebar activeNoteId={null} />
       <main className="flex-1 overflow-y-auto" style={{ background: 'var(--bg)' }}>
-        <div style={{ padding: '40px 40px', maxWidth: 640 }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 28 }}>
+        <div style={{ padding: isMobile ? '64px 16px 24px' : '40px 40px', maxWidth: 640 }}>
+          <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', alignItems: isMobile ? 'flex-start' : 'center', justifyContent: 'space-between', gap: isMobile ? 12 : 8, marginBottom: 28 }}>
             <div>
               <h1 style={{ fontFamily: 'var(--font-heading)', fontWeight: 700, fontSize: '1.5rem', color: 'var(--fg)', margin: 0 }}>
                 User Management
@@ -107,7 +118,7 @@ function UsersPage() {
               display: 'flex', flexDirection: 'column', gap: 12,
             }}>
               <p style={{ margin: 0, fontWeight: 600, fontSize: '0.875rem', color: 'var(--fg)' }}>Tambah User Baru</p>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 10 }}>
                 <input
                   style={inputBase} placeholder="Username" required
                   value={form.username} onChange={e => setForm(f => ({ ...f, username: e.target.value }))}
@@ -180,8 +191,8 @@ function UsersPage() {
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                 {users.filter(u => u.status === 'pending').map(u => (
                   <div key={u.id} style={{
-                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                    padding: '12px 16px',
+                    display: 'flex', flexDirection: isMobile ? 'column' : 'row', alignItems: isMobile ? 'stretch' : 'center', justifyContent: 'space-between',
+                    padding: '12px 16px', gap: isMobile ? 12 : 8,
                     border: '1px solid var(--border)', borderRadius: 10,
                     background: 'var(--card-bg)',
                   }}>
@@ -191,6 +202,7 @@ function UsersPage() {
                         background: 'var(--muted)',
                         display: 'flex', alignItems: 'center', justifyContent: 'center',
                         color: 'var(--fg-subtle)',
+                        flexShrink: 0,
                       }}>
                         <Eye size={16} />
                       </div>
@@ -203,7 +215,7 @@ function UsersPage() {
                         </div>
                       </div>
                     </div>
-                    <div style={{ display: 'flex', gap: 8 }}>
+                    <div style={{ display: 'flex', gap: 8, justifyContent: isMobile ? 'flex-end' : 'flex-start' }}>
                       <button
                         onClick={() => handleApprove(u.id)}
                         style={{
@@ -245,8 +257,8 @@ function UsersPage() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               {users.filter(u => u.status !== 'pending').map(u => (
                 <div key={u.id} style={{
-                  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                  padding: '12px 16px',
+                  display: 'flex', flexDirection: isMobile ? 'column' : 'row', alignItems: isMobile ? 'stretch' : 'center', justifyContent: 'space-between',
+                  padding: '12px 16px', gap: isMobile ? 12 : 8,
                   border: '1px solid var(--border)', borderRadius: 10,
                   background: u.id === user?.userId ? 'var(--accent)' : 'var(--card-bg)',
                 }}>
@@ -256,6 +268,7 @@ function UsersPage() {
                       background: u.role === 'admin' ? 'var(--accent)' : 'var(--muted)',
                       display: 'flex', alignItems: 'center', justifyContent: 'center',
                       color: u.role === 'admin' ? 'var(--primary)' : 'var(--fg-subtle)',
+                      flexShrink: 0,
                     }}>
                       {u.role === 'admin' ? <Shield size={16} /> : <Eye size={16} />}
                     </div>
@@ -292,7 +305,7 @@ function UsersPage() {
                     </div>
                   </div>
                   {u.id !== user?.userId && (
-                    <div style={{ display: 'flex', gap: 8 }}>
+                    <div style={{ display: 'flex', gap: 8, justifyContent: isMobile ? 'flex-end' : 'flex-start' }}>
                       {u.status === 'rejected' && (
                         <button
                           onClick={() => handleApprove(u.id)}

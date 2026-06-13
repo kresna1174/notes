@@ -3,7 +3,7 @@ import { useNavigate } from '@tanstack/react-router'
 import { ScrollArea } from '../ui/scroll-area'
 import { DayGroup } from './DayGroup'
 import { SearchBar } from './SearchBar'
-import { Plus, LogOut, Users, Shield, Eye, UsersRound, Info, CalendarDays } from 'lucide-react'
+import { Plus, LogOut, Users, Shield, Eye, UsersRound, Info, CalendarDays, Menu, X } from 'lucide-react'
 import { FontPicker } from './FontPicker'
 import { ThemeToggle } from './ThemeToggle'
 import { useAuth } from '../../lib/auth'
@@ -52,9 +52,29 @@ export function Sidebar({ activeNoteId, onShareNote, notesUpdateTrigger }: Sideb
   const { user, logout } = useAuth()
   const [showAbout, setShowAbout] = useState(false)
 
+  // Mobile states
+  const [isMobile, setIsMobile] = useState(false)
+  const [isOpen, setIsOpen] = useState(false)
+
+  useEffect(() => {
+    function checkMobile() {
+      setIsMobile(window.innerWidth < 768)
+    }
+    checkMobile()
+    window.addEventListener('resize', checkMobile)
+    return () => window.removeEventListener('resize', checkMobile)
+  }, [])
+
+  function navigateAndClose(opts: { to: string; params?: any }) {
+    navigate(opts)
+    if (window.innerWidth < 768) {
+      setIsOpen(false)
+    }
+  }
+
   useEffect(() => {
     function onMove(e: MouseEvent) {
-      if (!dragging.current) return
+      if (!dragging.current || isMobile) return
       const delta = e.clientX - startX.current
       setWidth(Math.max(180, Math.min(480, startW.current + delta)))
     }
@@ -62,7 +82,7 @@ export function Sidebar({ activeNoteId, onShareNote, notesUpdateTrigger }: Sideb
     window.addEventListener('mousemove', onMove)
     window.addEventListener('mouseup', onUp)
     return () => { window.removeEventListener('mousemove', onMove); window.removeEventListener('mouseup', onUp) }
-  }, [])
+  }, [isMobile])
 
   async function loadNotes() {
     const res = await fetch('/api/notes?scope=mine')
@@ -108,10 +128,10 @@ export function Sidebar({ activeNoteId, onShareNote, notesUpdateTrigger }: Sideb
     if (activeNoteId === id) {
       if (activeTab === 'team') {
         const remainingTeam = teamNotes.filter(n => n.id !== id)
-        navigate({ to: remainingTeam.length > 0 ? '/notes/$id' : '/', params: remainingTeam.length > 0 ? { id: remainingTeam[0].id } : {} })
+        navigateAndClose({ to: remainingTeam.length > 0 ? '/notes/$id' : '/', params: remainingTeam.length > 0 ? { id: remainingTeam[0].id } : {} })
       } else {
         const remainingMine = notes.filter(n => n.id !== id)
-        navigate({ to: remainingMine.length > 0 ? '/notes/$id' : '/', params: remainingMine.length > 0 ? { id: remainingMine[0].id } : {} })
+        navigateAndClose({ to: remainingMine.length > 0 ? '/notes/$id' : '/', params: remainingMine.length > 0 ? { id: remainingMine[0].id } : {} })
       }
     }
     await loadNotes()
@@ -127,7 +147,7 @@ export function Sidebar({ activeNoteId, onShareNote, notesUpdateTrigger }: Sideb
     if (!res.ok) return
     const note = await res.json()
     await loadNotes()
-    navigate({ to: '/notes/$id', params: { id: note.id } })
+    navigateAndClose({ to: '/notes/$id', params: { id: note.id } })
   }
 
   async function createNote() {
@@ -143,7 +163,7 @@ export function Sidebar({ activeNoteId, onShareNote, notesUpdateTrigger }: Sideb
     if (!note?.id) return
     await loadNotes()
     if (teamId) await loadTeamNotes()
-    navigate({ to: '/notes/$id', params: { id: note.id } })
+    navigateAndClose({ to: '/notes/$id', params: { id: note.id } })
   }
 
   const groups = groupByDay(notes)
@@ -156,77 +176,132 @@ export function Sidebar({ activeNoteId, onShareNote, notesUpdateTrigger }: Sideb
   }
 
   return (
-    <div className="shrink-0 flex flex-col h-screen" style={{ width, background: 'var(--sidebar-bg)', borderRight: `1px solid ${C.border}`, position: 'relative' }}>
-      {/* Header */}
-      <div className="px-4 py-4 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <img src="/logo192.png" alt="Homebrew Notes Logo" className="w-6 h-6 object-contain" />
-          <span className="text-sm font-semibold" style={{ color: C.fg, letterSpacing: '-0.01em' }}>Homebrew Notes</span>
-        </div>
-        <div className="flex items-center gap-1">
-          <ThemeToggle />
-          <FontPicker />
-        </div>
-      </div>
-
-      <SearchBar onResults={setSearchResults} />
-
-      {/* Tab switcher — only show when user has a team */}
-      {user?.teamId && (
-        <div style={{ display: 'flex', margin: '0 10px 4px', gap: 4, background: C.muted, borderRadius: 8, padding: 3 }}>
-          {([['mine', 'Saya'], ['team', teamName ?? 'Tim']] as const).map(([tab, label]) => (
-            <button
-              key={tab}
-              onClick={() => setActiveTab(tab)}
-              style={{
-                flex: 1, padding: '5px 0', fontSize: '0.75rem', fontWeight: activeTab === tab ? 600 : 400,
-                border: 'none', borderRadius: 6, cursor: 'pointer', fontFamily: 'var(--font-body)',
-                background: activeTab === tab ? 'var(--bg)' : 'transparent',
-                color: activeTab === tab ? C.fg : C.fgMuted,
-                boxShadow: activeTab === tab ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
-                transition: 'all 0.15s',
-                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4,
-              }}
-            >
-              {tab === 'team' && <UsersRound size={11} />}
-              {label}
-            </button>
-          ))}
-        </div>
-      )}
-
-      {/* New Add Button */}
-      <div style={{ padding: '0 10px 4px', display: 'flex', flexDirection: 'column', gap: 4 }}>
+    <>
+      {isMobile && (
         <button
-          ref={newBtnRef}
-          onClick={createNote}
+          onClick={() => setIsOpen(true)}
+          title="Tampilkan sidebar"
           style={{
-            width: '100%',
+            position: 'fixed',
+            top: 16,
+            left: 16,
+            zIndex: 40,
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            gap: 6,
-            padding: '7px 0',
-            fontSize: '0.78rem',
-            fontWeight: 600,
+            width: 32,
+            height: 32,
+            border: '1px solid var(--border)',
             borderRadius: 7,
-            border: 'none',
-            background: C.primary,
-            color: 'var(--primary-fg)',
+            background: 'var(--bg)',
+            color: 'var(--fg-muted)',
             cursor: 'pointer',
-            fontFamily: 'var(--font-body)',
-            boxShadow: '0 2px 6px rgba(0,0,0,0.06)',
             transition: 'all 0.15s',
           }}
-          onMouseEnter={e => (e.currentTarget.style.opacity = '0.9')}
-          onMouseLeave={e => (e.currentTarget.style.opacity = '1')}
+          onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--primary)'; e.currentTarget.style.color = 'var(--primary)' }}
+          onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.color = 'var(--fg-muted)' }}
         >
-          <Plus size={13} strokeWidth={2.5} />
-          {activeTab === 'team' ? 'Catatan Tim Baru' : 'Catatan Baru'}
+          <Menu size={16} />
         </button>
-        {activeTab === 'mine' && (
+      )}
+
+      {isMobile && (
+        <div
+          onClick={() => setIsOpen(false)}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0,0,0,0.3)',
+            backdropFilter: 'blur(3px)',
+            zIndex: 48,
+            opacity: isOpen ? 1 : 0,
+            pointerEvents: isOpen ? 'auto' : 'none',
+            transition: 'opacity 0.2s ease',
+          }}
+        />
+      )}
+
+      <div
+        className="shrink-0 flex flex-col h-screen"
+        style={{
+          width: isMobile ? 280 : width,
+          background: 'var(--sidebar-bg)',
+          borderRight: `1px solid ${C.border}`,
+          position: isMobile ? 'fixed' : 'relative',
+          top: isMobile ? 0 : undefined,
+          bottom: isMobile ? 0 : undefined,
+          left: isMobile ? 0 : undefined,
+          zIndex: isMobile ? 49 : undefined,
+          transform: isMobile ? (isOpen ? 'translateX(0)' : 'translateX(-100%)') : undefined,
+          transition: isMobile ? 'transform 0.25s cubic-bezier(0.4, 0, 0.2, 1)' : undefined,
+        }}
+      >
+        {/* Header */}
+        <div className="px-4 py-4 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <img src="/logo192.png" alt="Homebrew Notes Logo" className="w-6 h-6 object-contain" />
+            <span className="text-sm font-semibold" style={{ color: C.fg, letterSpacing: '-0.01em' }}>Homebrew Notes</span>
+          </div>
+          <div className="flex items-center gap-1">
+            <ThemeToggle />
+            <FontPicker />
+            {isMobile && (
+              <button
+                onClick={() => setIsOpen(false)}
+                title="Sembunyikan sidebar"
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  width: 28,
+                  height: 28,
+                  border: 'none',
+                  borderRadius: 6,
+                  background: 'transparent',
+                  color: C.fgMuted,
+                  cursor: 'pointer',
+                  transition: 'all 0.15s',
+                }}
+                onMouseEnter={e => { e.currentTarget.style.background = C.accent; e.currentTarget.style.color = C.primary }}
+                onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = C.fgMuted }}
+              >
+                <X size={15} />
+              </button>
+            )}
+          </div>
+        </div>
+
+        <SearchBar onResults={setSearchResults} />
+
+        {/* Tab switcher — only show when user has a team */}
+        {user?.teamId && (
+          <div style={{ display: 'flex', margin: '0 10px 4px', gap: 4, background: C.muted, borderRadius: 8, padding: 3 }}>
+            {([['mine', 'Saya'], ['team', teamName ?? 'Tim']] as const).map(([tab, label]) => (
+              <button
+                key={tab}
+                onClick={() => setActiveTab(tab)}
+                style={{
+                  flex: 1, padding: '5px 0', fontSize: '0.75rem', fontWeight: activeTab === tab ? 600 : 400,
+                  border: 'none', borderRadius: 6, cursor: 'pointer', fontFamily: 'var(--font-body)',
+                  background: activeTab === tab ? 'var(--bg)' : 'transparent',
+                  color: activeTab === tab ? C.fg : C.fgMuted,
+                  boxShadow: activeTab === tab ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
+                  transition: 'all 0.15s',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4,
+                }}
+              >
+                {tab === 'team' && <UsersRound size={11} />}
+                {label}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {/* New Add Button */}
+        <div style={{ padding: '0 10px 4px', display: 'flex', flexDirection: 'column', gap: 4 }}>
           <button
-            onClick={openDailyLog}
+            ref={newBtnRef}
+            onClick={createNote}
             style={{
               width: '100%',
               display: 'flex',
@@ -237,139 +312,182 @@ export function Sidebar({ activeNoteId, onShareNote, notesUpdateTrigger }: Sideb
               fontSize: '0.78rem',
               fontWeight: 600,
               borderRadius: 7,
-              border: `1px solid ${C.border}`,
-              background: 'transparent',
-              color: C.fg,
+              border: 'none',
+              background: C.primary,
+              color: 'var(--primary-fg)',
               cursor: 'pointer',
               fontFamily: 'var(--font-body)',
+              boxShadow: '0 2px 6px rgba(0,0,0,0.06)',
               transition: 'all 0.15s',
             }}
-            onMouseEnter={e => { e.currentTarget.style.background = C.accent; e.currentTarget.style.borderColor = C.primary; e.currentTarget.style.color = C.primary }}
-            onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.borderColor = C.border; e.currentTarget.style.color = C.fg }}
+            onMouseEnter={e => (e.currentTarget.style.opacity = '0.9')}
+            onMouseLeave={e => (e.currentTarget.style.opacity = '1')}
           >
-            <CalendarDays size={13} strokeWidth={2.5} />
-            Daily Log Hari Ini
+            <Plus size={13} strokeWidth={2.5} />
+            {activeTab === 'team' ? 'Catatan Tim Baru' : 'Catatan Baru'}
           </button>
-        )}
-      </div>
+          {activeTab === 'mine' && (
+            <button
+              onClick={openDailyLog}
+              style={{
+                width: '100%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 6,
+                padding: '7px 0',
+                fontSize: '0.78rem',
+                fontWeight: 600,
+                borderRadius: 7,
+                border: `1px solid ${C.border}`,
+                background: 'transparent',
+                color: C.fg,
+                cursor: 'pointer',
+                fontFamily: 'var(--font-body)',
+                transition: 'all 0.15s',
+              }}
+              onMouseEnter={e => { e.currentTarget.style.background = C.accent; e.currentTarget.style.borderColor = C.primary; e.currentTarget.style.color = C.primary }}
+              onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.borderColor = C.border; e.currentTarget.style.color = C.fg }}
+            >
+              <CalendarDays size={13} strokeWidth={2.5} />
+              Daily Log Hari Ini
+            </button>
+          )}
+        </div>
 
-      <div style={{ height: '1px', background: C.border, margin: '4px 0' }} />
+        <div style={{ height: '1px', background: C.border, margin: '4px 0' }} />
 
-      <ScrollArea className="flex-1">
-        {searchResults ? (
-          <div className="py-1 px-2">
-            <p className="px-2 py-1 text-xs font-medium" style={{ color: C.fgMuted }}>
-              {searchResults.length} result{searchResults.length !== 1 ? 's' : ''}
-            </p>
-            {searchResults.map(r => (
-              <button
-                key={r.id}
-                onClick={() => navigate({ to: '/notes/$id', params: { id: r.id } })}
-                className="flex flex-col w-full px-3 py-2 text-left rounded-lg mb-0.5"
-                style={{ color: C.fg, background: 'transparent', border: 'none', cursor: 'pointer' }}
-                onMouseEnter={e => (e.currentTarget.style.background = C.accent)}
-                onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
-              >
-                <span className="text-sm font-medium truncate">{r.title || 'Untitled'}</span>
-                <span className="text-xs line-clamp-2 mt-0.5" style={{ color: C.fgMuted }}
-                  dangerouslySetInnerHTML={{ __html: r.snippet }} />
-              </button>
-            ))}
-          </div>
-        ) : activeTab === 'mine' ? (
-          <div className="py-1 px-2">
-            {notes.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-12 px-4 text-center">
-                <div className="w-10 h-10 rounded-full flex items-center justify-center mb-3" style={{ background: C.accent, color: C.primary }}>
-                  <Plus className="h-5 w-5" />
-                </div>
-                <p className="text-xs font-medium mb-3" style={{ color: C.fg }}>Belum ada catatan</p>
+        <ScrollArea className="flex-1">
+          {searchResults ? (
+            <div className="py-1 px-2">
+              <p className="px-2 py-1 text-xs font-medium" style={{ color: C.fgMuted }}>
+                {searchResults.length} result{searchResults.length !== 1 ? 's' : ''}
+              </p>
+              {searchResults.map(r => (
                 <button
-                  onClick={createNote}
-                  className="text-xs font-semibold py-2 px-4 rounded-lg transition-all"
-                  style={{
-                    background: C.primary,
-                    color: 'var(--primary-fg)',
-                    border: 'none',
-                    cursor: 'pointer',
-                    boxShadow: '0 2px 4px rgba(0,0,0,0.05)'
-                  }}
-                  onMouseEnter={e => (e.currentTarget.style.opacity = '0.9')}
-                  onMouseLeave={e => (e.currentTarget.style.opacity = '1')}
+                  key={r.id}
+                  onClick={() => navigateAndClose({ to: '/notes/$id', params: { id: r.id } })}
+                  className="flex flex-col w-full px-3 py-2 text-left rounded-lg mb-0.5"
+                  style={{ color: C.fg, background: 'transparent', border: 'none', cursor: 'pointer' }}
+                  onMouseEnter={e => (e.currentTarget.style.background = C.accent)}
+                  onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
                 >
-                  Buat Catatan Baru
+                  <span className="text-sm font-medium truncate">{r.title || 'Untitled'}</span>
+                  <span className="text-xs line-clamp-2 mt-0.5" style={{ color: C.fgMuted }}
+                    dangerouslySetInnerHTML={{ __html: r.snippet }} />
                 </button>
-              </div>
-            ) : (
-              groups.map(g => (
-                <DayGroup key={g.label} label={g.label} notes={g.notes}
-                  activeNoteId={activeNoteId}
-                  onSelect={id => navigate({ to: '/notes/$id', params: { id } })}
-                  onRename={renameNote}
-                  onDelete={deleteNote}
-                  onShare={onShareNote}
-                />
-              ))
-            )}
-          </div>
-        ) : (
-          <div className="py-1 px-2">
-            {teamNotes.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-12 px-4 text-center">
-                <div className="w-10 h-10 rounded-full flex items-center justify-center mb-3" style={{ background: C.accent, color: C.primary }}>
-                  <Plus className="h-5 w-5" />
+              ))}
+            </div>
+          ) : activeTab === 'mine' ? (
+            <div className="py-1 px-2">
+              {notes.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-12 px-4 text-center">
+                  <div className="w-10 h-10 rounded-full flex items-center justify-center mb-3" style={{ background: C.accent, color: C.primary }}>
+                    <Plus className="h-5 w-5" />
+                  </div>
+                  <p className="text-xs font-medium mb-3" style={{ color: C.fg }}>Belum ada catatan</p>
+                  <button
+                    onClick={createNote}
+                    className="text-xs font-semibold py-2 px-4 rounded-lg transition-all"
+                    style={{
+                      background: C.primary,
+                      color: 'var(--primary-fg)',
+                      border: 'none',
+                      cursor: 'pointer',
+                      boxShadow: '0 2px 4px rgba(0,0,0,0.05)'
+                    }}
+                    onMouseEnter={e => (e.currentTarget.style.opacity = '0.9')}
+                    onMouseLeave={e => (e.currentTarget.style.opacity = '1')}
+                  >
+                    Buat Catatan Baru
+                  </button>
                 </div>
-                <p className="text-xs font-medium mb-3" style={{ color: C.fg }}>Belum ada catatan tim</p>
-                <button
-                  onClick={createNote}
-                  className="text-xs font-semibold py-2 px-4 rounded-lg transition-all"
-                  style={{
-                    background: C.primary,
-                    color: 'var(--primary-fg)',
-                    border: 'none',
-                    cursor: 'pointer',
-                    boxShadow: '0 2px 4px rgba(0,0,0,0.05)'
-                  }}
-                  onMouseEnter={e => (e.currentTarget.style.opacity = '0.9')}
-                  onMouseLeave={e => (e.currentTarget.style.opacity = '1')}
-                >
-                  Buat Catatan Tim Baru
-                </button>
-              </div>
-            ) : (
-              teamGroups.map(g => (
-                <DayGroup key={'team-' + g.label} label={g.label} notes={g.notes}
-                  activeNoteId={activeNoteId}
-                  onSelect={id => navigate({ to: '/notes/$id', params: { id } })}
-                  onRename={renameNote}
-                  onDelete={deleteNote}
-                  onShare={onShareNote}
-                />
-              ))
-            )}
-          </div>
-        )}
-      </ScrollArea>
+              ) : (
+                groups.map(g => (
+                  <DayGroup key={g.label} label={g.label} notes={g.notes}
+                    activeNoteId={activeNoteId}
+                    onSelect={id => navigateAndClose({ to: '/notes/$id', params: { id } })}
+                    onRename={renameNote}
+                    onDelete={deleteNote}
+                    onShare={onShareNote}
+                  />
+                ))
+              )}
+            </div>
+          ) : (
+            <div className="py-1 px-2">
+              {teamNotes.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-12 px-4 text-center">
+                  <div className="w-10 h-10 rounded-full flex items-center justify-center mb-3" style={{ background: C.accent, color: C.primary }}>
+                    <Plus className="h-5 w-5" />
+                  </div>
+                  <p className="text-xs font-medium mb-3" style={{ color: C.fg }}>Belum ada catatan tim</p>
+                  <button
+                    onClick={createNote}
+                    className="text-xs font-semibold py-2 px-4 rounded-lg transition-all"
+                    style={{
+                      background: C.primary,
+                      color: 'var(--primary-fg)',
+                      border: 'none',
+                      cursor: 'pointer',
+                      boxShadow: '0 2px 4px rgba(0,0,0,0.05)'
+                    }}
+                    onMouseEnter={e => (e.currentTarget.style.opacity = '0.9')}
+                    onMouseLeave={e => (e.currentTarget.style.opacity = '1')}
+                  >
+                    Buat Catatan Tim Baru
+                  </button>
+                </div>
+              ) : (
+                teamGroups.map(g => (
+                  <DayGroup key={'team-' + g.label} label={g.label} notes={g.notes}
+                    activeNoteId={activeNoteId}
+                    onSelect={id => navigateAndClose({ to: '/notes/$id', params: { id } })}
+                    onRename={renameNote}
+                    onDelete={deleteNote}
+                    onShare={onShareNote}
+                  />
+                ))
+              )}
+            </div>
+          )}
+        </ScrollArea>
 
-      {/* Footer */}
-      <div style={{ borderTop: `1px solid ${C.border}`, padding: '10px 12px', flexShrink: 0 }}>
-        {user?.role === 'admin' && (
-          <>
+        {/* Footer */}
+        <div style={{ borderTop: `1px solid ${C.border}`, padding: '10px 12px', flexShrink: 0 }}>
+          {user?.role === 'admin' && (
+            <>
+            <button
+              onClick={() => navigateAndClose({ to: '/teams' })}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 8, width: '100%',
+                padding: '7px 10px', borderRadius: 7, border: 'none',
+                background: 'transparent', cursor: 'pointer', marginBottom: 2,
+                fontSize: '0.8125rem', color: C.fgMuted, fontFamily: 'var(--font-body)',
+              }}
+              onMouseEnter={e => { e.currentTarget.style.background = C.accent; e.currentTarget.style.color = C.primary }}
+              onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = C.fgMuted }}
+            >
+              <UsersRound size={14} /> Kelola Tim
+            </button>
+            <button
+              onClick={() => navigateAndClose({ to: '/users' })}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 8, width: '100%',
+                padding: '7px 10px', borderRadius: 7, border: 'none',
+                background: 'transparent', cursor: 'pointer', marginBottom: 4,
+                fontSize: '0.8125rem', color: C.fgMuted, fontFamily: 'var(--font-body)',
+              }}
+              onMouseEnter={e => { e.currentTarget.style.background = C.accent; e.currentTarget.style.color = C.primary }}
+              onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = C.fgMuted }}
+            >
+              <Users size={14} /> Kelola User
+            </button>
+            </>
+          )}
+
           <button
-            onClick={() => navigate({ to: '/teams' })}
-            style={{
-              display: 'flex', alignItems: 'center', gap: 8, width: '100%',
-              padding: '7px 10px', borderRadius: 7, border: 'none',
-              background: 'transparent', cursor: 'pointer', marginBottom: 2,
-              fontSize: '0.8125rem', color: C.fgMuted, fontFamily: 'var(--font-body)',
-            }}
-            onMouseEnter={e => { e.currentTarget.style.background = C.accent; e.currentTarget.style.color = C.primary }}
-            onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = C.fgMuted }}
-          >
-            <UsersRound size={14} /> Kelola Tim
-          </button>
-          <button
-            onClick={() => navigate({ to: '/users' })}
+            onClick={() => setShowAbout(true)}
             style={{
               display: 'flex', alignItems: 'center', gap: 8, width: '100%',
               padding: '7px 10px', borderRadius: 7, border: 'none',
@@ -379,78 +497,65 @@ export function Sidebar({ activeNoteId, onShareNote, notesUpdateTrigger }: Sideb
             onMouseEnter={e => { e.currentTarget.style.background = C.accent; e.currentTarget.style.color = C.primary }}
             onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = C.fgMuted }}
           >
-            <Users size={14} /> Kelola User
+            <Info size={14} /> Info & Changelog
           </button>
-          </>
-        )}
-
-        <button
-          onClick={() => setShowAbout(true)}
-          style={{
-            display: 'flex', alignItems: 'center', gap: 8, width: '100%',
-            padding: '7px 10px', borderRadius: 7, border: 'none',
-            background: 'transparent', cursor: 'pointer', marginBottom: 4,
-            fontSize: '0.8125rem', color: C.fgMuted, fontFamily: 'var(--font-body)',
-          }}
-          onMouseEnter={e => { e.currentTarget.style.background = C.accent; e.currentTarget.style.color = C.primary }}
-          onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = C.fgMuted }}
-        >
-          <Info size={14} /> Info & Changelog
-        </button>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 10px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
-            <div style={{
-              width: 26, height: 26, borderRadius: 6, flexShrink: 0,
-              background: user?.role === 'admin' ? C.accent : C.muted,
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              color: user?.role === 'admin' ? C.primary : C.fgMuted,
-            }}>
-              {user?.role === 'admin' ? <Shield size={13} /> : <Eye size={13} />}
-            </div>
-            <div style={{ minWidth: 0 }}>
-              <div style={{ fontSize: '0.8rem', fontWeight: 600, color: C.fg, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                {user?.username}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 10px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+              <div style={{
+                width: 26, height: 26, borderRadius: 6, flexShrink: 0,
+                background: user?.role === 'admin' ? C.accent : C.muted,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                color: user?.role === 'admin' ? C.primary : C.fgMuted,
+              }}>
+                {user?.role === 'admin' ? <Shield size={13} /> : <Eye size={13} />}
               </div>
-              <div style={{ fontSize: '0.7rem', color: C.fgSubtle, textTransform: 'capitalize' }}>
-                {user?.role}{teamName ? ` · ${teamName}` : ''}
+              <div style={{ minWidth: 0 }}>
+                <div style={{ fontSize: '0.8rem', fontWeight: 600, color: C.fg, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {user?.username}
+                </div>
+                <div style={{ fontSize: '0.7rem', color: C.fgSubtle, textTransform: 'capitalize' }}>
+                  {user?.role}{teamName ? ` · ${teamName}` : ''}
+                </div>
               </div>
             </div>
+            <button
+              onClick={async () => { await logout(); navigateAndClose({ to: '/login' }) }}
+              title="Logout"
+              style={{
+                width: 28, height: 28, flexShrink: 0,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                background: 'transparent', border: 'none', borderRadius: 6,
+                cursor: 'pointer', color: C.fgSubtle,
+              }}
+              onMouseEnter={e => { e.currentTarget.style.background = 'rgba(224,49,49,0.1)'; e.currentTarget.style.color = '#e03131' }}
+              onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = C.fgSubtle }}
+            >
+              <LogOut size={14} />
+            </button>
           </div>
-          <button
-            onClick={async () => { await logout(); navigate({ to: '/login' }) }}
-            title="Logout"
-            style={{
-              width: 28, height: 28, flexShrink: 0,
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              background: 'transparent', border: 'none', borderRadius: 6,
-              cursor: 'pointer', color: C.fgSubtle,
-            }}
-            onMouseEnter={e => { e.currentTarget.style.background = 'rgba(224,49,49,0.1)'; e.currentTarget.style.color = '#e03131' }}
-            onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = C.fgSubtle }}
-          >
-            <LogOut size={14} />
-          </button>
         </div>
-      </div>
 
-      {/* resize handle */}
-      <div
-        style={{
-          position: 'absolute', top: 0, right: -3, bottom: 0, width: 6,
-          cursor: 'col-resize', zIndex: 10,
-        }}
-        onMouseDown={e => {
-          e.preventDefault()
-          dragging.current = true
-          startX.current = e.clientX
-          startW.current = width
-          document.body.style.cursor = 'col-resize'
-          document.body.style.userSelect = 'none'
-        }}
-        onMouseEnter={e => (e.currentTarget.style.background = 'var(--primary)')}
-        onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
-      />
-      <AboutModal open={showAbout} onOpenChange={setShowAbout} />
-    </div>
+        {/* resize handle */}
+        {!isMobile && (
+          <div
+            style={{
+              position: 'absolute', top: 0, right: -3, bottom: 0, width: 6,
+              cursor: 'col-resize', zIndex: 10,
+            }}
+            onMouseDown={e => {
+              e.preventDefault()
+              dragging.current = true
+              startX.current = e.clientX
+              startW.current = width
+              document.body.style.cursor = 'col-resize'
+              document.body.style.userSelect = 'none'
+            }}
+            onMouseEnter={e => (e.currentTarget.style.background = 'var(--primary)')}
+            onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+          />
+        )}
+        <AboutModal open={showAbout} onOpenChange={setShowAbout} />
+      </div>
+    </>
   )
 }

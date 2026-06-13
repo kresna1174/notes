@@ -23,6 +23,16 @@ function ShareViewComponent() {
   const [notFound, setNotFound] = useState(false)
   const [unlocked, setUnlocked] = useState(false)
   const [showPin, setShowPin] = useState(false)
+  const [isMobile, setIsMobile] = useState(false)
+
+  useEffect(() => {
+    function checkMobile() {
+      setIsMobile(window.innerWidth < 768)
+    }
+    checkMobile()
+    window.addEventListener('resize', checkMobile)
+    return () => window.removeEventListener('resize', checkMobile)
+  }, [])
 
   useEffect(() => {
     fetch(`/api/share/${token}`)
@@ -81,7 +91,7 @@ function ShareViewComponent() {
         position: 'sticky', top: 0, zIndex: 10,
         borderBottom: '1px solid var(--border, #e9ecef)',
         background: 'var(--bg, #fff)',
-        padding: '12px 40px',
+        padding: isMobile ? '12px 16px' : '12px 40px',
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -135,9 +145,9 @@ function ShareViewComponent() {
       </div>
 
       {unlocked ? (
-        <div style={{ maxWidth: 960, margin: '0 auto', padding: '48px 48px' }}>
+        <div style={{ maxWidth: 960, margin: '0 auto', padding: isMobile ? '24px 16px' : '48px 48px' }}>
           <h1 style={{
-            fontSize: '2rem', fontWeight: 700, letterSpacing: '-0.02em', lineHeight: 1.2,
+            fontSize: isMobile ? '1.75rem' : '2rem', fontWeight: 700, letterSpacing: '-0.02em', lineHeight: 1.2,
             color: 'var(--fg, #1a1a2e)', fontFamily: 'var(--font-heading, sans-serif)',
             marginBottom: 10,
           }}>

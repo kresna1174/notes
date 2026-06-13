@@ -50,6 +50,16 @@ function NotePageComponent() {
   const [unlocked, setUnlocked] = useState(false)
   const [showUnlockModal, setShowUnlockModal] = useState(false)
   const [sidebarVisible, setSidebarVisible] = useState(true)
+  const [isMobile, setIsMobile] = useState(false)
+
+  useEffect(() => {
+    function checkMobile() {
+      setIsMobile(window.innerWidth < 768)
+    }
+    checkMobile()
+    window.addEventListener('resize', checkMobile)
+    return () => window.removeEventListener('resize', checkMobile)
+  }, [])
 
   useEffect(() => {
     setLoading(true)
@@ -90,7 +100,7 @@ function NotePageComponent() {
 
   return (
     <div className="flex h-screen overflow-hidden">
-      <div style={{
+      <div style={isMobile ? { position: 'absolute', width: 0, height: 0, overflow: 'visible' } : {
         width: sidebarVisible ? undefined : 0,
         overflow: 'hidden',
         transition: 'width 0.2s ease',
@@ -113,31 +123,33 @@ function NotePageComponent() {
         />
       </div>
       <main className="flex-1 overflow-hidden flex flex-col" style={{ background: 'var(--bg)', position: 'relative' }}>
-        <button
-          onClick={() => setSidebarVisible(v => !v)}
-          title={sidebarVisible ? 'Sembunyikan sidebar' : 'Tampilkan sidebar'}
-          style={{
-            position: 'absolute',
-            top: 16,
-            left: 16,
-            zIndex: 20,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            width: 30,
-            height: 30,
-            border: '1px solid var(--border)',
-            borderRadius: 7,
-            background: 'var(--bg)',
-            color: 'var(--fg-muted)',
-            cursor: 'pointer',
-            transition: 'all 0.15s',
-          }}
-          onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--primary)'; e.currentTarget.style.color = 'var(--primary)' }}
-          onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.color = 'var(--fg-muted)' }}
-        >
-          {sidebarVisible ? <PanelLeftClose size={15} /> : <PanelLeftOpen size={15} />}
-        </button>
+        {!isMobile && (
+          <button
+            onClick={() => setSidebarVisible(v => !v)}
+            title={sidebarVisible ? 'Sembunyikan sidebar' : 'Tampilkan sidebar'}
+            style={{
+              position: 'absolute',
+              top: 16,
+              left: 16,
+              zIndex: 20,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              width: 30,
+              height: 30,
+              border: '1px solid var(--border)',
+              borderRadius: 7,
+              background: 'var(--bg)',
+              color: 'var(--fg-muted)',
+              cursor: 'pointer',
+              transition: 'all 0.15s',
+            }}
+            onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--primary)'; e.currentTarget.style.color = 'var(--primary)' }}
+            onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.color = 'var(--fg-muted)' }}
+          >
+            {sidebarVisible ? <PanelLeftClose size={15} /> : <PanelLeftOpen size={15} />}
+          </button>
+        )}
         {loading ? (
           <div className="px-10 py-10">
             <div className="animate-pulse">
