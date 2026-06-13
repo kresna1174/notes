@@ -37,7 +37,7 @@ COPY --from=builder /app /app
 ENV PATH="/app/.venv/bin:$PATH"
 ENV HOST=0.0.0.0
 ENV PORT=8000
-ENV DATABASE_URL="sqlite+aiosqlite:///app/data/sessions.db"
+ENV DATABASE_URL="sqlite+aiosqlite:////app/data/sessions.db"
 
 # Expose FastAPI API port
 EXPOSE 8000

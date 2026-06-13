@@ -22,7 +22,7 @@ services:
     volumes:
       - ./apps/ai-agent/data:/app/data
     environment:
-      - DATABASE_URL=sqlite+aiosqlite:///app/data/sessions.db
+      - DATABASE_URL=sqlite+aiosqlite:////app/data/sessions.db
       - CELERY_BROKER_URL=redis://redis:6379/0
       - CELERY_RESULT_BACKEND=redis://redis:6379/0
       - OPENROUTER_MODEL=${OPENROUTER_MODEL:-google/gemini-2.5-flash:free}
@@ -44,7 +44,7 @@ services:
     volumes:
       - ./apps/ai-agent/data:/app/data
     environment:
-      - DATABASE_URL=sqlite+aiosqlite:///app/data/sessions.db
+      - DATABASE_URL=sqlite+aiosqlite:////app/data/sessions.db
       - CELERY_BROKER_URL=redis://redis:6379/0
       - CELERY_RESULT_BACKEND=redis://redis:6379/0
       - OPENROUTER_MODEL=${OPENROUTER_MODEL:-google/gemini-2.5-flash:free}
