@@ -250,78 +250,87 @@ interface StaticTerminalProps {
   left?: string
   right?: string
   transform?: string
+  delay?: string
 }
 
-function StaticTerminal({ title, lines, opacity, width, height, top, bottom, left, right, transform }: StaticTerminalProps) {
+function StaticTerminal({ title, lines, opacity, width, height, top, bottom, left, right, transform, delay }: StaticTerminalProps) {
   return (
     <div 
-      className="absolute rounded-lg border pointer-events-none select-none"
       style={{
-        background: '#22170d',
-        borderColor: '#3a2717',
-        fontFamily: 'Courier New, Courier, monospace',
-        display: 'flex',
-        flexDirection: 'column',
-        width,
-        height,
+        position: 'absolute',
         top,
         bottom,
         left,
         right,
+        width,
+        height,
         transform,
-        opacity,
         zIndex: 1,
-        boxShadow: '0 8px 24px rgba(44, 30, 17, 0.12)',
       }}
     >
-      {/* Mini Title Bar */}
       <div 
+        className="w-full h-full rounded-lg border pointer-events-none select-none"
         style={{
-          background: '#2c1e11',
-          padding: '6px 10px',
+          background: '#22170d',
+          borderColor: '#3a2717',
+          fontFamily: 'Courier New, Courier, monospace',
           display: 'flex',
-          alignItems: 'center',
-          borderBottom: '1px solid #3a2717',
-          position: 'relative',
+          flexDirection: 'column',
+          opacity,
+          boxShadow: '0 8px 24px rgba(44, 30, 17, 0.12)',
+          animation: 'fadeInUp 0.8s cubic-bezier(0.16, 1, 0.3, 1) both',
+          animationDelay: delay || '0ms',
         }}
       >
-        <div style={{ display: 'flex', gap: 4 }}>
-          <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#ff5f56' }} />
-          <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#ffbd2e' }} />
-          <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#27c93f' }} />
-        </div>
+        {/* Mini Title Bar */}
         <div 
           style={{
-            position: 'absolute',
-            inset: 0,
+            background: '#2c1e11',
+            padding: '6px 10px',
             display: 'flex',
             alignItems: 'center',
-            justifyContent: 'center',
-            fontSize: '0.6rem',
-            color: '#a6927d',
-            fontWeight: 500,
+            borderBottom: '1px solid #3a2717',
+            position: 'relative',
           }}
         >
-          {title}
-        </div>
-      </div>
-      {/* Mini Content */}
-      <div 
-        style={{
-          padding: 8,
-          flex: 1,
-          fontSize: '0.65rem',
-          lineHeight: '1.35',
-          color: '#ebdcb9',
-          overflow: 'hidden',
-          textAlign: 'left',
-        }}
-      >
-        {lines.map((line, idx) => (
-          <div key={idx} style={{ whiteSpace: 'pre', marginBottom: 2 }}>
-            {line}
+          <div style={{ display: 'flex', gap: 4 }}>
+            <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#ff5f56' }} />
+            <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#ffbd2e' }} />
+            <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#27c93f' }} />
           </div>
-        ))}
+          <div 
+            style={{
+              position: 'absolute',
+              inset: 0,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: '0.6rem',
+              color: '#a6927d',
+              fontWeight: 500,
+            }}
+          >
+            {title}
+          </div>
+        </div>
+        {/* Mini Content */}
+        <div 
+          style={{
+            padding: 8,
+            flex: 1,
+            fontSize: '0.65rem',
+            lineHeight: '1.35',
+            color: '#ebdcb9',
+            overflow: 'hidden',
+            textAlign: 'left',
+          }}
+        >
+          {lines.map((line, idx) => (
+            <div key={idx} style={{ whiteSpace: 'pre', marginBottom: 2 }}>
+              {line}
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   )
@@ -338,6 +347,33 @@ function LoginPage() {
   const [successMsg, setSuccessMsg] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [showAbout, setShowAbout] = useState(false)
+
+  const cardRef = useRef<HTMLDivElement>(null)
+  const [transformStyle, setTransformStyle] = useState('perspective(1000px) rotateX(0deg) rotateY(0deg)')
+  const [transitionStyle, setTransitionStyle] = useState('transform 0.5s ease')
+  const [glowStyle, setGlowStyle] = useState({ opacity: 0, x: 0, y: 0 })
+
+  function handleMouseMove(e: React.MouseEvent<HTMLDivElement>) {
+    const card = cardRef.current
+    if (!card) return
+    const rect = card.getBoundingClientRect()
+    const x = e.clientX - rect.left
+    const y = e.clientY - rect.top
+    const centerX = rect.width / 2
+    const centerY = rect.height / 2
+    const rotateX = ((centerY - y) / centerY) * 6
+    const rotateY = ((x - centerX) / centerX) * 6
+
+    setTransitionStyle('transform 0.15s ease-out')
+    setTransformStyle(`perspective(1000px) rotateX(${rotateX}deg) rotateY(${rotateY}deg)`)
+    setGlowStyle({ opacity: 1, x, y })
+  }
+
+  function handleMouseLeave() {
+    setTransitionStyle('transform 0.5s cubic-bezier(0.25, 1, 0.5, 1)')
+    setTransformStyle('perspective(1000px) rotateX(0deg) rotateY(0deg)')
+    setGlowStyle({ opacity: 0, x: 0, y: 0 })
+  }
 
   if (user) {
     navigate({ to: '/' })
@@ -420,6 +456,7 @@ function LoginPage() {
           top="6%" 
           left="4%" 
           transform="rotate(-4deg)" 
+          delay="100ms"
         />
         <StaticTerminal 
           title="vitest-run.sh" 
@@ -430,6 +467,7 @@ function LoginPage() {
           bottom="8%" 
           left="6%" 
           transform="rotate(5deg)" 
+          delay="250ms"
         />
         <StaticTerminal 
           title="docker-compose.log" 
@@ -440,6 +478,7 @@ function LoginPage() {
           top="10%" 
           right="4%" 
           transform="rotate(6deg)" 
+          delay="400ms"
         />
         <StaticTerminal 
           title="npm-build.log" 
@@ -450,10 +489,20 @@ function LoginPage() {
           bottom="8%" 
           right="6%" 
           transform="rotate(-3deg)" 
+          delay="550ms"
         />
 
         {/* Center Main Terminal */}
-        <div style={{ zIndex: 10, textAlign: 'center', width: '100%', maxWidth: 500 }}>
+        <div 
+          style={{ 
+            zIndex: 10, 
+            textAlign: 'center', 
+            width: '100%', 
+            maxWidth: 500,
+            animation: 'fadeInUp 0.8s cubic-bezier(0.16, 1, 0.3, 1) both',
+            animationDelay: '650ms',
+          }}
+        >
           <h1 style={{
             fontFamily: 'var(--font-heading)',
             fontSize: '1.85rem',
@@ -489,19 +538,50 @@ function LoginPage() {
           backgroundSize: '20px 20px',
         }}
       >
-        <div style={{
-          background: 'color-mix(in srgb, var(--card-bg) 82%, transparent)',
-          backdropFilter: 'blur(12px)',
-          WebkitBackdropFilter: 'blur(12px)',
-          border: '1px solid var(--border)',
-          borderRadius: 16, 
-          width: '100%', maxWidth: 400,
-          boxShadow: '0 12px 40px rgba(0,0,0,0.15)',
-          overflow: 'hidden',
-          display: 'flex',
-          flexDirection: 'column',
-          zIndex: 10,
-        }}>
+        {/* Cascade entrance wrapper */}
+        <div 
+          style={{ 
+            width: '100%', 
+            maxWidth: 400,
+            animation: 'fadeInUp 0.8s cubic-bezier(0.16, 1, 0.3, 1) both',
+            animationDelay: '780ms',
+          }}
+        >
+          <div 
+            ref={cardRef}
+            onMouseMove={handleMouseMove}
+            onMouseLeave={handleMouseLeave}
+            style={{
+              background: 'color-mix(in srgb, var(--card-bg) 82%, transparent)',
+              backdropFilter: 'blur(12px)',
+              WebkitBackdropFilter: 'blur(12px)',
+              border: '1px solid var(--border)',
+              borderRadius: 16, 
+              width: '100%', maxWidth: 400,
+              boxShadow: '0 12px 40px rgba(0,0,0,0.15)',
+              overflow: 'hidden',
+              display: 'flex',
+              flexDirection: 'column',
+              zIndex: 10,
+              transform: transformStyle,
+              transition: transitionStyle,
+              transformStyle: 'preserve-3d',
+              position: 'relative',
+            }}
+          >
+          {/* Mouse glow overlay */}
+          <div 
+            style={{
+              position: 'absolute',
+              inset: 0,
+              background: `radial-gradient(350px circle at ${glowStyle.x}px ${glowStyle.y}px, color-mix(in srgb, var(--primary) 15%, transparent), transparent 80%)`,
+              opacity: glowStyle.opacity,
+              pointerEvents: 'none',
+              transition: 'opacity 0.2s ease',
+              zIndex: 1,
+            }}
+          />
+
           {/* Terminal-style Card Header */}
           <div 
             style={{
@@ -511,6 +591,7 @@ function LoginPage() {
               alignItems: 'center',
               borderBottom: '1px solid var(--border)',
               position: 'relative',
+              zIndex: 2,
             }}
           >
             {/* Traffic lights */}
@@ -531,6 +612,7 @@ function LoginPage() {
                 color: 'var(--fg-muted)',
                 fontWeight: 600,
                 fontFamily: 'Courier New, Courier, monospace',
+                zIndex: 2,
               }}
             >
               auth-session.sh
@@ -538,7 +620,7 @@ function LoginPage() {
           </div>
 
           {/* Terminal Form Body */}
-          <div style={{ padding: '32px 28px 28px 28px' }}>
+          <div style={{ padding: '32px 28px 28px 28px', position: 'relative', zIndex: 2 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 24 }}>
               <img
                 src="/logo192.png"
@@ -685,6 +767,7 @@ function LoginPage() {
           </div>
         </div>
       </div>
+    </div>
 
       <AboutModal open={showAbout} onOpenChange={setShowAbout} />
 
@@ -692,6 +775,16 @@ function LoginPage() {
         @keyframes blink {
           0%, 100% { opacity: 1; }
           50% { opacity: 0; }
+        }
+        @keyframes fadeInUp {
+          from {
+            opacity: 0;
+            transform: translateY(20px) scale(0.97);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0) scale(1);
+          }
         }
       `}</style>
     </div>
