@@ -9,7 +9,7 @@ import core.llm
 from core.llm import get_model
 
 # Helper asinkron untuk menjalan agent Summarize
-async def run_summarize_agent_async(task_id: str, content: str):
+async def run_summarize_agent_async(task_id: str, content: str, user_id: str | None = None):
     async with AsyncSessionLocal() as db:
         # Ambil record task dari database sessions.db
         stmt = select(SubAgentTask).where(SubAgentTask.id == task_id)
@@ -22,15 +22,18 @@ async def run_summarize_agent_async(task_id: str, content: str):
         await db.commit()
         
         try:
+            from custom_tools import write_notes, search_web, extract_web, crawl_web
             # 1. Definisikan Sub-Agent khusus Summarizer
             summarizer_agent = Agent(
                 name="SummarizerSubAgent",
                 instructions="You are a specialized sub-agent that summarizes note content. Provide a concise, bullet-pointed summary.",
-                model=get_model()
+                model=get_model(),
+                tools=[write_notes, search_web, extract_web, crawl_web]
             )
             
             # 2. Jalankan sub-agent
-            res = await Runner.run(summarizer_agent, f"Please summarize this note content:\n\n{content}")
+            context = {"session_id": task.session_id, "user_id": user_id}
+            res = await Runner.run(summarizer_agent, f"Please summarize this note content:\n\n{content}", context=context)
             
             # 3. Update task status ke completed beserta outputnya
             task.status = "completed"
@@ -43,7 +46,7 @@ async def run_summarize_agent_async(task_id: str, content: str):
             await db.commit()
 
 # Helper asinkron untuk menjalan agent Tagger
-async def run_tags_agent_async(task_id: str, content: str):
+async def run_tags_agent_async(task_id: str, content: str, user_id: str | None = None):
     async with AsyncSessionLocal() as db:
         # Ambil record task dari database sessions.db
         stmt = select(SubAgentTask).where(SubAgentTask.id == task_id)
@@ -56,15 +59,18 @@ async def run_tags_agent_async(task_id: str, content: str):
         await db.commit()
         
         try:
+            from custom_tools import write_notes, search_web, extract_web, crawl_web
             # 1. Definisikan Sub-Agent khusus Tagger
             tagger_agent = Agent(
                 name="TaggerSubAgent",
                 instructions="You are a specialized sub-agent that extracts 3 to 5 relevant tags from the content. Return ONLY a comma-separated list of tags.",
-                model=get_model()
+                model=get_model(),
+                tools=[write_notes, search_web, extract_web, crawl_web]
             )
             
             # 2. Jalankan sub-agent
-            res = await Runner.run(tagger_agent, f"Extract tags for this content:\n\n{content}")
+            context = {"session_id": task.session_id, "user_id": user_id}
+            res = await Runner.run(tagger_agent, f"Extract tags for this content:\n\n{content}", context=context)
             
             # 3. Update task status ke completed beserta outputnya
             task.status = "completed"
@@ -78,9 +84,9 @@ async def run_tags_agent_async(task_id: str, content: str):
 # --- Definisi Tugas Celery (Synchronous Wrapper) ---
 
 @celery_app.task(name="tasks.summarize_task")
-def summarize_task(task_id: str, content: str):
-    asyncio.run(run_summarize_agent_async(task_id, content))
+def summarize_task(task_id: str, content: str, user_id: str | None = None):
+    asyncio.run(run_summarize_agent_async(task_id, content, user_id))
 
 @celery_app.task(name="tasks.tags_task")
-def tags_task(task_id: str, content: str):
-    asyncio.run(run_tags_agent_async(task_id, content))
+def tags_task(task_id: str, content: str, user_id: str | None = None):
+    asyncio.run(run_tags_agent_async(task_id, content, user_id))

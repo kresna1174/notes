@@ -80,6 +80,7 @@ async def scalar_html():
 class ChatRequest(BaseModel):
     message: str
     session_id: str = "default"
+    user_id: str | None = None
 
 class ChatStreamRequest(BaseModel):
     message: str | None = None
@@ -87,26 +88,33 @@ class ChatStreamRequest(BaseModel):
     session_id: str = "default"
     note_title: str | None = None
     note_content: str | None = None
+    user_id: str | None = None
 
 class SummarizeRequest(BaseModel):
     content: str
     session_id: str = "default"
+    user_id: str | None = None
 
 class TagsRequest(BaseModel):
     content: str
     session_id: str = "default"
+    user_id: str | None = None
+
+from custom_tools import write_notes, search_web, extract_web, crawl_web
 
 # 1. Definisikan Sub-Agents
 summarizer_sub_agent = Agent(
     name="SummarizerSubAgent",
     instructions="You are a specialized sub-agent that summarizes note content. Provide a concise, bullet-pointed summary.",
-    model=get_model()
+    model=get_model(),
+    tools=[write_notes, search_web, extract_web, crawl_web]
 )
 
 tagger_sub_agent = Agent(
     name="TaggerSubAgent",
     instructions="You are a specialized sub-agent that extracts 3 to 5 relevant tags from the content. Return ONLY a comma-separated list of tags.",
-    model=get_model()
+    model=get_model(),
+    tools=[write_notes, search_web, extract_web, crawl_web]
 )
 
 # 2. Definisikan Parent Agent dengan Sub-Agents sebagai Tools
@@ -114,7 +122,8 @@ parent_agent = Agent(
     name="NotesParentAssistant",
     instructions="""You are a helpful notes platform assistant. 
     You help the user summarize notes, categorize notes, and answer questions.
-    For advanced summarization or tag extraction tasks, delegate to your specialized sub-agents using their tools.""",
+    For advanced summarization or tag extraction tasks, delegate to your specialized sub-agents using their tools.
+    You can also search the web, extract content, crawl sites, and write/update notes directly.""",
     model=get_model(),
     tools=[
         summarizer_sub_agent.as_tool(
@@ -125,6 +134,10 @@ parent_agent = Agent(
             tool_name="tagger_expert",
             tool_description="Use for extracting tags or keywords from notes or text content.",
         ),
+        write_notes,
+        search_web,
+        extract_web,
+        crawl_web,
     ]
 )
 
@@ -172,7 +185,8 @@ async def chat(request: ChatRequest):
         )
         
         # Jalankan agent dengan session memory
-        result = await Runner.run(parent_agent, request.message, session=session)
+        context = {"session_id": request.session_id, "user_id": request.user_id}
+        result = await Runner.run(parent_agent, request.message, session=session, context=context)
         
         return {
             "response": normalize_content(result.final_output),
@@ -186,7 +200,7 @@ def sse(payload: dict):
     return f"data: {json.dumps(payload)}\n\n"
 
 
-async def chat_event_generator(message: str, session_id: str):
+async def chat_event_generator(message: str, session_id: str, user_id: str | None = None):
     db_url = os.getenv("DATABASE_URL", "sqlite+aiosqlite:///sessions.db")
     try:
         session = SQLAlchemySession.from_url(
@@ -203,7 +217,8 @@ async def chat_event_generator(message: str, session_id: str):
         yield sse({"type": "text-start", "id": current_text_id})
 
         # Jalankan runner secara streaming
-        result = Runner.run_streamed(parent_agent, message, session=session)
+        context = {"session_id": session_id, "user_id": user_id}
+        result = Runner.run_streamed(parent_agent, message, session=session, context=context)
         
         active_agent = "NotesParentAssistant"
         current_reasoning_id = None
@@ -365,7 +380,7 @@ async def chat_stream(request: ChatStreamRequest):
             user_message = f"{context_str}Pertanyaan/Instruksi User: {user_message}"
             
     return StreamingResponse(
-        chat_event_generator(user_message, request.session_id),
+        chat_event_generator(user_message, request.session_id, request.user_id),
         media_type="text/event-stream",
         headers={"x-vercel-ai-ui-stream-event": "v1", "cache-control": "no-cache"}
     )
@@ -389,7 +404,7 @@ async def summarize(request: SummarizeRequest, db: AsyncSession = Depends(get_db
 
     try:
         # 2. Kirim tugas ke Celery worker secara asynchronous
-        summarize_task.delay(task.id, request.content)
+        summarize_task.delay(task.id, request.content, request.user_id)
         
         return {
             "task_id": task.id,
@@ -417,7 +432,7 @@ async def tags(request: TagsRequest, db: AsyncSession = Depends(get_db)):
 
     try:
         # 2. Kirim tugas ke Celery worker secara asynchronous
-        tags_task.delay(task.id, request.content)
+        tags_task.delay(task.id, request.content, request.user_id)
         
         return {
             "task_id": task.id,

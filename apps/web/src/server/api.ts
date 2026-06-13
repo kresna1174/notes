@@ -828,7 +828,8 @@ export async function handleApiRequest(req: IncomingMessage, res: ServerResponse
     const session = getSession(req)
     if (!session) { json(res, { error: 'unauthenticated' }, 401); return true }
     try {
-      const body = await readBody(req)
+      const body = await readBody(req) as any
+      body.user_id = session.userId
       const forwardRes = await fetch('http://localhost:8000/api/chat/stream', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -867,7 +868,8 @@ export async function handleApiRequest(req: IncomingMessage, res: ServerResponse
     const session = getSession(req)
     if (!session) { json(res, { error: 'unauthenticated' }, 401); return true }
     try {
-      const body = await readBody(req)
+      const body = await readBody(req) as any
+      body.user_id = session.userId
       const forwardRes = await fetch('http://localhost:8000/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -891,7 +893,8 @@ export async function handleApiRequest(req: IncomingMessage, res: ServerResponse
     const session = getSession(req)
     if (!session) { json(res, { error: 'unauthenticated' }, 401); return true }
     try {
-      const body = await readBody(req)
+      const body = await readBody(req) as any
+      body.user_id = session.userId
       const forwardRes = await fetch('http://localhost:8000/api/summarize', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -915,7 +918,8 @@ export async function handleApiRequest(req: IncomingMessage, res: ServerResponse
     const session = getSession(req)
     if (!session) { json(res, { error: 'unauthenticated' }, 401); return true }
     try {
-      const body = await readBody(req)
+      const body = await readBody(req) as any
+      body.user_id = session.userId
       const forwardRes = await fetch('http://localhost:8000/api/tags', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

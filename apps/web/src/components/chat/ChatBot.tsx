@@ -16,11 +16,14 @@ function ReasoningPanel({ typeLabel, content, isGenerating }: { typeLabel: strin
   return (
     <div
       style={{
-        margin: '8px 0 8px 4px',
-        borderLeft: '2px solid var(--border)',
-        paddingLeft: '10px',
-        fontFamily: 'var(--font-body)',
-        fontSize: '0.8rem'
+        margin: '6px 0 10px 4px',
+        padding: '8px 12px',
+        fontSize: '0.8rem',
+        borderRadius: 8,
+        border: '1px solid var(--border)',
+        background: 'var(--input-bg)',
+        color: 'var(--fg-muted)',
+        fontFamily: 'var(--font-body)'
       }}
     >
       {/* Header */}
@@ -31,16 +34,14 @@ function ReasoningPanel({ typeLabel, content, isGenerating }: { typeLabel: strin
           alignItems: 'center',
           justifyContent: 'space-between',
           cursor: 'pointer',
-          padding: '4px 0',
           userSelect: 'none',
           color: 'var(--primary)',
-          opacity: 0.85,
           fontWeight: 600,
           gap: 8
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <span>🤖 {typeLabel}</span>
+          <span>🧠 Reasoning: {typeLabel}</span>
           {isGenerating ? (
             <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
               <Loader2 className="animate-spin" size={12} color="var(--primary)" />
@@ -63,11 +64,11 @@ function ReasoningPanel({ typeLabel, content, isGenerating }: { typeLabel: strin
       {isOpen && (
         <div
           style={{
-            marginTop: '4px',
+            marginTop: '8px',
             color: 'var(--fg-muted)',
             lineHeight: '1.4',
             whiteSpace: 'pre-wrap',
-            background: 'var(--muted)',
+            background: 'var(--bg)',
             padding: '8px 10px',
             borderRadius: '6px',
             fontSize: '0.78rem',
@@ -76,6 +77,85 @@ function ReasoningPanel({ typeLabel, content, isGenerating }: { typeLabel: strin
           }}
         >
           {content || 'Memulai proses berpikir...'}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function ToolCallPanel({ item }: { item: any }) {
+  const [isOpen, setIsOpen] = useState(false)
+  const isAnyCallActive = item.calls.some((c: any) => c.state === 'call')
+
+  return (
+    <div
+      style={{
+        margin: '6px 0 10px 4px',
+        padding: '8px 12px',
+        fontSize: '0.8rem',
+        borderRadius: 8,
+        border: '1px solid var(--border)',
+        background: 'var(--input-bg)',
+        color: 'var(--fg-muted)',
+        fontFamily: 'var(--font-body)'
+      }}
+    >
+      {/* Header */}
+      <div
+        onClick={() => setIsOpen(!isOpen)}
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          cursor: 'pointer',
+          userSelect: 'none',
+          fontWeight: 600,
+          color: 'var(--primary)',
+          gap: 8
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <span>🛠️ Tool: {item.toolName}</span>
+          <span style={{ fontSize: '0.7rem', fontWeight: 400, color: 'var(--fg-subtle)' }}>
+            ({isAnyCallActive ? 'memanggil...' : 'selesai'})
+          </span>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          {isAnyCallActive && <Loader2 className="animate-spin" size={12} color="var(--primary)" />}
+          <span style={{ fontSize: '0.7rem', color: 'var(--fg-subtle)' }}>
+            {isOpen ? '▲' : '▼'}
+          </span>
+        </div>
+      </div>
+
+      {/* Content */}
+      {isOpen && (
+        <div style={{ marginTop: 8 }}>
+          {item.calls.map((call: any, callIdx: number) => (
+            <div key={callIdx} style={{ marginTop: callIdx > 0 ? 8 : 0, borderTop: callIdx > 0 ? '1px dashed var(--border)' : 'none', paddingTop: callIdx > 0 ? 8 : 0 }}>
+              {call.args && (
+                <details open style={{ fontSize: '0.72rem', marginBottom: call.result ? 6 : 0 }}>
+                  <summary style={{ cursor: 'pointer', color: 'var(--fg-subtle)' }}>
+                    Parameter Input {item.calls.length > 1 ? `#${callIdx + 1}` : ''}
+                  </summary>
+                  <pre style={{ margin: '4px 0 0', padding: 6, background: 'var(--bg)', borderRadius: 4, overflowX: 'auto', fontFamily: 'monospace' }}>
+                    {JSON.stringify(call.args, null, 2)}
+                  </pre>
+                </details>
+              )}
+
+              {call.result && (
+                <div style={{ borderTop: call.args ? '1px dashed var(--border)' : 'none', paddingTop: call.args ? 6 : 0, marginTop: call.args ? 6 : 0 }}>
+                  <div style={{ fontWeight: 600, fontSize: '0.75rem', marginBottom: 4 }}>
+                    Hasil Output {item.calls.length > 1 ? `#${callIdx + 1}` : ''}:
+                  </div>
+                  <pre style={{ margin: 0, padding: 6, background: 'var(--bg)', borderRadius: 4, overflowX: 'auto', fontFamily: 'monospace', fontSize: '0.72rem', whiteSpace: 'pre-wrap' }}>
+                    {typeof call.result === 'string' ? call.result : JSON.stringify(call.result, null, 2)}
+                  </pre>
+                </div>
+              )}
+            </div>
+          ))}
         </div>
       )}
     </div>
@@ -576,58 +656,7 @@ export function ChatBot({ noteId, noteContent, noteTitle, onClose }: ChatBotProp
 
                   return groupedItems.map((item: any, itemIdx: number) => {
                     if (item.type === 'grouped-tool') {
-                      const isAnyCallActive = item.calls.some((c: any) => c.state === 'call');
-                      return (
-                        <div
-                          key={itemIdx}
-                          style={{
-                            margin: '6px 0 10px 4px',
-                            padding: '8px 12px',
-                            fontSize: '0.8rem',
-                            borderRadius: 8,
-                            border: '1px solid var(--border)',
-                            background: 'var(--input-bg)',
-                            color: 'var(--fg-muted)',
-                            fontFamily: 'var(--font-body)'
-                          }}
-                        >
-                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontWeight: 600, color: 'var(--primary)', marginBottom: 6 }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                              <span>🛠️ Tool: {item.toolName}</span>
-                              <span style={{ fontSize: '0.7rem', fontWeight: 400, color: 'var(--fg-subtle)' }}>
-                                ({isAnyCallActive ? 'memanggil...' : 'selesai'})
-                              </span>
-                            </div>
-                            {isAnyCallActive && <Loader2 className="animate-spin" size={12} color="var(--primary)" />}
-                          </div>
-
-                          {item.calls.map((call: any, callIdx: number) => (
-                            <div key={callIdx} style={{ marginTop: callIdx > 0 ? 8 : 0, borderTop: callIdx > 0 ? '1px dashed var(--border)' : 'none', paddingTop: callIdx > 0 ? 8 : 0 }}>
-                              {call.args && (
-                                <details style={{ fontSize: '0.72rem', marginBottom: call.result ? 6 : 0 }}>
-                                  <summary style={{ cursor: 'pointer', color: 'var(--fg-subtle)' }}>
-                                    Lihat Parameter Input {item.calls.length > 1 ? `#${callIdx + 1}` : ''}
-                                  </summary>
-                                  <pre style={{ margin: '4px 0 0', padding: 6, background: 'var(--bg)', borderRadius: 4, overflowX: 'auto', fontFamily: 'monospace' }}>
-                                    {JSON.stringify(call.args, null, 2)}
-                                  </pre>
-                                </details>
-                              )}
-
-                              {call.result && (
-                                <div style={{ borderTop: call.args ? '1px dashed var(--border)' : 'none', paddingTop: call.args ? 6 : 0, marginTop: call.args ? 6 : 0 }}>
-                                  <div style={{ fontWeight: 600, fontSize: '0.75rem', marginBottom: 4 }}>
-                                    Hasil Output {item.calls.length > 1 ? `#${callIdx + 1}` : ''}:
-                                  </div>
-                                  <pre style={{ margin: 0, padding: 6, background: 'var(--bg)', borderRadius: 4, overflowX: 'auto', fontFamily: 'monospace', fontSize: '0.72rem', whiteSpace: 'pre-wrap' }}>
-                                    {typeof call.result === 'string' ? call.result : JSON.stringify(call.result, null, 2)}
-                                  </pre>
-                                </div>
-                              )}
-                            </div>
-                          ))}
-                        </div>
-                      );
+                      return <ToolCallPanel key={itemIdx} item={item} />;
                     }
 
                     if (item.type === 'grouped-source-url') {
