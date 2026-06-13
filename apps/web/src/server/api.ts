@@ -846,6 +846,7 @@ export async function handleApiRequest(req: IncomingMessage, res: ServerResponse
         'Content-Type': 'text/event-stream',
         'Cache-Control': 'no-cache',
         'Connection': 'keep-alive',
+        'x-vercel-ai-ui-stream-event': 'v1',
       })
 
       const reader = forwardRes.body?.getReader()

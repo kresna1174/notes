@@ -114,7 +114,7 @@ export function Editor({ note, onUpdate, onSaveStatusChange, onLockChange, share
       try { return JSON.parse(note.content) } catch { return {} }
     })(),
     onUpdate: ({ editor }) => {
-      setStatus('unsaved')
+      Promise.resolve().then(() => setStatus('unsaved'))
       clearTimeout(saveTimer.current)
       saveTimer.current = setTimeout(() => {
         setStatus('saving')
@@ -177,6 +177,42 @@ export function Editor({ note, onUpdate, onSaveStatusChange, onLockChange, share
   useEffect(() => {
     if (editor) (editor.storage as any).noteId = note.id
   }, [editor, note.id])
+
+  useEffect(() => {
+    function handleAiUpdate(e: Event) {
+      const customEvent = e as CustomEvent<{ title?: string; content?: string }>
+      const { title: newTitle, content: newContent } = customEvent.detail
+      
+      let finalTitle = titleValRef.current
+      if (newTitle !== undefined) {
+        setTitle(newTitle)
+        finalTitle = newTitle
+      }
+
+      let parsedContent: any = null
+      if (newContent !== undefined && editor) {
+        try {
+          parsedContent = JSON.parse(newContent)
+          editor.commands.setContent(parsedContent)
+        } catch {
+          editor.commands.setContent(newContent)
+          parsedContent = { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: newContent }] }] }
+        }
+      }
+
+      setStatus('saving')
+      const finalContent = parsedContent ? JSON.stringify(parsedContent) : JSON.stringify(editor?.getJSON() || {})
+      
+      onUpdate({ title: finalTitle, content: finalContent })
+        .then(() => {
+          setUpdatedAt(Date.now())
+          setStatus('saved')
+        })
+    }
+
+    window.addEventListener('note-updated-by-ai', handleAiUpdate)
+    return () => window.removeEventListener('note-updated-by-ai', handleAiUpdate)
+  }, [editor, onUpdate])
 
   useEffect(() => {
     setTitle(note.title)

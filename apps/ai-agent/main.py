@@ -42,7 +42,7 @@ from core.database import engine, Base, get_db
 from core.models import SubAgentTask
 
 # Import OpenAI Agents SDK
-from agents import Agent, Runner
+from agents import Agent, Runner, ToolCallItem, ToolCallOutputItem
 from agents.extensions.memory import SQLAlchemySession
 
 # Inisialisasi LLM Client (OpenRouter)
@@ -221,6 +221,7 @@ async def chat_event_generator(message: str, session_id: str, user_id: str | Non
         result = Runner.run_streamed(parent_agent, message, session=session, context=context)
         
         active_agent = "NotesParentAssistant"
+        active_tool_names = {}
         current_reasoning_id = None
         current_text_id = None
         text_open = False
@@ -327,6 +328,70 @@ async def chat_event_generator(message: str, session_id: str, user_id: str | Non
                             "id": current_text_id,
                             "delta": data.delta
                         })
+            elif event.type == "run_item_stream_event":
+                item = event.item
+                if isinstance(item, ToolCallItem):
+                    # Tutup text part jika sedang terbuka
+                    if text_open:
+                        yield sse({"type": "text-end", "id": current_text_id})
+                        text_open = False
+                    # Tutup reasoning part jika sedang terbuka
+                    if current_reasoning_id:
+                        yield sse({"type": "reasoning-end", "id": current_reasoning_id})
+                        current_reasoning_id = None
+                    
+                    # Simpan nama tool call untuk ToolCallOutputItem lookup
+                    active_tool_names[item.call_id] = item.tool_name
+                    
+                    args_dict = {}
+                    if hasattr(item, "raw_item") and hasattr(item.raw_item, "arguments"):
+                        args_str = item.raw_item.arguments
+                        if isinstance(args_str, str):
+                            try:
+                                args_dict = json.loads(args_str)
+                            except Exception:
+                                args_dict = {"raw_arguments": args_str}
+                        elif isinstance(args_str, dict):
+                            args_dict = args_str
+                            
+                    yield sse({
+                        "type": "tool-input-available",
+                        "toolCallId": item.call_id,
+                        "toolName": item.tool_name,
+                        "input": args_dict
+                    })
+                    
+                elif isinstance(item, ToolCallOutputItem):
+                    # Tutup text part jika sedang terbuka
+                    if text_open:
+                        yield sse({"type": "text-end", "id": current_text_id})
+                        text_open = False
+                    # Tutup reasoning part jika sedang terbuka
+                    if current_reasoning_id:
+                        yield sse({"type": "reasoning-end", "id": current_reasoning_id})
+                        current_reasoning_id = None
+                        
+                    # Dapatkan nama tool call menggunakan lookup
+                    tool_name = active_tool_names.pop(item.call_id, None)
+                    if not tool_name:
+                        if hasattr(item, "tool_origin") and item.tool_origin:
+                            tool_name = getattr(item.tool_origin, "agent_tool_name", None)
+                    if not tool_name:
+                        tool_name = "unknown_tool"
+                        
+                    output_val = item.output
+                    if isinstance(output_val, str):
+                        try:
+                            output_val = json.loads(output_val)
+                        except Exception:
+                            pass
+                            
+                    yield sse({
+                        "type": "tool-output-available",
+                        "toolCallId": item.call_id,
+                        "toolName": tool_name,
+                        "output": output_val
+                    })
                         
         # Pastikan semua part ditutup di akhir stream
         if current_reasoning_id:

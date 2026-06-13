@@ -83,9 +83,37 @@ function ReasoningPanel({ typeLabel, content, isGenerating }: { typeLabel: strin
   )
 }
 
-function ToolCallPanel({ item }: { item: any }) {
-  const [isOpen, setIsOpen] = useState(false)
+function ToolCallPanel({ item, noteId }: { item: any; noteId: string }) {
+  const [isOpen, setIsOpen] = useState(item.toolName === 'write_notes')
   const isAnyCallActive = item.calls.some((c: any) => c.state === 'call')
+
+  const storageKey = `note_approve_state_${noteId}_${JSON.stringify(item.calls[0]?.args || {})}`
+
+  const [approvalState, setApprovalState] = useState<'pending' | 'approved' | 'rejected'>(() => {
+    const saved = localStorage.getItem(storageKey)
+    if (saved === 'approved' || saved === 'rejected') {
+      return saved
+    }
+    return 'pending'
+  })
+
+  const handleApprove = (args: any) => {
+    setApprovalState('approved')
+    localStorage.setItem(storageKey, 'approved')
+    window.dispatchEvent(
+      new CustomEvent('note-updated-by-ai', {
+        detail: {
+          title: args.title,
+          content: args.content
+        }
+      })
+    )
+  }
+
+  const handleReject = () => {
+    setApprovalState('rejected')
+    localStorage.setItem(storageKey, 'rejected')
+  }
 
   return (
     <div
@@ -149,9 +177,69 @@ function ToolCallPanel({ item }: { item: any }) {
                   <div style={{ fontWeight: 600, fontSize: '0.75rem', marginBottom: 4 }}>
                     Hasil Output {item.calls.length > 1 ? `#${callIdx + 1}` : ''}:
                   </div>
-                  <pre style={{ margin: 0, padding: 6, background: 'var(--bg)', borderRadius: 4, overflowX: 'auto', fontFamily: 'monospace', fontSize: '0.72rem', whiteSpace: 'pre-wrap' }}>
-                    {typeof call.result === 'string' ? call.result : JSON.stringify(call.result, null, 2)}
-                  </pre>
+                  {item.toolName === 'write_notes' ? (
+                    <div style={{ fontSize: '0.72rem', color: 'var(--fg-subtle)', fontStyle: 'italic' }}>
+                      Tindakan penulisan catatan diusulkan oleh AI. Silakan berikan persetujuan Anda di bawah.
+                    </div>
+                  ) : (
+                    <pre style={{ margin: 0, padding: 6, background: 'var(--bg)', borderRadius: 4, overflowX: 'auto', fontFamily: 'monospace', fontSize: '0.72rem', whiteSpace: 'pre-wrap' }}>
+                      {typeof call.result === 'string' ? call.result : JSON.stringify(call.result, null, 2)}
+                    </pre>
+                  )}
+                </div>
+              )}
+
+              {/* Action Buttons for write_notes */}
+              {item.toolName === 'write_notes' && !isAnyCallActive && (
+                <div style={{ marginTop: 12, display: 'flex', gap: 8, alignItems: 'center' }}>
+                  {approvalState === 'pending' ? (
+                    <>
+                      <button
+                        onClick={() => handleApprove(call.args)}
+                        style={{
+                          padding: '6px 14px',
+                          fontSize: '0.75rem',
+                          fontWeight: 600,
+                          borderRadius: 20,
+                          background: 'var(--primary)',
+                          color: '#fff',
+                          border: 'none',
+                          cursor: 'pointer',
+                          transition: 'opacity 0.15s'
+                        }}
+                        onMouseEnter={e => { e.currentTarget.style.opacity = '0.9' }}
+                        onMouseLeave={e => { e.currentTarget.style.opacity = '1' }}
+                      >
+                        Setujui (Approve)
+                      </button>
+                      <button
+                        onClick={handleReject}
+                        style={{
+                          padding: '6px 14px',
+                          fontSize: '0.75rem',
+                          fontWeight: 600,
+                          borderRadius: 20,
+                          background: 'transparent',
+                          color: 'var(--fg-muted)',
+                          border: '1px solid var(--border)',
+                          cursor: 'pointer',
+                          transition: 'background 0.15s'
+                        }}
+                        onMouseEnter={e => { e.currentTarget.style.background = 'var(--muted)' }}
+                        onMouseLeave={e => { e.currentTarget.style.background = 'transparent' }}
+                      >
+                        Tolak (Reject)
+                      </button>
+                    </>
+                  ) : approvalState === 'approved' ? (
+                    <span style={{ fontSize: '0.75rem', color: '#22c55e', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4 }}>
+                      ✓ Catatan diperbarui di layar & disimpan ke database.
+                    </span>
+                  ) : (
+                    <span style={{ fontSize: '0.75rem', color: '#ef4444', fontWeight: 600 }}>
+                      ✗ Tindakan ditolak oleh pengguna.
+                    </span>
+                  )}
                 </div>
               )}
             </div>
@@ -597,22 +685,41 @@ export function ChatBot({ noteId, noteContent, noteTitle, onClose }: ChatBotProp
                   let lastItem: any = null;
 
                   for (const part of nonReasoningParts) {
-                    if (part.type === 'tool' || part.type === 'dynamic-tool') {
-                      if (lastItem && lastItem.type === 'grouped-tool' && lastItem.toolName === part.toolName) {
+                    if (
+                      part.type === 'tool' ||
+                      part.type === 'dynamic-tool' ||
+                      (typeof part.type === 'string' && part.type.startsWith('tool-'))
+                    ) {
+                      const partToolName =
+                        part.toolName ||
+                        (typeof part.type === 'string' && part.type.startsWith('tool-')
+                          ? part.type.replace('tool-', '')
+                          : 'unknown_tool');
+                      const partArgs = part.args !== undefined ? part.args : (part as any).input;
+                      const partResult = part.result !== undefined ? part.result : (part as any).output;
+                      const partState = part.state || (partResult !== undefined ? 'result' : 'call');
+
+                      if (
+                        lastItem &&
+                        lastItem.type === 'grouped-tool' &&
+                        lastItem.toolName === partToolName
+                      ) {
                         lastItem.calls.push({
-                          args: part.args,
-                          result: part.result,
-                          state: part.state
+                          args: partArgs,
+                          result: partResult,
+                          state: partState
                         });
                       } else {
                         lastItem = {
                           type: 'grouped-tool',
-                          toolName: part.toolName,
-                          calls: [{
-                            args: part.args,
-                            result: part.result,
-                            state: part.state
-                          }]
+                          toolName: partToolName,
+                          calls: [
+                            {
+                              args: partArgs,
+                              result: partResult,
+                              state: partState
+                            }
+                          ]
                         };
                         groupedItems.push(lastItem);
                       }
@@ -656,7 +763,7 @@ export function ChatBot({ noteId, noteContent, noteTitle, onClose }: ChatBotProp
 
                   return groupedItems.map((item: any, itemIdx: number) => {
                     if (item.type === 'grouped-tool') {
-                      return <ToolCallPanel key={itemIdx} item={item} />;
+                      return <ToolCallPanel key={itemIdx} item={item} noteId={noteId} />;
                     }
 
                     if (item.type === 'grouped-source-url') {
