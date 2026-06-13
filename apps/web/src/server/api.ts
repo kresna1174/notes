@@ -2,7 +2,7 @@ import type { IncomingMessage, ServerResponse } from 'node:http'
 import { createReadStream } from 'node:fs'
 import { db, sqlite } from '../lib/db'
 import { notes, attachments, users, teams } from '../../drizzle/schema'
-import { desc, eq, and, inArray, sql } from 'drizzle-orm'
+import { desc, eq, and, sql } from 'drizzle-orm'
 import { randomUUID } from 'crypto'
 import Busboy from 'busboy'
 import { saveFile, getFilePath, deleteFile } from '../lib/storage'
@@ -301,7 +301,7 @@ export async function handleApiRequest(req: IncomingMessage, res: ServerResponse
     const [me] = await db.select({ teamId: users.teamId }).from(users).where(eq(users.id, session.userId))
     const myTeamId = me?.teamId ?? null
 
-    let allNotes;
+    let allNotes: any[] = [];
     if (session.role === 'admin') {
       if (scope === 'mine') {
         allNotes = await db.select().from(notes).where(eq(notes.type, 'individual')).orderBy(desc(notes.createdAt))
@@ -800,6 +800,138 @@ export async function handleApiRequest(req: IncomingMessage, res: ServerResponse
       json(res, { ok: true })
       return true
     }
+  }
+
+  // GET /api/ai/chat/history/:id
+  const historyMatch = path.match(/^\/api\/ai\/chat\/history\/([^/]+)$/)
+  if (historyMatch && method === 'GET') {
+    const session = getSession(req)
+    if (!session) { json(res, { error: 'unauthenticated' }, 401); return true }
+    try {
+      const sessionId = historyMatch[1]
+      const forwardRes = await fetch(`http://localhost:8000/api/chat/history/${sessionId}`)
+      if (!forwardRes.ok) {
+        const errText = await forwardRes.text()
+        json(res, { error: `AI service error: ${errText}` }, forwardRes.status)
+        return true
+      }
+      const data = await forwardRes.json()
+      json(res, data)
+    } catch (err) {
+      json(res, { error: `Failed to communicate with AI agent: ${String(err)}` }, 500)
+    }
+    return true
+  }
+
+  // POST /api/ai/chat/stream
+  if (method === 'POST' && path === '/api/ai/chat/stream') {
+    const session = getSession(req)
+    if (!session) { json(res, { error: 'unauthenticated' }, 401); return true }
+    try {
+      const body = await readBody(req)
+      const forwardRes = await fetch('http://localhost:8000/api/chat/stream', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      })
+
+      if (!forwardRes.ok) {
+        const errText = await forwardRes.text()
+        json(res, { error: `AI service error: ${errText}` }, forwardRes.status)
+        return true
+      }
+
+      res.writeHead(200, {
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache',
+        'Connection': 'keep-alive',
+      })
+
+      const reader = forwardRes.body?.getReader()
+      if (reader) {
+        while (true) {
+          const { done, value } = await reader.read()
+          if (done) break
+          res.write(value)
+        }
+      }
+      res.end()
+    } catch (err) {
+      json(res, { error: `Failed to communicate with AI agent: ${String(err)}` }, 500)
+    }
+    return true
+  }
+
+  // POST /api/ai/chat
+  if (method === 'POST' && path === '/api/ai/chat') {
+    const session = getSession(req)
+    if (!session) { json(res, { error: 'unauthenticated' }, 401); return true }
+    try {
+      const body = await readBody(req)
+      const forwardRes = await fetch('http://localhost:8000/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      })
+      if (!forwardRes.ok) {
+        const errText = await forwardRes.text()
+        json(res, { error: `AI service error: ${errText}` }, forwardRes.status)
+        return true
+      }
+      const data = await forwardRes.json()
+      json(res, data)
+    } catch (err) {
+      json(res, { error: `Failed to communicate with AI agent: ${String(err)}` }, 500)
+    }
+    return true
+  }
+
+  // POST /api/ai/summarize
+  if (method === 'POST' && path === '/api/ai/summarize') {
+    const session = getSession(req)
+    if (!session) { json(res, { error: 'unauthenticated' }, 401); return true }
+    try {
+      const body = await readBody(req)
+      const forwardRes = await fetch('http://localhost:8000/api/summarize', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      })
+      if (!forwardRes.ok) {
+        const errText = await forwardRes.text()
+        json(res, { error: `AI service error: ${errText}` }, forwardRes.status)
+        return true
+      }
+      const data = await forwardRes.json()
+      json(res, data)
+    } catch (err) {
+      json(res, { error: `Failed to communicate with AI agent: ${String(err)}` }, 500)
+    }
+    return true
+  }
+
+  // POST /api/ai/tags
+  if (method === 'POST' && path === '/api/ai/tags') {
+    const session = getSession(req)
+    if (!session) { json(res, { error: 'unauthenticated' }, 401); return true }
+    try {
+      const body = await readBody(req)
+      const forwardRes = await fetch('http://localhost:8000/api/tags', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      })
+      if (!forwardRes.ok) {
+        const errText = await forwardRes.text()
+        json(res, { error: `AI service error: ${errText}` }, forwardRes.status)
+        return true
+      }
+      const data = await forwardRes.json()
+      json(res, data)
+    } catch (err) {
+      json(res, { error: `Failed to communicate with AI agent: ${String(err)}` }, 500)
+    }
+    return true
   }
 
   return false

@@ -23,7 +23,7 @@ import { PinLockModal } from './PinLockModal'
 import { ShareModal } from './ShareModal'
 import { DailyLogBar } from './DailyLogBar'
 import { useEffect, useRef, useState } from 'react'
-import { Eye, EyeOff, Lock, LockOpen, Share2, FileUp, Paperclip, Pencil } from 'lucide-react'
+import { Eye, EyeOff, Lock, LockOpen, Share2, FileUp, Paperclip, Sparkles } from 'lucide-react'
 import { marked } from 'marked'
 import mammoth from 'mammoth'
 import * as XLSX from 'xlsx'
@@ -48,6 +48,8 @@ interface EditorProps {
   onSaveStatusChange?: (status: 'saved' | 'saving' | 'unsaved') => void
   onLockChange?: (isLocked: boolean) => void
   shareTrigger?: number
+  chatOpen?: boolean
+  onToggleChat?: () => void
 }
 
 function fmt(ts: number) {
@@ -58,7 +60,7 @@ function fmt(ts: number) {
 
 type SaveStatus = 'saved' | 'saving' | 'unsaved'
 
-export function Editor({ note, onUpdate, onSaveStatusChange, onLockChange, shareTrigger }: EditorProps) {
+export function Editor({ note, onUpdate, onSaveStatusChange, onLockChange, shareTrigger, chatOpen, onToggleChat }: EditorProps) {
   const [title, setTitle] = useState(note.title)
   const titleValRef = useRef(title)
   titleValRef.current = title
@@ -453,6 +455,27 @@ export function Editor({ note, onUpdate, onSaveStatusChange, onLockChange, share
               {preview ? <EyeOff size={14} /> : <Eye size={14} />}
               {!isMobile && (preview ? 'Hide Preview' : 'Preview')}
             </button>
+
+            {onToggleChat && (
+              <button
+                onClick={onToggleChat}
+                title={chatOpen ? 'Sembunyikan AI Assistant' : 'Tampilkan AI Assistant'}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: isMobile ? 0 : 6,
+                  padding: isMobile ? '8px' : '5px 12px', fontSize: '0.75rem', fontWeight: 500,
+                  fontFamily: 'var(--font-body)',
+                  border: `1px solid ${chatOpen ? 'var(--primary)' : 'var(--border)'}`, borderRadius: 20,
+                  background: chatOpen ? 'var(--accent)' : 'var(--bg)',
+                  color: chatOpen ? 'var(--primary)' : 'var(--fg-muted)',
+                  cursor: 'pointer', transition: 'all 0.15s',
+                }}
+                onMouseEnter={e => { if (!chatOpen) { e.currentTarget.style.borderColor = 'var(--primary)'; e.currentTarget.style.color = 'var(--primary)' } }}
+                onMouseLeave={e => { if (!chatOpen) { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.color = 'var(--fg-muted)' } }}
+              >
+                <Sparkles size={14} />
+                {!isMobile && 'AI Assistant'}
+              </button>
+            )}
           </div>
 
           {/* metadata bar */}

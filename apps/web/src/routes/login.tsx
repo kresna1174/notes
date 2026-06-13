@@ -53,7 +53,7 @@ function HomebrewTerminal() {
 
       if (step.action === 'type') {
         let typed = ''
-        const text = step.text
+        const text = step.text || ''
         for (let i = 0; i < text.length; i++) {
           if (!active) return
           await new Promise(r => { timer = setTimeout(r, step.delay || 50) })

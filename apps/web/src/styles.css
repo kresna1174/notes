@@ -397,3 +397,26 @@ mark { background-color: #fff3bf; color: #5c4400; border-radius: 2px; padding: 0
 .react-flow__background pattern {
   stroke: var(--border) !important;
 }
+
+/* ── Typing Indicator Animation ── */
+.dot-blink {
+  animation: dot-blink 1.4s infinite both;
+}
+@keyframes dot-blink {
+  0% { opacity: .2; }
+  20% { opacity: 1; }
+  100% { opacity: .2; }
+}
+
+/* ── Thinking text ellipsis animation ── */
+.thinking-text::after {
+  content: '';
+  animation: thinking-dots 1.5s steps(4, end) infinite;
+}
+@keyframes thinking-dots {
+  0%   { content: ''; }
+  25%  { content: '.'; }
+  50%  { content: '..'; }
+  75%  { content: '...'; }
+  100% { content: ''; }
+}

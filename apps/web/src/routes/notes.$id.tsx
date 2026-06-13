@@ -4,6 +4,8 @@ import { Editor } from '../components/editor/Editor'
 import { PinLockModal } from '../components/editor/PinLockModal'
 import { useState, useEffect } from 'react'
 import { Check, Loader2, Circle, PanelLeftClose, PanelLeftOpen } from 'lucide-react'
+import { ChatBot } from '../components/chat/ChatBot'
+
 
 export const Route = createFileRoute('/notes/$id')({
   component: NotePageComponent,
@@ -51,6 +53,7 @@ function NotePageComponent() {
   const [showUnlockModal, setShowUnlockModal] = useState(false)
   const [sidebarVisible, setSidebarVisible] = useState(true)
   const [isMobile, setIsMobile] = useState(false)
+  const [chatOpen, setChatOpen] = useState(false)
 
   useEffect(() => {
     function checkMobile() {
@@ -174,7 +177,17 @@ function NotePageComponent() {
                 if (locked) setUnlocked(false)
               }}
               shareTrigger={shareTrigger}
+              chatOpen={chatOpen}
+              onToggleChat={() => setChatOpen(v => !v)}
             />
+            {chatOpen && (
+              <ChatBot
+                noteId={id}
+                noteContent={note.content}
+                noteTitle={note.title}
+                onClose={() => setChatOpen(false)}
+              />
+            )}
           </div>
         ) : (
           <div className="flex h-full items-center justify-center flex-col" style={{ gap: 12 }}>
