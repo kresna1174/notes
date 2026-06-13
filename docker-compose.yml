@@ -1,15 +1,85 @@
 services:
+  # Redis service used as message broker for Celery sub-agent tasks
+  redis:
+    image: redis:7-alpine
+    container_name: notes-redis
+    restart: always
+    command: redis-server --save 60 1 --loglevel warning
+    volumes:
+      - redis_data:/data
+    networks:
+      - notes-network
+
+  # FastAPI Python service hosting the AI agent and tools API
+  ai-agent:
+    build:
+      context: ./apps/ai-agent
+      dockerfile: Dockerfile
+    container_name: notes-ai-agent
+    restart: always
+    ports:
+      - "127.0.0.1:8000:8000"
+    volumes:
+      - ./apps/ai-agent/data:/app/data
+    environment:
+      - DATABASE_URL=sqlite+aiosqlite:///app/data/sessions.db
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+      - OPENROUTER_MODEL=${OPENROUTER_MODEL:-google/gemini-2.5-flash:free}
+      - OPENROUTER_BASE_URL=${OPENROUTER_BASE_URL:-https://openrouter.ai/api/v1}
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
+    depends_on:
+      - redis
+    networks:
+      - notes-network
+
+  # Celery background worker for executing sub-agent tasks asynchronously
+  celery-worker:
+    build:
+      context: ./apps/ai-agent
+      dockerfile: Dockerfile
+    container_name: notes-celery-worker
+    command: celery -A tasks.celery_app worker --loglevel=info
+    restart: always
+    volumes:
+      - ./apps/ai-agent/data:/app/data
+    environment:
+      - DATABASE_URL=sqlite+aiosqlite:///app/data/sessions.db
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+      - OPENROUTER_MODEL=${OPENROUTER_MODEL:-google/gemini-2.5-flash:free}
+      - OPENROUTER_BASE_URL=${OPENROUTER_BASE_URL:-https://openrouter.ai/api/v1}
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
+    depends_on:
+      - redis
+      - ai-agent
+    networks:
+      - notes-network
+
+  # Web frontend and proxy Node.js API server
   notes-app:
     build:
-      context: .
+      context: ./apps/web
       dockerfile: Dockerfile
-    container_name: homebrew-notes
+    container_name: notes-web-app
     restart: always
     ports:
       - "127.0.0.1:3000:3000"
     volumes:
-      - ./data:/app/data
-      - ./uploads:/app/uploads
+      - ./apps/web/data:/app/data
+      - ./apps/web/uploads:/app/uploads
     environment:
       - PORT=3000
       - NODE_ENV=production
+      - AI_AGENT_URL=http://ai-agent:8000
+    depends_on:
+      - ai-agent
+    networks:
+      - notes-network
+
+volumes:
+  redis_data:
+
+networks:
+  notes-network:
+    driver: bridge

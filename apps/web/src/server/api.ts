@@ -8,6 +8,8 @@ import Busboy from 'busboy'
 import { saveFile, getFilePath, deleteFile } from '../lib/storage'
 import bcrypt from 'bcryptjs'
 
+const AI_AGENT_URL = process.env.AI_AGENT_URL || 'http://localhost:8000'
+
 function getSession(req: IncomingMessage) {
   const cookie = req.headers.cookie || ''
   const match = cookie.match(/(?:^|;\s*)session=([^;]+)/)
@@ -809,7 +811,7 @@ export async function handleApiRequest(req: IncomingMessage, res: ServerResponse
     if (!session) { json(res, { error: 'unauthenticated' }, 401); return true }
     try {
       const sessionId = historyMatch[1]
-      const forwardRes = await fetch(`http://localhost:8000/api/chat/history/${sessionId}`)
+      const forwardRes = await fetch(`${AI_AGENT_URL}/api/chat/history/${sessionId}`)
       if (!forwardRes.ok) {
         const errText = await forwardRes.text()
         json(res, { error: `AI service error: ${errText}` }, forwardRes.status)
@@ -830,7 +832,7 @@ export async function handleApiRequest(req: IncomingMessage, res: ServerResponse
     try {
       const body = await readBody(req) as any
       body.user_id = session.userId
-      const forwardRes = await fetch('http://localhost:8000/api/chat/stream', {
+      const forwardRes = await fetch(`${AI_AGENT_URL}/api/chat/stream`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body)
@@ -871,7 +873,7 @@ export async function handleApiRequest(req: IncomingMessage, res: ServerResponse
     try {
       const body = await readBody(req) as any
       body.user_id = session.userId
-      const forwardRes = await fetch('http://localhost:8000/api/chat', {
+      const forwardRes = await fetch(`${AI_AGENT_URL}/api/chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body)
@@ -896,7 +898,7 @@ export async function handleApiRequest(req: IncomingMessage, res: ServerResponse
     try {
       const body = await readBody(req) as any
       body.user_id = session.userId
-      const forwardRes = await fetch('http://localhost:8000/api/summarize', {
+      const forwardRes = await fetch(`${AI_AGENT_URL}/api/summarize`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body)
@@ -921,7 +923,7 @@ export async function handleApiRequest(req: IncomingMessage, res: ServerResponse
     try {
       const body = await readBody(req) as any
       body.user_id = session.userId
-      const forwardRes = await fetch('http://localhost:8000/api/tags', {
+      const forwardRes = await fetch(`${AI_AGENT_URL}/api/tags`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body)

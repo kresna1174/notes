@@ -40,67 +40,23 @@ def write_notes(
     note_id: str | None = None
 ) -> str:
     """
-    Create a new note or update an existing note in the local database.
+    Propose creating a new note or updating an existing note. This action requires user approval.
 
     Args:
         ctx: Run context containing user session details.
-        title: The title of the note.
-        content: The text content of the note (raw text or TipTap JSON format).
-        note_id: Optional ID of the note to update. If not provided, updates the current note in context (if any) or creates a new note.
+        title: The proposed title of the note.
+        content: The proposed text content of the note (raw text or TipTap JSON format).
+        note_id: Optional ID of the note to update.
     """
-    # Grab the user_id from the run context, fallback if not found
-    user_id = ctx.context.get("user_id") if ctx.context else None
-    session_id = ctx.context.get("session_id") if ctx.context else None
+    formatted_content = format_as_tiptap(content)
+    target_id = note_id or (ctx.context.get("session_id") if ctx.context else None)
     
-    db_path = "/Users/krisna/Documents/PROJECT/notes-app/apps/web/data/notes.db"
-    conn = sqlite3.connect(db_path)
-    cursor = conn.cursor()
-    
-    try:
-        # Fallback to get first user if user_id is missing/empty
-        if not user_id:
-            cursor.execute("SELECT id FROM users ORDER BY created_at LIMIT 1")
-            row = cursor.fetchone()
-            user_id = row[0] if row else ""
-
-        formatted_content = format_as_tiptap(content)
-        now_ms = int(time.time() * 1000)
-        
-        target_id = note_id or session_id
-        should_update = False
-        
-        if target_id and target_id != "default":
-            cursor.execute("SELECT id FROM notes WHERE id = ?", (target_id,))
-            if cursor.fetchone():
-                should_update = True
-        
-        if should_update:
-            cursor.execute(
-                """
-                UPDATE notes 
-                SET title = ?, content = ?, updated_at = ?, updated_by_user_id = ?
-                WHERE id = ?
-                """,
-                (title, formatted_content, now_ms, user_id, target_id)
-            )
-            conn.commit()
-            return f"Successfully updated note with ID: {target_id}"
-        else:
-            new_id = str(uuid.uuid4())
-            cursor.execute(
-                """
-                INSERT INTO notes (id, user_id, title, content, type, created_at, updated_at)
-                VALUES (?, ?, ?, ?, 'individual', ?, ?)
-                """,
-                (new_id, user_id, title, formatted_content, now_ms, now_ms)
-            )
-            conn.commit()
-            return f"Successfully created new note with ID: {new_id}"
-            
-    except Exception as e:
-        return f"Error writing note to database: {str(e)}"
-    finally:
-        conn.close()
+    return json.dumps({
+        "status": "pending_approval",
+        "title": title,
+        "content": formatted_content,
+        "note_id": target_id
+    })
 
 @function_tool
 def search_web(query: str, max_results: int = 5) -> str:
