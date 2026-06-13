@@ -706,8 +706,8 @@ export function ChatBot({ noteId, noteContent, noteTitle, onClose }: ChatBotProp
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Quick Prompts */}
-      {messages.length <= 2 && !isLoading && (
+      {/* Quick Prompts — hanya tampil jika belum ada sesi chat (belum ada pesan dari user) */}
+      {!messages.some((m: any) => m.role === 'user') && !isLoading && (
         <div style={{ padding: '0 20px', display: 'flex', flexDirection: 'column', gap: 8 }}>
           <span style={{ fontSize: '0.7rem', fontWeight: 600, color: 'var(--fg-muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
             Saran Pertanyaan
