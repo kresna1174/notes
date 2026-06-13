@@ -1,7 +1,8 @@
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { useState, useEffect, useRef } from 'react'
 import { useAuth } from '../lib/auth'
-import { Eye, EyeOff } from 'lucide-react'
+import { useTheme } from '../lib/theme'
+import { Eye, EyeOff, Sun, Moon, Coffee, Zap } from 'lucide-react'
 import { AboutModal } from '../components/ui/AboutModal'
 
 export const Route = createFileRoute('/login')({
@@ -339,6 +340,7 @@ function StaticTerminal({ title, lines, opacity, width, height, top, bottom, lef
 function LoginPage() {
   const { login, user } = useAuth()
   const navigate = useNavigate()
+  const { theme, toggle } = useTheme()
   const [isRegister, setIsRegister] = useState(false)
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
@@ -352,6 +354,16 @@ function LoginPage() {
   const [transformStyle, setTransformStyle] = useState('perspective(1000px) rotateX(0deg) rotateY(0deg)')
   const [transitionStyle, setTransitionStyle] = useState('transform 0.5s ease')
   const [glowStyle, setGlowStyle] = useState({ opacity: 0, x: 0, y: 0 })
+
+  const getThemeIcon = (t: string) => {
+    switch (t) {
+      case 'light': return <Sun size={18} />
+      case 'dark': return <Moon size={18} />
+      case 'homebrew': return <Coffee size={18} />
+      case 'reactor': return <Zap size={18} />
+      default: return <Sun size={18} />
+    }
+  }
 
   function handleMouseMove(e: React.MouseEvent<HTMLDivElement>) {
     const card = cardRef.current
@@ -429,19 +441,47 @@ function LoginPage() {
   }
 
   return (
-    <div className="flex flex-col md:flex-row min-h-screen w-full" style={{ background: 'var(--bg-app)' }}>
+    <div className="flex flex-col md:flex-row min-h-screen w-full relative" style={{ background: 'var(--bg-app)' }}>
+      {/* Floating Theme Toggle */}
+      <button
+        onClick={toggle}
+        title={`Switch theme (Current: ${theme})`}
+        style={{
+          position: 'absolute',
+          top: 20,
+          right: 20,
+          zIndex: 100,
+          background: 'color-mix(in srgb, var(--card-bg) 80%, transparent)',
+          backdropFilter: 'blur(8px)',
+          border: '1px solid var(--border)',
+          borderRadius: 10,
+          padding: 10,
+          cursor: 'pointer',
+          color: 'var(--fg)',
+          boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          transition: 'transform 0.15s, background-color 0.15s',
+        }}
+        onMouseEnter={e => { e.currentTarget.style.transform = 'scale(1.05)'; e.currentTarget.style.background = 'var(--muted)' }}
+        onMouseLeave={e => { e.currentTarget.style.transform = 'scale(1)'; e.currentTarget.style.background = 'color-mix(in srgb, var(--card-bg) 80%, transparent)' }}
+      >
+        {getThemeIcon(theme)}
+      </button>
+
       {/* Left Panel - Scattered Terminals & Homebrew Terminal Animation */}
       <div 
         className="hidden md:flex md:w-[55%] lg:w-[60%] flex-col justify-center items-center p-12 relative overflow-hidden"
         style={{
-          background: '#f9f5eb',
-          borderRight: '1px solid #ebdcb9',
+          background: 'var(--bg)',
+          borderRight: '1px solid var(--border)',
         }}
       >
         {/* Subtle retro overlay pattern */}
         <div style={{
           position: 'absolute', inset: 0, opacity: 0.03, pointerEvents: 'none',
-          backgroundImage: 'radial-gradient(#2c1e11 20%, transparent 20%)',
+          backgroundImage: 'radial-gradient(var(--fg) 20%, transparent 20%)',
           backgroundSize: '24px 24px',
           zIndex: 2,
         }} />
@@ -507,7 +547,7 @@ function LoginPage() {
             fontFamily: 'var(--font-heading)',
             fontSize: '1.85rem',
             fontWeight: 800,
-            color: '#c27d0c',
+            color: 'var(--primary)',
             marginBottom: 8,
             textAlign: 'center',
             letterSpacing: '-0.02em',
@@ -517,7 +557,7 @@ function LoginPage() {
           <p style={{
             fontFamily: 'var(--font-body)',
             fontSize: '0.9rem',
-            color: '#735f4b',
+            color: 'var(--fg-muted)',
             marginBottom: 32,
             textAlign: 'center',
             lineHeight: '1.5',
