@@ -2,7 +2,7 @@ import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { useState, useEffect, useRef } from 'react'
 import { useAuth } from '../lib/auth'
 import { useTheme } from '../lib/theme'
-import { Eye, EyeOff, Sun, Moon, Coffee, Zap } from 'lucide-react'
+import { Eye, EyeOff, Sun, Moon, Beer, Zap } from 'lucide-react'
 import { AboutModal } from '../components/ui/AboutModal'
 
 export const Route = createFileRoute('/login')({
@@ -28,7 +28,7 @@ const TERMINAL_STEPS = [
   { action: 'print', text: '📡 Server running at http://localhost:3000', delay: 80 },
   { action: 'print', text: '🔑 Secure session key generated.', delay: 80 },
   { action: 'print', text: '----------------------------------------', delay: 40 },
-  { action: 'print', text: '📝 [Note] Coffee Shopping List ☕', delay: 80 },
+  { action: 'print', text: '📝 [Note] Homebrew Beer Recipe 🍺', delay: 80 },
   { action: 'print', text: '📊 [Flow] Drizzle DB System Schema', delay: 80 },
   { action: 'print', text: '🔒 [Lock] Secret Crypto Wallet Passphrase', delay: 80 },
   { action: 'print', text: '----------------------------------------', delay: 40 },
@@ -359,7 +359,7 @@ function LoginPage() {
     switch (t) {
       case 'light': return <Sun size={18} />
       case 'dark': return <Moon size={18} />
-      case 'homebrew': return <Coffee size={18} />
+      case 'homebrew': return <Beer size={18} />
       case 'reactor': return <Zap size={18} />
       default: return <Sun size={18} />
     }
@@ -552,7 +552,7 @@ function LoginPage() {
             textAlign: 'center',
             letterSpacing: '-0.02em',
           }}>
-            ☕ Homebrew Notes
+            🍺 Homebrew Notes
           </h1>
           <p style={{
             fontFamily: 'var(--font-body)',
