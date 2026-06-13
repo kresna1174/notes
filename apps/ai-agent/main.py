@@ -4,6 +4,9 @@ import uuid
 import logging
 from contextlib import asynccontextmanager
 
+from dotenv import load_dotenv
+load_dotenv()
+
 # Inisialisasi Logger
 logger = logging.getLogger("ai-agent")
 logger.setLevel(logging.INFO)
@@ -30,7 +33,6 @@ from fastapi import FastAPI, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from pydantic import BaseModel
-from dotenv import load_dotenv
 import json
 from openai.types.responses import (
     ResponseReasoningTextDeltaEvent,
@@ -49,7 +51,6 @@ from agents.extensions.memory import SQLAlchemySession
 import core.llm
 from core.llm import get_model
 
-load_dotenv()
 
 # Setup lifespan untuk inisialisasi DB di startup
 @asynccontextmanager
