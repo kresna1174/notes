@@ -30,10 +30,10 @@ export const ABOUT_MARKDOWN = `# 📝 Homebrew Notes
 ## 📅 Riwayat Perubahan (Changelog)
 
 ### v1.3.2 (Terbaru - Juni 2026)
-*   🎨 **Split-Screen Halaman Login & Animasi Terminal Homebrew**:
-    - Pemisahan tampilan login menjadi split-screen dua kolom yang responsif pada desktop (kolom kiri dominan).
-    - Animasi simulator terminal Homebrew interaktif di layar kiri yang mensimulasikan proses unduh/install, inisiasi database lokal SQLite, dan memulai daemon server notes secara real-time.
-    - Penyempurnaan responsivitas halaman login/register dan pembersihan styling cursor blink.
+*   🎨 **Desain Ulang Halaman Login Kolase Terminal & Transparansi**:
+    - Kolom kiri (dominan pada desktop) didesain sebagai kolase beberapa terminal retro tersebar secara tidak beraturan dengan tingkat transparansi bervariasi, berpusat pada satu terminal utama yang menjalankan animasi inisiasi notes.
+    - Kolom kanan menggunakan pola latar belakang grid titik-titik (*dot grid background*) dengan kartu otentikasi berbentuk terminal transparan (*glassmorphic terminal card*) lengkap dengan tombol kontrol jendela OS.
+    - Penyempurnaan responsivitas layout, optimalisasi backdrop blur, dan font monospace terminal yang terpadu.
 
 ### v1.3.1 (Juni 2026)
 *   🎨 **Tema Reactor Baru**:

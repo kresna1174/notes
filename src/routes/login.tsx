@@ -200,6 +200,133 @@ function HomebrewTerminal() {
   )
 }
 
+const MOCK_GIT_LOG = [
+  'commit 100768fa6283bf5e58c537c38c8cb9ae7649558a',
+  'Author: Kresna <kresna@users.noreply.github.com>',
+  'Date:   Sat Jun 13 09:38:01 2026 +0700',
+  '',
+  '  * style: split-screen login page',
+  '  * feat: add HomebrewTerminal animation',
+  '  * docs: update changelog v1.3.2'
+]
+
+const MOCK_TEST_LOG = [
+  'RUN  v4.1.8 /Users/krisna/notes-app',
+  '✓ src/server/copy.test.ts (2 tests) 13ms',
+  '✓ src/server/auth.test.ts (5 tests) 706ms',
+  '',
+  'Test Files  2 passed (2)',
+  '     Tests  7 passed (7)',
+  '  Duration  1.41s'
+]
+
+const MOCK_DOCKER_LOG = [
+  '✔ Container db-1       Created',
+  '✔ Container redis-1    Created',
+  '✔ Container dev-app-1  Created',
+  'Attaching to dev-app-1',
+  'dev-app-1 | Server listening on port 3000',
+  'dev-app-1 | Connected to sqlite db'
+]
+
+const MOCK_NPM_LOG = [
+  'npm install @tanstack/react-router',
+  'added 142 packages, and audited 143 packages',
+  'found 0 vulnerabilities',
+  '',
+  'npm run build',
+  '✓ 2382 modules transformed.',
+  'dist/assets/login-BHMKjdvB.js  11.71 kB'
+]
+
+interface StaticTerminalProps {
+  title: string
+  lines: string[]
+  opacity: number
+  width: number
+  height: number
+  top?: string
+  bottom?: string
+  left?: string
+  right?: string
+  transform?: string
+}
+
+function StaticTerminal({ title, lines, opacity, width, height, top, bottom, left, right, transform }: StaticTerminalProps) {
+  return (
+    <div 
+      className="absolute rounded-lg border pointer-events-none select-none"
+      style={{
+        background: '#22170d',
+        borderColor: '#3a2717',
+        fontFamily: 'Courier New, Courier, monospace',
+        display: 'flex',
+        flexDirection: 'column',
+        width,
+        height,
+        top,
+        bottom,
+        left,
+        right,
+        transform,
+        opacity,
+        zIndex: 1,
+        boxShadow: '0 8px 24px rgba(44, 30, 17, 0.12)',
+      }}
+    >
+      {/* Mini Title Bar */}
+      <div 
+        style={{
+          background: '#2c1e11',
+          padding: '6px 10px',
+          display: 'flex',
+          alignItems: 'center',
+          borderBottom: '1px solid #3a2717',
+          position: 'relative',
+        }}
+      >
+        <div style={{ display: 'flex', gap: 4 }}>
+          <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#ff5f56' }} />
+          <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#ffbd2e' }} />
+          <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#27c93f' }} />
+        </div>
+        <div 
+          style={{
+            position: 'absolute',
+            inset: 0,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontSize: '0.6rem',
+            color: '#a6927d',
+            fontWeight: 500,
+          }}
+        >
+          {title}
+        </div>
+      </div>
+      {/* Mini Content */}
+      <div 
+        style={{
+          padding: 8,
+          flex: 1,
+          fontSize: '0.65rem',
+          lineHeight: '1.35',
+          color: '#ebdcb9',
+          overflow: 'hidden',
+          textAlign: 'left',
+        }}
+      >
+        {lines.map((line, idx) => (
+          <div key={idx} style={{ whiteSpace: 'pre', marginBottom: 2 }}>
+            {line}
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 function LoginPage() {
   const { login, user } = useAuth()
   const navigate = useNavigate()
@@ -267,7 +394,7 @@ function LoginPage() {
 
   return (
     <div className="flex flex-col md:flex-row min-h-screen w-full" style={{ background: 'var(--bg-app)' }}>
-      {/* Left Panel - Homebrew Terminal Animation */}
+      {/* Left Panel - Scattered Terminals & Homebrew Terminal Animation */}
       <div 
         className="hidden md:flex md:w-[55%] lg:w-[60%] flex-col justify-center items-center p-12 relative overflow-hidden"
         style={{
@@ -280,184 +407,281 @@ function LoginPage() {
           position: 'absolute', inset: 0, opacity: 0.03, pointerEvents: 'none',
           backgroundImage: 'radial-gradient(#2c1e11 20%, transparent 20%)',
           backgroundSize: '24px 24px',
+          zIndex: 2,
         }} />
 
-        <h1 style={{
-          fontFamily: 'var(--font-heading)',
-          fontSize: '1.85rem',
-          fontWeight: 800,
-          color: '#c27d0c',
-          marginBottom: 8,
-          textAlign: 'center',
-          letterSpacing: '-0.02em',
-        }}>
-          ☕ Homebrew Notes
-        </h1>
-        <p style={{
-          fontFamily: 'var(--font-body)',
-          fontSize: '0.9rem',
-          color: '#735f4b',
-          marginBottom: 32,
-          textAlign: 'center',
-          maxWidth: 420,
-          lineHeight: '1.5',
-        }}>
-          Tempat aman untuk mencatat ide kreatif, berkolaborasi dengan tim, dan merancang diagram alir secara instan.
-        </p>
+        {/* Scattered background terminals */}
+        <StaticTerminal 
+          title="git-log.sh" 
+          lines={MOCK_GIT_LOG} 
+          opacity={0.15} 
+          width={240} 
+          height={160} 
+          top="6%" 
+          left="4%" 
+          transform="rotate(-4deg)" 
+        />
+        <StaticTerminal 
+          title="vitest-run.sh" 
+          lines={MOCK_TEST_LOG} 
+          opacity={0.25} 
+          width={280} 
+          height={150} 
+          bottom="8%" 
+          left="6%" 
+          transform="rotate(5deg)" 
+        />
+        <StaticTerminal 
+          title="docker-compose.log" 
+          lines={MOCK_DOCKER_LOG} 
+          opacity={0.12} 
+          width={270} 
+          height={140} 
+          top="10%" 
+          right="4%" 
+          transform="rotate(6deg)" 
+        />
+        <StaticTerminal 
+          title="npm-build.log" 
+          lines={MOCK_NPM_LOG} 
+          opacity={0.2} 
+          width={260} 
+          height={160} 
+          bottom="8%" 
+          right="6%" 
+          transform="rotate(-3deg)" 
+        />
 
-        <HomebrewTerminal />
+        {/* Center Main Terminal */}
+        <div style={{ zIndex: 10, textAlign: 'center', width: '100%', maxWidth: 500 }}>
+          <h1 style={{
+            fontFamily: 'var(--font-heading)',
+            fontSize: '1.85rem',
+            fontWeight: 800,
+            color: '#c27d0c',
+            marginBottom: 8,
+            textAlign: 'center',
+            letterSpacing: '-0.02em',
+          }}>
+            ☕ Homebrew Notes
+          </h1>
+          <p style={{
+            fontFamily: 'var(--font-body)',
+            fontSize: '0.9rem',
+            color: '#735f4b',
+            marginBottom: 32,
+            textAlign: 'center',
+            lineHeight: '1.5',
+          }}>
+            Tempat aman untuk mencatat ide kreatif, berkolaborasi dengan tim, dan merancang diagram alir secara instan.
+          </p>
+
+          <HomebrewTerminal />
+        </div>
       </div>
 
       {/* Right Panel - Login Card */}
-      <div className="flex-1 flex items-center justify-center p-6 md:p-12" style={{ background: 'var(--bg-app)' }}>
+      <div 
+        className="flex-1 flex items-center justify-center p-6 md:p-12 relative" 
+        style={{ 
+          background: 'var(--bg-app)',
+          backgroundImage: 'radial-gradient(var(--border) 1px, transparent 1px)',
+          backgroundSize: '20px 20px',
+        }}
+      >
         <div style={{
-          background: 'var(--card-bg)', border: '1px solid var(--border)',
-          borderRadius: 16, padding: '40px 36px',
+          background: 'color-mix(in srgb, var(--card-bg) 82%, transparent)',
+          backdropFilter: 'blur(12px)',
+          WebkitBackdropFilter: 'blur(12px)',
+          border: '1px solid var(--border)',
+          borderRadius: 16, 
           width: '100%', maxWidth: 400,
-          boxShadow: '0 8px 32px rgba(0,0,0,0.1)',
+          boxShadow: '0 12px 40px rgba(0,0,0,0.15)',
+          overflow: 'hidden',
+          display: 'flex',
+          flexDirection: 'column',
+          zIndex: 10,
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 24 }}>
-            <img
-              src="/logo192.png"
-              alt="Homebrew Notes Logo"
-              style={{ width: 36, height: 36, borderRadius: 10, objectFit: 'contain' }}
-            />
-            <span style={{ fontFamily: 'var(--font-heading)', fontWeight: 700, fontSize: '1.125rem', color: 'var(--fg)' }}>
-              Homebrew Notes
-            </span>
-          </div>
-
-          {/* Tab Switcher */}
-          <div style={{ display: 'flex', gap: 4, background: 'var(--muted)', borderRadius: 8, padding: 3, marginBottom: 24 }}>
-            <button
-              onClick={() => { setIsRegister(false); setError(null); setSuccessMsg(null) }}
-              style={{
-                flex: 1, padding: '6px 0', fontSize: '0.8rem', fontWeight: !isRegister ? 600 : 400,
-                border: 'none', borderRadius: 6, cursor: 'pointer', fontFamily: 'var(--font-body)',
-                background: !isRegister ? 'var(--bg)' : 'transparent',
-                color: !isRegister ? 'var(--fg)' : 'var(--fg-muted)',
-                boxShadow: !isRegister ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
-                transition: 'all 0.15s',
-              }}
-            >
-              Masuk (Sign in)
-            </button>
-            <button
-              onClick={() => { setIsRegister(true); setError(null); setSuccessMsg(null) }}
-              style={{
-                flex: 1, padding: '6px 0', fontSize: '0.8rem', fontWeight: isRegister ? 600 : 400,
-                border: 'none', borderRadius: 6, cursor: 'pointer', fontFamily: 'var(--font-body)',
-                background: isRegister ? 'var(--bg)' : 'transparent',
-                color: isRegister ? 'var(--fg)' : 'var(--fg-muted)',
-                boxShadow: isRegister ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
-                transition: 'all 0.15s',
-              }}
-            >
-              Daftar (Register)
-            </button>
-          </div>
-
-          <h1 style={{ fontFamily: 'var(--font-heading)', fontWeight: 700, fontSize: '1.375rem', color: 'var(--fg)', margin: '0 0 6px' }}>
-            {isRegister ? 'Daftar Akun Baru' : 'Welcome back'}
-          </h1>
-          <p style={{ fontSize: '0.875rem', color: 'var(--fg-muted)', margin: '0 0 28px' }}>
-            {isRegister ? 'Pendaftaran memerlukan persetujuan admin' : 'Sign in to your account'}
-          </p>
-
-          {successMsg && (
-            <div style={{
-              padding: '9px 13px', background: 'rgba(43,138,62,0.08)',
-              border: '1px solid rgba(43,138,62,0.25)',
-              borderRadius: 8, fontSize: '0.8375rem', color: '#2b8a3e',
-              marginBottom: 16
-            }}>
-              {successMsg}
+          {/* Terminal-style Card Header */}
+          <div 
+            style={{
+              background: 'color-mix(in srgb, var(--muted) 40%, transparent)',
+              padding: '12px 20px',
+              display: 'flex',
+              alignItems: 'center',
+              borderBottom: '1px solid var(--border)',
+              position: 'relative',
+            }}
+          >
+            {/* Traffic lights */}
+            <div style={{ display: 'flex', gap: 6, zIndex: 2 }}>
+              <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#ff5f56' }} />
+              <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#ffbd2e' }} />
+              <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#27c93f' }} />
             </div>
-          )}
+            {/* Title */}
+            <div 
+              style={{
+                position: 'absolute',
+                inset: 0,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: '0.75rem',
+                color: 'var(--fg-muted)',
+                fontWeight: 600,
+                fontFamily: 'Courier New, Courier, monospace',
+              }}
+            >
+              auth-session.sh
+            </div>
+          </div>
 
-          <form onSubmit={isRegister ? handleRegister : handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-            <div>
-              <label style={{ display: 'block', fontSize: '0.8125rem', fontWeight: 500, color: 'var(--fg-muted)', marginBottom: 6 }}>
-                Username
-              </label>
-              <input
-                autoFocus type="text" value={username} required
-                onChange={e => setUsername(e.target.value)}
-                placeholder="Enter username"
-                style={inputBase}
-                onFocus={e => { e.currentTarget.style.borderColor = 'var(--primary)'; e.currentTarget.style.boxShadow = '0 0 0 3px var(--accent)' }}
-                onBlur={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.boxShadow = 'none' }}
+          {/* Terminal Form Body */}
+          <div style={{ padding: '32px 28px 28px 28px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 24 }}>
+              <img
+                src="/logo192.png"
+                alt="Homebrew Notes Logo"
+                style={{ width: 36, height: 36, borderRadius: 10, objectFit: 'contain' }}
               />
+              <span style={{ fontFamily: 'var(--font-heading)', fontWeight: 700, fontSize: '1.125rem', color: 'var(--fg)' }}>
+                Homebrew Notes
+              </span>
             </div>
 
-            <div>
-              <label style={{ display: 'block', fontSize: '0.8125rem', fontWeight: 500, color: 'var(--fg-muted)', marginBottom: 6 }}>
-                Password
-              </label>
-              <div style={{ position: 'relative' }}>
-                <input
-                  type={showPw ? 'text' : 'password'} value={password} required
-                  onChange={e => setPassword(e.target.value)}
-                  placeholder="Enter password"
-                  style={{ ...inputBase, padding: '9px 40px 9px 13px' }}
-                  onFocus={e => { e.currentTarget.style.borderColor = 'var(--primary)'; e.currentTarget.style.boxShadow = '0 0 0 3px var(--accent)' }}
-                  onBlur={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.boxShadow = 'none' }}
-                />
-                <button
-                  type="button" onClick={() => setShowPw(v => !v)}
-                  style={{
-                    position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)',
-                    background: 'none', border: 'none', cursor: 'pointer', padding: 4,
-                    color: 'var(--fg-subtle)', display: 'flex', alignItems: 'center',
-                  }}
-                >
-                  {showPw ? <EyeOff size={15} /> : <Eye size={15} />}
-                </button>
-              </div>
+            {/* Tab Switcher */}
+            <div style={{ display: 'flex', gap: 4, background: 'var(--muted)', borderRadius: 8, padding: 3, marginBottom: 24 }}>
+              <button
+                onClick={() => { setIsRegister(false); setError(null); setSuccessMsg(null) }}
+                style={{
+                  flex: 1, padding: '6px 0', fontSize: '0.8rem', fontWeight: !isRegister ? 600 : 400,
+                  border: 'none', borderRadius: 6, cursor: 'pointer', fontFamily: 'var(--font-body)',
+                  background: !isRegister ? 'var(--bg)' : 'transparent',
+                  color: !isRegister ? 'var(--fg)' : 'var(--fg-muted)',
+                  boxShadow: !isRegister ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
+                  transition: 'all 0.15s',
+                }}
+              >
+                Masuk (Sign in)
+              </button>
+              <button
+                onClick={() => { setIsRegister(true); setError(null); setSuccessMsg(null) }}
+                style={{
+                  flex: 1, padding: '6px 0', fontSize: '0.8rem', fontWeight: isRegister ? 600 : 400,
+                  border: 'none', borderRadius: 6, cursor: 'pointer', fontFamily: 'var(--font-body)',
+                  background: isRegister ? 'var(--bg)' : 'transparent',
+                  color: isRegister ? 'var(--fg)' : 'var(--fg-muted)',
+                  boxShadow: isRegister ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
+                  transition: 'all 0.15s',
+                }}
+              >
+                Daftar (Register)
+              </button>
             </div>
 
-            {error && (
+            <h1 style={{ fontFamily: 'var(--font-heading)', fontWeight: 700, fontSize: '1.375rem', color: 'var(--fg)', margin: '0 0 6px' }}>
+              {isRegister ? 'Daftar Akun Baru' : 'Welcome back'}
+            </h1>
+            <p style={{ fontSize: '0.875rem', color: 'var(--fg-muted)', margin: '0 0 28px' }}>
+              {isRegister ? 'Pendaftaran memerlukan persetujuan admin' : 'Sign in to your account'}
+            </p>
+
+            {successMsg && (
               <div style={{
-                padding: '9px 13px', background: 'rgba(224,49,49,0.08)',
-                border: '1px solid rgba(224,49,49,0.25)',
-                borderRadius: 8, fontSize: '0.8375rem', color: '#e03131',
+                padding: '9px 13px', background: 'rgba(43,138,62,0.08)',
+                border: '1px solid rgba(43,138,62,0.25)',
+                borderRadius: 8, fontSize: '0.8375rem', color: '#2b8a3e',
+                marginBottom: 16
               }}>
-                {error}
+                {successMsg}
               </div>
             )}
 
-            <button
-              type="submit" disabled={loading}
-              style={{
-                marginTop: 4, padding: '10px',
-                background: 'var(--primary)', color: 'var(--primary-fg)',
-                border: 'none', borderRadius: 8,
-                fontSize: '0.9375rem', fontWeight: 600,
-                fontFamily: 'var(--font-body)',
-                cursor: loading ? 'not-allowed' : 'pointer',
-                opacity: loading ? 0.7 : 1,
-                transition: 'opacity 0.15s',
-              }}
-            >
-              {isRegister ? (loading ? 'Mendaftar…' : 'Daftar') : (loading ? 'Signing in…' : 'Sign in')}
-            </button>
-          </form>
+            <form onSubmit={isRegister ? handleRegister : handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.8125rem', fontWeight: 500, color: 'var(--fg-muted)', marginBottom: 6 }}>
+                  Username
+                </label>
+                <input
+                  autoFocus type="text" value={username} required
+                  onChange={e => setUsername(e.target.value)}
+                  placeholder="Enter username"
+                  style={inputBase}
+                  onFocus={e => { e.currentTarget.style.borderColor = 'var(--primary)'; e.currentTarget.style.boxShadow = '0 0 0 3px var(--accent)' }}
+                  onBlur={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.boxShadow = 'none' }}
+                />
+              </div>
 
-          <div style={{ marginTop: 24, textAlign: 'center' }}>
-            <button
-              type="button"
-              onClick={() => setShowAbout(true)}
-              style={{
-                background: 'none', border: 'none',
-                fontSize: '0.75rem', color: 'var(--fg-muted)',
-                cursor: 'pointer', textDecoration: 'underline',
-                fontFamily: 'var(--font-body)'
-              }}
-              onMouseEnter={e => (e.currentTarget.style.color = 'var(--primary)')}
-              onMouseLeave={e => (e.currentTarget.style.color = 'var(--fg-muted)')}
-            >
-              Tentang & Catatan Rilis
-            </button>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.8125rem', fontWeight: 500, color: 'var(--fg-muted)', marginBottom: 6 }}>
+                  Password
+                </label>
+                <div style={{ position: 'relative' }}>
+                  <input
+                    type={showPw ? 'text' : 'password'} value={password} required
+                    onChange={e => setPassword(e.target.value)}
+                    placeholder="Enter password"
+                    style={{ ...inputBase, padding: '9px 40px 9px 13px' }}
+                    onFocus={e => { e.currentTarget.style.borderColor = 'var(--primary)'; e.currentTarget.style.boxShadow = '0 0 0 3px var(--accent)' }}
+                    onBlur={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.boxShadow = 'none' }}
+                  />
+                  <button
+                    type="button" onClick={() => setShowPw(v => !v)}
+                    style={{
+                      position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)',
+                      background: 'none', border: 'none', cursor: 'pointer', padding: 4,
+                      color: 'var(--fg-subtle)', display: 'flex', alignItems: 'center',
+                    }}
+                  >
+                    {showPw ? <EyeOff size={15} /> : <Eye size={15} />}
+                  </button>
+                </div>
+              </div>
+
+              {error && (
+                <div style={{
+                  padding: '9px 13px', background: 'rgba(224,49,49,0.08)',
+                  border: '1px solid rgba(224,49,49,0.25)',
+                  borderRadius: 8, fontSize: '0.8375rem', color: '#e03131',
+                }}>
+                  {error}
+                </div>
+              )}
+
+              <button
+                type="submit" disabled={loading}
+                style={{
+                  marginTop: 4, padding: '10px',
+                  background: 'var(--primary)', color: 'var(--primary-fg)',
+                  border: 'none', borderRadius: 8,
+                  fontSize: '0.9375rem', fontWeight: 600,
+                  fontFamily: 'var(--font-body)',
+                  cursor: loading ? 'not-allowed' : 'pointer',
+                  opacity: loading ? 0.7 : 1,
+                  transition: 'opacity 0.15s',
+                }}
+              >
+                {isRegister ? (loading ? 'Mendaftar…' : 'Daftar') : (loading ? 'Signing in…' : 'Sign in')}
+              </button>
+            </form>
+
+            <div style={{ marginTop: 24, textAlign: 'center' }}>
+              <button
+                type="button"
+                onClick={() => setShowAbout(true)}
+                style={{
+                  background: 'none', border: 'none',
+                  fontSize: '0.75rem', color: 'var(--fg-muted)',
+                  cursor: 'pointer', textDecoration: 'underline',
+                  fontFamily: 'var(--font-body)'
+                }}
+                onMouseEnter={e => (e.currentTarget.style.color = 'var(--primary)')}
+                onMouseLeave={e => (e.currentTarget.style.color = 'var(--fg-muted)')}
+              >
+                Tentang & Catatan Rilis
+              </button>
+            </div>
           </div>
         </div>
       </div>
