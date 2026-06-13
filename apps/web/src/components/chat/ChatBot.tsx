@@ -135,8 +135,7 @@ export function ChatBot({ noteId, noteContent, noteTitle, onClose }: ChatBotProp
                   state: m.result ? ('result' as const) : ('call' as const)
                 };
               } else {
-                // Jika response type nya bukan completed (misal 'reasoning' atau 'text' yang bukan completed),
-                // selalu petakan ke 'reasoning' agar ditaruh di bawah bubble chat completed.
+                // Non-completed (reasoning, text biasa) → panel reasoning
                 partObj = { type: 'reasoning', text: m.content };
               }
 
@@ -241,6 +240,8 @@ export function ChatBot({ noteId, noteContent, noteTitle, onClose }: ChatBotProp
         display: 'flex',
         flexDirection: 'column',
         height: '100%',
+        minHeight: 0,
+        overflow: 'hidden',
         flexShrink: 0,
         boxShadow: '-4px 0 16px rgba(0,0,0,0.02)',
         fontFamily: 'var(--font-body)'
@@ -306,6 +307,7 @@ export function ChatBot({ noteId, noteContent, noteTitle, onClose }: ChatBotProp
         style={{
           flex: 1,
           overflowY: 'auto',
+          minHeight: 0,
           padding: '20px',
           display: 'flex',
           flexDirection: 'column',

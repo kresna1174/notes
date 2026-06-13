@@ -1,4 +1,5 @@
 import os
+import re
 import uuid
 import logging
 from contextlib import asynccontextmanager
@@ -332,17 +333,30 @@ async def chat_stream(request: ChatStreamRequest):
     if request.message:
         user_message = request.message
     elif request.messages:
-        # Ambil pesan terakhir dari history
+        # Ambil pesan terakhir dari history (format AI SDK)
         last_msg = request.messages[-1]
         content = last_msg.get("content", "")
-        if isinstance(content, str):
-            user_message = content
+
+        if isinstance(content, str) and content.strip():
+            user_message = content.strip()
         elif isinstance(content, list):
+            # Format lama: content = [{"type": "text", "text": "..."}]
             parts_text = []
             for part in content:
                 if isinstance(part, dict) and part.get("type") == "text":
                     parts_text.append(part.get("text", ""))
             user_message = "".join(parts_text)
+
+        # Fallback: AI SDK v3/v6 sering kirim text di field 'parts', bukan 'content'
+        if not user_message:
+            parts = last_msg.get("parts", [])
+            parts_text = []
+            for part in parts:
+                if isinstance(part, dict) and part.get("type") == "text":
+                    parts_text.append(part.get("text", ""))
+            user_message = "".join(parts_text)
+
+        logger.info(f"Extracted user_message: {user_message[:100]!r}")
             
     # Sisipkan konteks catatan jika ada di body
     if request.note_title or request.note_content:
@@ -533,9 +547,18 @@ async def get_chat_history(session_id: str):
                 })
             elif role in ["user", "assistant"]:
                 msg_type = "completed" if (role == "assistant" and status == "completed") else "text"
+                raw_content = normalize_content(content)
+                # Hapus prefix konteks catatan dari user message agar tidak tampil di UI
+                if role == "user" and raw_content.startswith("[Konteks Catatan:"):
+                    marker = "Pertanyaan/Instruksi User: "
+                    idx = raw_content.find(marker)
+                    if idx != -1:
+                        raw_content = raw_content[idx + len(marker):]
+                    else:
+                        raw_content = re.sub(r'^\[Konteks Catatan:.*?\]\s*\n*', '', raw_content, flags=re.DOTALL)
                 messages.append({
                     "role": role,
-                    "content": normalize_content(content),
+                    "content": raw_content,
                     "type": msg_type
                 })
         return {"messages": messages}
