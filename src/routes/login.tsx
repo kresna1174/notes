@@ -27,9 +27,9 @@ const TERMINAL_STEPS = [
   { action: 'print', text: '📡 Server running at http://localhost:3000', delay: 80 },
   { action: 'print', text: '🔑 Secure session key generated.', delay: 80 },
   { action: 'print', text: '----------------------------------------', delay: 40 },
-  { action: 'print', text: '📝 [Note] Catatan Belanja Kopi ☕', delay: 80 },
-  { action: 'print', text: '📊 [Flow] Skema Sistem Database Drizzle', delay: 80 },
-  { action: 'print', text: '🔒 [Lock] Sandi Dompet Kripto Rahasia', delay: 80 },
+  { action: 'print', text: '📝 [Note] Coffee Shopping List ☕', delay: 80 },
+  { action: 'print', text: '📊 [Flow] Drizzle DB System Schema', delay: 80 },
+  { action: 'print', text: '🔒 [Lock] Secret Crypto Wallet Passphrase', delay: 80 },
   { action: 'print', text: '----------------------------------------', delay: 40 },
   { action: 'print', text: '==> Ready for user authentication...', delay: 80 },
   { action: 'wait', delay: 4000 },
@@ -369,16 +369,16 @@ function LoginPage() {
       const data = await res.json()
       setLoading(false)
       if (!res.ok) {
-        setError(data.error || 'Gagal mendaftar')
+        setError(data.error || 'Registration failed')
         return
       }
-      setSuccessMsg('Pendaftaran berhasil! Akun Anda kini menunggu persetujuan admin.')
+      setSuccessMsg('Registration successful! Your account is now pending admin approval.')
       setUsername('')
       setPassword('')
       setIsRegister(false)
     } catch {
       setLoading(false)
-      setError('Terjadi kesalahan jaringan')
+      setError('A network error occurred')
     }
   }
 
@@ -473,7 +473,7 @@ function LoginPage() {
             textAlign: 'center',
             lineHeight: '1.5',
           }}>
-            Tempat aman untuk mencatat ide kreatif, berkolaborasi dengan tim, dan merancang diagram alir secara instan.
+            A secure workspace to write creative ideas, collaborate with teams, and design interactive flowcharts instantly.
           </p>
 
           <HomebrewTerminal />
@@ -563,7 +563,7 @@ function LoginPage() {
                   transition: 'all 0.15s',
                 }}
               >
-                Masuk (Sign in)
+                Sign In
               </button>
               <button
                 onClick={() => { setIsRegister(true); setError(null); setSuccessMsg(null) }}
@@ -576,15 +576,15 @@ function LoginPage() {
                   transition: 'all 0.15s',
                 }}
               >
-                Daftar (Register)
+                Register
               </button>
             </div>
 
             <h1 style={{ fontFamily: 'var(--font-heading)', fontWeight: 700, fontSize: '1.375rem', color: 'var(--fg)', margin: '0 0 6px' }}>
-              {isRegister ? 'Daftar Akun Baru' : 'Welcome back'}
+              {isRegister ? 'Create New Account' : 'Welcome Back'}
             </h1>
             <p style={{ fontSize: '0.875rem', color: 'var(--fg-muted)', margin: '0 0 28px' }}>
-              {isRegister ? 'Pendaftaran memerlukan persetujuan admin' : 'Sign in to your account'}
+              {isRegister ? 'Registration requires admin approval' : 'Sign in to your account'}
             </p>
 
             {successMsg && (
@@ -662,7 +662,7 @@ function LoginPage() {
                   transition: 'opacity 0.15s',
                 }}
               >
-                {isRegister ? (loading ? 'Mendaftar…' : 'Daftar') : (loading ? 'Signing in…' : 'Sign in')}
+                {isRegister ? (loading ? 'Registering…' : 'Register') : (loading ? 'Signing in…' : 'Sign In')}
               </button>
             </form>
 
@@ -679,7 +679,7 @@ function LoginPage() {
                 onMouseEnter={e => (e.currentTarget.style.color = 'var(--primary)')}
                 onMouseLeave={e => (e.currentTarget.style.color = 'var(--fg-muted)')}
               >
-                Tentang & Catatan Rilis
+                About & Release Notes
               </button>
             </div>
           </div>
