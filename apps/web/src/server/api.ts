@@ -1,4 +1,6 @@
 import type { IncomingMessage, ServerResponse } from 'node:http'
+import http from 'node:http'
+import https from 'node:https'
 import { createReadStream } from 'node:fs'
 import { db, sqlite } from '../lib/db'
 import { notes, attachments, users, teams } from '../../drizzle/schema'
@@ -832,36 +834,58 @@ export async function handleApiRequest(req: IncomingMessage, res: ServerResponse
     try {
       const body = await readBody(req) as any
       body.user_id = session.userId
-      const forwardRes = await fetch(`${AI_AGENT_URL}/api/chat/stream`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body)
+      const payload = JSON.stringify(body)
+
+      const agentUrl = new URL(`${AI_AGENT_URL}/api/chat/stream`)
+      const transport = agentUrl.protocol === 'https:' ? https : http
+
+      await new Promise<void>((resolve, reject) => {
+        const proxyReq = transport.request(
+          {
+            hostname: agentUrl.hostname,
+            port: agentUrl.port || (agentUrl.protocol === 'https:' ? 443 : 80),
+            path: agentUrl.pathname,
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Content-Length': Buffer.byteLength(payload),
+            },
+          },
+          (proxyRes) => {
+            if (proxyRes.statusCode && proxyRes.statusCode >= 400) {
+              let errBody = ''
+              proxyRes.on('data', (chunk: Buffer) => { errBody += chunk.toString() })
+              proxyRes.on('end', () => {
+                json(res, { error: `AI service error: ${errBody}` }, proxyRes.statusCode!)
+                resolve()
+              })
+              return
+            }
+            res.writeHead(200, {
+              'Content-Type': 'text/event-stream',
+              'Cache-Control': 'no-cache',
+              'Connection': 'keep-alive',
+              'x-vercel-ai-ui-stream-event': 'v1',
+              'x-accel-buffering': 'no',
+              'X-Accel-Buffering': 'no',
+            })
+            proxyRes.pipe(res)
+            proxyRes.on('end', resolve)
+            proxyRes.on('error', reject)
+            req.on('close', () => proxyReq.destroy())
+          }
+        )
+        proxyReq.on('error', reject)
+        proxyReq.write(payload)
+        proxyReq.end()
       })
-
-      if (!forwardRes.ok) {
-        const errText = await forwardRes.text()
-        json(res, { error: `AI service error: ${errText}` }, forwardRes.status)
-        return true
-      }
-
-      res.writeHead(200, {
-        'Content-Type': 'text/event-stream',
-        'Cache-Control': 'no-cache',
-        'Connection': 'keep-alive',
-        'x-vercel-ai-ui-stream-event': 'v1',
-      })
-
-      const reader = forwardRes.body?.getReader()
-      if (reader) {
-        while (true) {
-          const { done, value } = await reader.read()
-          if (done) break
-          res.write(value)
-        }
-      }
-      res.end()
     } catch (err) {
-      json(res, { error: `Failed to communicate with AI agent: ${String(err)}` }, 500)
+      console.error('[stream error]', err)
+      if (!res.headersSent) {
+        json(res, { error: `Failed to communicate with AI agent: ${String(err)}` }, 500)
+      } else {
+        res.end()
+      }
     }
     return true
   }
@@ -874,6 +898,30 @@ export async function handleApiRequest(req: IncomingMessage, res: ServerResponse
       const body = await readBody(req) as any
       body.user_id = session.userId
       const forwardRes = await fetch(`${AI_AGENT_URL}/api/chat`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      })
+      if (!forwardRes.ok) {
+        const errText = await forwardRes.text()
+        json(res, { error: `AI service error: ${errText}` }, forwardRes.status)
+        return true
+      }
+      const data = await forwardRes.json()
+      json(res, data)
+    } catch (err) {
+      json(res, { error: `Failed to communicate with AI agent: ${String(err)}` }, 500)
+    }
+    return true
+  }
+
+  // POST /api/ai/chat/approve_or_reject
+  if (method === 'POST' && path === '/api/ai/chat/approve_or_reject') {
+    const session = getSession(req)
+    if (!session) { json(res, { error: 'unauthenticated' }, 401); return true }
+    try {
+      const body = await readBody(req) as any
+      const forwardRes = await fetch(`${AI_AGENT_URL}/api/chat/approve_or_reject`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body)

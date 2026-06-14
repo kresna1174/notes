@@ -90,6 +90,22 @@ function ToolCallPanel({ item, noteId }: { item: any; noteId: string }) {
   const storageKey = `note_approve_state_${noteId}_${JSON.stringify(item.calls[0]?.args || {})}`
 
   const [approvalState, setApprovalState] = useState<'pending' | 'approved' | 'rejected'>(() => {
+    const firstCall = item.calls[0];
+    if (firstCall && firstCall.result) {
+      try {
+        const resObj = typeof firstCall.result === 'string'
+          ? JSON.parse(firstCall.result)
+          : firstCall.result;
+        if (resObj && (resObj.status === 'approved' || resObj.status === 'rejected')) {
+          return resObj.status;
+        }
+        if (resObj && resObj.status === 'pending_approval') {
+          return 'pending';
+        }
+      } catch (e) {
+        // Not a JSON result
+      }
+    }
     const saved = localStorage.getItem(storageKey)
     if (saved === 'approved' || saved === 'rejected') {
       return saved
@@ -97,9 +113,27 @@ function ToolCallPanel({ item, noteId }: { item: any; noteId: string }) {
     return 'pending'
   })
 
-  const handleApprove = (args: any) => {
+  const handleApprove = async (args: any) => {
     setApprovalState('approved')
     localStorage.setItem(storageKey, 'approved')
+
+    const callId = item.calls[0]?.toolCallId || item.calls[0]?.id || item.toolCallId;
+    if (callId) {
+      try {
+        await fetch('/api/ai/chat/approve_or_reject', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            session_id: noteId,
+            call_id: callId,
+            status: 'approved'
+          })
+        });
+      } catch (err) {
+        console.error('Failed to save approval status to database:', err);
+      }
+    }
+
     window.dispatchEvent(
       new CustomEvent('note-updated-by-ai', {
         detail: {
@@ -110,9 +144,26 @@ function ToolCallPanel({ item, noteId }: { item: any; noteId: string }) {
     )
   }
 
-  const handleReject = () => {
+  const handleReject = async () => {
     setApprovalState('rejected')
     localStorage.setItem(storageKey, 'rejected')
+
+    const callId = item.calls[0]?.toolCallId || item.calls[0]?.id || item.toolCallId;
+    if (callId) {
+      try {
+        await fetch('/api/ai/chat/approve_or_reject', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            session_id: noteId,
+            call_id: callId,
+            status: 'rejected'
+          })
+        });
+      } catch (err) {
+        console.error('Failed to save rejection status to database:', err);
+      }
+    }
   }
 
   return (
@@ -699,12 +750,14 @@ export function ChatBot({ noteId, noteContent, noteTitle, onClose }: ChatBotProp
                       const partResult = part.result !== undefined ? part.result : (part as any).output;
                       const partState = part.state || (partResult !== undefined ? 'result' : 'call');
 
+                      const partToolCallId = part.toolCallId || part.id || part.callId || (part.toolCall && part.toolCall.id) || (part as any).call_id;
                       if (
                         lastItem &&
                         lastItem.type === 'grouped-tool' &&
                         lastItem.toolName === partToolName
                       ) {
                         lastItem.calls.push({
+                          toolCallId: partToolCallId,
                           args: partArgs,
                           result: partResult,
                           state: partState
@@ -715,6 +768,7 @@ export function ChatBot({ noteId, noteContent, noteTitle, onClose }: ChatBotProp
                           toolName: partToolName,
                           calls: [
                             {
+                              toolCallId: partToolCallId,
                               args: partArgs,
                               result: partResult,
                               state: partState
