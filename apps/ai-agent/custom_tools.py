@@ -60,6 +60,50 @@ def write_notes(
     })
 
 @function_tool
+def create_new_note(
+    ctx: RunContextWrapper[dict],
+    title: str,
+    content: str
+) -> str:
+    """
+    Propose creating a brand new note. This action requires user approval.
+
+    Args:
+        ctx: Run context containing user session details.
+        title: The proposed title of the new note.
+        content: The proposed text content of the new note (raw text or TipTap JSON format).
+    """
+    formatted_content = format_as_tiptap(content)
+    return json.dumps({
+        "status": "pending_approval",
+        "title": title,
+        "content": formatted_content
+    })
+
+@function_tool
+def update_note_direct(
+    ctx: RunContextWrapper[dict],
+    title: str,
+    content: str
+) -> str:
+    """
+    Directly update the current note with new title and content. This executes instantly without user approval.
+
+    Args:
+        ctx: Run context containing user session details.
+        title: The new title for the note.
+        content: The new text content for the note (raw text or TipTap JSON format).
+    """
+    formatted_content = format_as_tiptap(content)
+    target_id = ctx.context.get("session_id") if ctx.context else None
+    return json.dumps({
+        "status": "pending_approval",
+        "title": title,
+        "content": formatted_content,
+        "note_id": target_id
+    })
+
+@function_tool
 async def search_web(query: str, max_results: int = 5) -> str:
     """
     Search the web for a given query and return a summary of search results.
