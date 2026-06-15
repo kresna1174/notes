@@ -151,6 +151,39 @@ export async function handleApiRequest(req: IncomingMessage, res: ServerResponse
     return true
   }
 
+  // POST /api/auth/change-password
+  if (method === 'POST' && path === '/api/auth/change-password') {
+    const session = getSession(req)
+    if (!session) { json(res, { error: 'unauthenticated' }, 401); return true }
+    const body = await readBody(req)
+    const { oldPassword, newPassword } = body as { oldPassword?: string; newPassword?: string }
+    if (!oldPassword || !newPassword) { json(res, { error: 'oldPassword and newPassword required' }, 400); return true }
+    const [user] = await db.select().from(users).where(eq(users.id, session.userId))
+    if (!user) { json(res, { error: 'user not found' }, 404); return true }
+    if (!bcrypt.compareSync(oldPassword, user.passwordHash)) {
+      json(res, { error: 'Password lama salah' }, 400); return true
+    }
+    const hash = bcrypt.hashSync(newPassword, 10)
+    await db.update(users).set({ passwordHash: hash }).where(eq(users.id, session.userId))
+    json(res, { ok: true })
+    return true
+  }
+
+  // PUT /api/auth/users/:id/reset-password (admin only)
+  const resetPasswordMatch = path.match(/^\/api\/auth\/users\/([^/]+)\/reset-password$/)
+  if (resetPasswordMatch && method === 'PUT') {
+    const session = getSession(req)
+    if (!session || session.role !== 'admin') { json(res, { error: 'forbidden' }, 403); return true }
+    const userId = resetPasswordMatch[1]
+    const body = await readBody(req)
+    const { newPassword } = body as { newPassword?: string }
+    if (!newPassword) { json(res, { error: 'newPassword required' }, 400); return true }
+    const hash = bcrypt.hashSync(newPassword, 10)
+    await db.update(users).set({ passwordHash: hash }).where(eq(users.id, userId))
+    json(res, { ok: true })
+    return true
+  }
+
   // GET /api/auth/users (admin only)
   if (method === 'GET' && path === '/api/auth/users') {
     const session = getSession(req)

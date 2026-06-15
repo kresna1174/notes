@@ -3,11 +3,12 @@ import { useNavigate } from '@tanstack/react-router'
 import { ScrollArea } from '../ui/scroll-area'
 import { DayGroup } from './DayGroup'
 import { SearchBar } from './SearchBar'
-import { Plus, LogOut, Users, Shield, Eye, UsersRound, Info, CalendarDays, Menu, X } from 'lucide-react'
+import { Plus, LogOut, Users, Shield, Eye, UsersRound, Info, CalendarDays, Menu, X, KeyRound } from 'lucide-react'
 import { FontPicker } from './FontPicker'
 import { ThemeToggle } from './ThemeToggle'
 import { useAuth } from '../../lib/auth'
 import { AboutModal } from '../ui/AboutModal'
+import { ChangePasswordModal } from '../ui/ChangePasswordModal'
 
 interface Note { id: string; title: string; createdAt: number; shareToken?: string | null }
 interface SearchResult { id: string; title: string; createdAt: number; snippet: string }
@@ -51,6 +52,7 @@ export function Sidebar({ activeNoteId, onShareNote, notesUpdateTrigger }: Sideb
   const navigate = useNavigate()
   const { user, logout } = useAuth()
   const [showAbout, setShowAbout] = useState(false)
+  const [showChangePassword, setShowChangePassword] = useState(false)
 
   // Mobile states
   const [isMobile, setIsMobile] = useState(false)
@@ -487,6 +489,19 @@ export function Sidebar({ activeNoteId, onShareNote, notesUpdateTrigger }: Sideb
           )}
 
           <button
+            onClick={() => setShowChangePassword(true)}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 8, width: '100%',
+              padding: '7px 10px', borderRadius: 7, border: 'none',
+              background: 'transparent', cursor: 'pointer', marginBottom: 4,
+              fontSize: '0.8125rem', color: C.fgMuted, fontFamily: 'var(--font-body)',
+            }}
+            onMouseEnter={e => { e.currentTarget.style.background = C.accent; e.currentTarget.style.color = C.primary }}
+            onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = C.fgMuted }}
+          >
+            <KeyRound size={14} /> Ganti Password
+          </button>
+          <button
             onClick={() => setShowAbout(true)}
             style={{
               display: 'flex', alignItems: 'center', gap: 8, width: '100%',
@@ -555,6 +570,7 @@ export function Sidebar({ activeNoteId, onShareNote, notesUpdateTrigger }: Sideb
           />
         )}
         <AboutModal open={showAbout} onOpenChange={setShowAbout} />
+        <ChangePasswordModal open={showChangePassword} onOpenChange={setShowChangePassword} />
       </div>
     </>
   )
