@@ -13,12 +13,14 @@ export const Route = createFileRoute('/notes/$id')({
 
 type SaveStatus = 'saved' | 'saving' | 'unsaved'
 
-function SaveIndicator({ status }: { status: SaveStatus }) {
+function SaveIndicator({ status, chatOpen, isMobile }: { status: SaveStatus; chatOpen: boolean; isMobile: boolean }) {
+  if (isMobile && chatOpen) return null
+
   return (
     <div style={{
-      position: 'fixed',
+      position: 'absolute',
       bottom: 20,
-      right: 24,
+      right: chatOpen ? 404 : 24,
       display: 'flex',
       alignItems: 'center',
       gap: 6,
@@ -30,7 +32,7 @@ function SaveIndicator({ status }: { status: SaveStatus }) {
       borderRadius: 20,
       padding: '5px 12px',
       boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
-      transition: 'color 0.2s',
+      transition: 'right 0.2s ease, color 0.2s',
       pointerEvents: 'none',
       zIndex: 50,
     }}>
@@ -205,8 +207,8 @@ function NotePageComponent() {
             </button>
           </div>
         )}
+        {!loading && note && isContentVisible && <SaveIndicator status={saveStatus} chatOpen={chatOpen} isMobile={isMobile} />}
       </main>
-      {!loading && note && isContentVisible && <SaveIndicator status={saveStatus} />}
 
       {showUnlockModal && (
         <PinLockModal

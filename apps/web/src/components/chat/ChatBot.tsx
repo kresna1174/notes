@@ -83,9 +83,30 @@ function ReasoningPanel({ typeLabel, content, isGenerating }: { typeLabel: strin
   )
 }
 
-function ToolCallPanel({ item, noteId }: { item: any; noteId: string }) {
+function ToolCallPanel({ item, noteId, lastUserPrompt }: { item: any; noteId: string; lastUserPrompt?: string }) {
   const [isOpen, setIsOpen] = useState(item.toolName === 'write_notes')
   const isAnyCallActive = item.calls.some((c: any) => c.state === 'call')
+  const [isAuto, setIsAuto] = useState(false)
+
+  const shouldAutoApprove = (prompt: string): boolean => {
+    const p = prompt.toLowerCase();
+    const keywords = [
+      'ringkas', 'summarize', 'summary',
+      'tambah', 'add', 'insert',
+      'buat', 'create', 'make',
+      'update', 'perbarui', 'simpan', 'save',
+      'ubah', 'ganti', 'edit', 'replace', 'write', 'tulis',
+      'tag', 'label',
+      'generate', 'hasilkan',
+      'rapikan', 'format',
+      'terjemahkan', 'translate',
+      'koreksi', 'perbaiki', 'fix',
+      'panggil', 'call', 'run', 'jalankan', 'execute',
+      'apply', 'terapkan', 'ok', 'setuju', 'yes', 'boleh',
+      'catatan', 'notes'
+    ];
+    return keywords.some(kw => p.includes(kw));
+  }
 
   const storageKey = `note_approve_state_${noteId}_${JSON.stringify(item.calls[0]?.args || {})}`
 
@@ -113,8 +134,11 @@ function ToolCallPanel({ item, noteId }: { item: any; noteId: string }) {
     return 'pending'
   })
 
-  const handleApprove = async (args: any) => {
+  const handleApprove = async (args: any, isAutoCall = false) => {
     setApprovalState('approved')
+    if (isAutoCall) {
+      setIsAuto(true)
+    }
     localStorage.setItem(storageKey, 'approved')
 
     const callId = item.calls[0]?.toolCallId || item.calls[0]?.id || item.toolCallId;
@@ -165,6 +189,17 @@ function ToolCallPanel({ item, noteId }: { item: any; noteId: string }) {
       }
     }
   }
+
+  useEffect(() => {
+    if (item.toolName === 'write_notes' && approvalState === 'pending' && lastUserPrompt) {
+      if (shouldAutoApprove(lastUserPrompt)) {
+        const call = item.calls[0];
+        if (call && call.args) {
+          handleApprove(call.args, true);
+        }
+      }
+    }
+  }, [approvalState, item, lastUserPrompt]);
 
   return (
     <div
@@ -284,7 +319,7 @@ function ToolCallPanel({ item, noteId }: { item: any; noteId: string }) {
                     </>
                   ) : approvalState === 'approved' ? (
                     <span style={{ fontSize: '0.75rem', color: '#22c55e', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4 }}>
-                      ✓ Catatan diperbarui di layar & disimpan ke database.
+                      ✓ Catatan diperbarui {isAuto ? 'otomatis' : 'di layar'} & disimpan ke database.
                     </span>
                   ) : (
                     <span style={{ fontSize: '0.75rem', color: '#ef4444', fontWeight: 600 }}>
@@ -443,11 +478,39 @@ export function ChatBot({ noteId, noteContent, noteTitle, onClose }: ChatBotProp
      (!messages[messages.length - 1].parts || messages[messages.length - 1].parts.length === 0))
   )
 
-  const onSubmit = (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault()
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
+
+  const adjustHeight = () => {
+    const textarea = textareaRef.current
+    if (textarea) {
+      textarea.style.height = 'auto'
+      textarea.style.height = `${Math.min(textarea.scrollHeight, 200)}px`
+    }
+  }
+
+  useEffect(() => {
+    adjustHeight()
+  }, [inputValue])
+
+  const handleSend = () => {
     if (!inputValue.trim() || isLoading) return
     sendMessage({ text: inputValue })
     setInputValue('')
+    if (textareaRef.current) {
+      textareaRef.current.style.height = 'auto'
+    }
+  }
+
+  const onSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault()
+    handleSend()
+  }
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault()
+      handleSend()
+    }
   }
 
   return (
@@ -817,7 +880,9 @@ export function ChatBot({ noteId, noteContent, noteTitle, onClose }: ChatBotProp
 
                   return groupedItems.map((item: any, itemIdx: number) => {
                     if (item.type === 'grouped-tool') {
-                      return <ToolCallPanel key={itemIdx} item={item} noteId={noteId} />;
+                      const lastUserMsg = [...messages].reverse().find(m => m.role === 'user');
+                      const lastUserText = lastUserMsg?.parts?.filter((p: any) => p.type === 'text').map((p: any) => p.text).join('') || '';
+                      return <ToolCallPanel key={itemIdx} item={item} noteId={noteId} lastUserPrompt={lastUserText} />;
                     }
 
                     if (item.type === 'grouped-source-url') {
@@ -947,25 +1012,32 @@ export function ChatBot({ noteId, noteContent, noteTitle, onClose }: ChatBotProp
           background: 'var(--bg)',
           display: 'flex',
           gap: 10,
-          alignItems: 'center'
+          alignItems: 'flex-end'
         }}
       >
-        <input
-          type="text"
+        <textarea
+          ref={textareaRef}
           value={inputValue}
           onChange={(e) => setInputValue(e.target.value)}
+          onKeyDown={handleKeyDown}
           placeholder="Tanyakan sesuatu tentang catatan ini..."
           disabled={isLoading || fetchingHistory}
+          rows={1}
           style={{
             flex: 1,
             padding: '10px 14px',
-            borderRadius: '20px',
+            borderRadius: '16px',
             border: '1px solid var(--border)',
             background: 'var(--input-bg)',
             color: 'var(--fg)',
             fontSize: '0.825rem',
             outline: 'none',
-            fontFamily: 'var(--font-body)'
+            fontFamily: 'var(--font-body)',
+            resize: 'none',
+            minHeight: '38px',
+            maxHeight: '200px',
+            lineHeight: '1.4',
+            overflowY: 'auto'
           }}
         />
         <button
@@ -982,7 +1054,8 @@ export function ChatBot({ noteId, noteContent, noteTitle, onClose }: ChatBotProp
             alignItems: 'center',
             justifyContent: 'center',
             cursor: inputValue.trim() && !isLoading ? 'pointer' : 'default',
-            transition: 'background 0.2s'
+            transition: 'background 0.2s',
+            marginBottom: '1px'
           }}
         >
           <Send size={15} />
