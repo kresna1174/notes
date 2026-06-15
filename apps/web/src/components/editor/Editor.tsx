@@ -394,10 +394,9 @@ export function Editor({ note, onUpdate, onSaveStatusChange, onLockChange, share
               onClick={handleImportClick}
               title="Impor Konten"
               style={{
-                display: 'flex', alignItems: 'center', gap: isMobile ? 0 : 6,
-                padding: isMobile ? '8px' : '5px 12px', fontSize: '0.75rem', fontWeight: 500,
-                fontFamily: 'var(--font-body)',
-                border: '1px solid var(--border)', borderRadius: 20,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                width: 32, height: 32,
+                border: '1px solid var(--border)', borderRadius: '50%',
                 background: 'var(--bg)',
                 color: 'var(--fg-muted)',
                 cursor: 'pointer', transition: 'all 0.15s',
@@ -406,7 +405,6 @@ export function Editor({ note, onUpdate, onSaveStatusChange, onLockChange, share
               onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.color = 'var(--fg-muted)' }}
             >
               <FileUp size={14} />
-              {!isMobile && 'Impor Konten'}
             </button>
 
             <input
@@ -420,10 +418,9 @@ export function Editor({ note, onUpdate, onSaveStatusChange, onLockChange, share
               onClick={() => attachInputRef.current?.click()}
               title="Upload file & foto"
               style={{
-                display: 'flex', alignItems: 'center', gap: isMobile ? 0 : 6,
-                padding: isMobile ? '8px' : '5px 12px', fontSize: '0.75rem', fontWeight: 500,
-                fontFamily: 'var(--font-body)',
-                border: '1px solid var(--border)', borderRadius: 20,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                width: 32, height: 32,
+                border: '1px solid var(--border)', borderRadius: '50%',
                 background: 'var(--bg)',
                 color: 'var(--fg-muted)',
                 cursor: 'pointer', transition: 'all 0.15s',
@@ -432,17 +429,15 @@ export function Editor({ note, onUpdate, onSaveStatusChange, onLockChange, share
               onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.color = 'var(--fg-muted)' }}
             >
               <Paperclip size={14} />
-              {!isMobile && 'Upload File'}
             </button>
 
             <button
               onClick={() => setShowShare(true)}
               title="Bagikan catatan"
               style={{
-                display: 'flex', alignItems: 'center', gap: isMobile ? 0 : 6,
-                padding: isMobile ? '8px' : '5px 12px', fontSize: '0.75rem', fontWeight: 500,
-                fontFamily: 'var(--font-body)',
-                border: `1px solid ${shareToken ? 'var(--primary)' : 'var(--border)'}`, borderRadius: 20,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                width: 32, height: 32,
+                border: `1px solid ${shareToken ? 'var(--primary)' : 'var(--border)'}`, borderRadius: '50%',
                 background: shareToken ? 'var(--accent)' : 'var(--bg)',
                 color: shareToken ? 'var(--primary)' : 'var(--fg-muted)',
                 cursor: 'pointer', transition: 'all 0.15s',
@@ -451,17 +446,15 @@ export function Editor({ note, onUpdate, onSaveStatusChange, onLockChange, share
               onMouseLeave={e => { if (!shareToken) { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.color = 'var(--fg-muted)' } }}
             >
               <Share2 size={14} />
-              {!isMobile && (shareToken ? 'Dibagikan' : 'Bagikan')}
             </button>
 
             <button
               onClick={() => setPinModal(isLocked ? 'remove' : 'set')}
               title={isLocked ? 'Hapus PIN' : 'Kunci dengan PIN'}
               style={{
-                display: 'flex', alignItems: 'center', gap: isMobile ? 0 : 6,
-                padding: isMobile ? '8px' : '5px 12px', fontSize: '0.75rem', fontWeight: 500,
-                fontFamily: 'var(--font-body)',
-                border: `1px solid ${isLocked ? 'var(--primary)' : 'var(--border)'}`, borderRadius: 20,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                width: 32, height: 32,
+                border: `1px solid ${isLocked ? 'var(--primary)' : 'var(--border)'}`, borderRadius: '50%',
                 background: isLocked ? 'var(--accent)' : 'var(--bg)',
                 color: isLocked ? 'var(--primary)' : 'var(--fg-muted)',
                 cursor: 'pointer', transition: 'all 0.15s',
@@ -470,17 +463,15 @@ export function Editor({ note, onUpdate, onSaveStatusChange, onLockChange, share
               onMouseLeave={e => { if (!isLocked) { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.color = 'var(--fg-muted)' } }}
             >
               {isLocked ? <Lock size={14} /> : <LockOpen size={14} />}
-              {!isMobile && (isLocked ? 'Terkunci' : 'Kunci')}
             </button>
 
             <button
               onClick={() => setPreview(v => !v)}
               title={preview ? 'Hide preview' : 'Show preview'}
               style={{
-                display: 'flex', alignItems: 'center', gap: isMobile ? 0 : 6,
-                padding: isMobile ? '8px' : '5px 12px', fontSize: '0.75rem', fontWeight: 500,
-                fontFamily: 'var(--font-body)',
-                border: '1px solid var(--border)', borderRadius: 20,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                width: 32, height: 32,
+                border: '1px solid var(--border)', borderRadius: '50%',
                 background: preview ? 'var(--accent)' : 'var(--bg)',
                 color: preview ? 'var(--primary)' : 'var(--fg-muted)',
                 cursor: 'pointer', transition: 'all 0.15s',
@@ -489,7 +480,6 @@ export function Editor({ note, onUpdate, onSaveStatusChange, onLockChange, share
               onMouseLeave={e => { if (!preview) { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.color = 'var(--fg-muted)' } }}
             >
               {preview ? <EyeOff size={14} /> : <Eye size={14} />}
-              {!isMobile && (preview ? 'Hide Preview' : 'Preview')}
             </button>
 
             {onToggleChat && (
@@ -497,10 +487,9 @@ export function Editor({ note, onUpdate, onSaveStatusChange, onLockChange, share
                 onClick={onToggleChat}
                 title={chatOpen ? 'Sembunyikan AI Assistant' : 'Tampilkan AI Assistant'}
                 style={{
-                  display: 'flex', alignItems: 'center', gap: isMobile ? 0 : 6,
-                  padding: isMobile ? '8px' : '5px 12px', fontSize: '0.75rem', fontWeight: 500,
-                  fontFamily: 'var(--font-body)',
-                  border: `1px solid ${chatOpen ? 'var(--primary)' : 'var(--border)'}`, borderRadius: 20,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  width: 32, height: 32,
+                  border: `1px solid ${chatOpen ? 'var(--primary)' : 'var(--border)'}`, borderRadius: '50%',
                   background: chatOpen ? 'var(--accent)' : 'var(--bg)',
                   color: chatOpen ? 'var(--primary)' : 'var(--fg-muted)',
                   cursor: 'pointer', transition: 'all 0.15s',
@@ -509,7 +498,6 @@ export function Editor({ note, onUpdate, onSaveStatusChange, onLockChange, share
                 onMouseLeave={e => { if (!chatOpen) { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.color = 'var(--fg-muted)' } }}
               >
                 <Sparkles size={14} />
-                {!isMobile && 'AI Assistant'}
               </button>
             )}
           </div>
