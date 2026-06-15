@@ -7,5 +7,13 @@
   },
   "files.readonlyInclude": {
     "**/routeTree.gen.ts": true
-  }
+  },
+  "python.defaultInterpreterPath": "${workspaceFolder}/apps/ai-agent/.venv/bin/python",
+  "python.languageServer": "Pylance",
+  "python.analysis.extraPaths": [
+    "${workspaceFolder}/apps/ai-agent"
+  ],
+  "python.analysis.autoImportUserSymbols": true,
+  "python.analysis.indexing": true,
+  "python.analysis.typeCheckingMode": "basic"
 }

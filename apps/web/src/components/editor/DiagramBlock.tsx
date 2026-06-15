@@ -164,7 +164,7 @@ function DiagramNodeView({ node, updateAttributes, deleteNode }: any) {
   )
 
   const onNodeDoubleClick = useCallback(
-    (event: React.MouseEvent, flowNode: any) => {
+    (_event: React.MouseEvent, flowNode: any) => {
       const newLabel = prompt('Ganti label node:', flowNode.data.label)
       if (newLabel !== null) {
         setNodes(ns =>

@@ -2,7 +2,7 @@ import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { useAuth } from '../lib/auth'
 import { useState, useEffect } from 'react'
 import { Sidebar } from '../components/sidebar/Sidebar'
-import { Trash2, UserPlus, Shield, Eye } from 'lucide-react'
+import { Trash2, UserPlus, Shield, Eye, KeyRound } from 'lucide-react'
 
 export const Route = createFileRoute('/users')({
   component: UsersPage,
@@ -71,6 +71,26 @@ function UsersPage() {
     if (!window.confirm(`Hapus user "${username}"?`)) return
     await fetch(`/api/auth/users/${id}`, { method: 'DELETE' })
     load()
+  }
+
+  async function handleResetPassword(id: string, username: string) {
+    const newPw = window.prompt(`Masukkan password baru untuk user "${username}" (min 4 karakter):`)
+    if (newPw === null) return
+    if (newPw.trim().length < 4) {
+      alert('Password minimal harus 4 karakter!')
+      return
+    }
+    const res = await fetch(`/api/auth/users/${id}/reset-password`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ newPassword: newPw.trim() })
+    })
+    if (res.ok) {
+      alert(`Password untuk user "${username}" berhasil direset!`)
+    } else {
+      const data = await res.json()
+      alert(`Gagal mereset password: ${data.error || 'Terjadi kesalahan'}`)
+    }
   }
 
   const inputBase: React.CSSProperties = {
@@ -319,6 +339,20 @@ function UsersPage() {
                           Aktifkan
                         </button>
                       )}
+                      <button
+                        onClick={() => handleResetPassword(u.id, u.username)}
+                        title="Reset Password"
+                        style={{
+                          width: 32, height: 32,
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          background: 'transparent', border: 'none',
+                          borderRadius: 6, cursor: 'pointer', color: 'var(--fg-subtle)',
+                        }}
+                        onMouseEnter={e => { e.currentTarget.style.background = 'var(--accent)'; e.currentTarget.style.color = 'var(--primary)' }}
+                        onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--fg-subtle)' }}
+                      >
+                        <KeyRound size={15} />
+                      </button>
                       <button
                         onClick={() => handleDelete(u.id, u.username)}
                         style={{

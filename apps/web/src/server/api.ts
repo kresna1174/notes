@@ -1,12 +1,16 @@
 import type { IncomingMessage, ServerResponse } from 'node:http'
+import http from 'node:http'
+import https from 'node:https'
 import { createReadStream } from 'node:fs'
 import { db, sqlite } from '../lib/db'
 import { notes, attachments, users, teams } from '../../drizzle/schema'
-import { desc, eq, and, inArray, sql } from 'drizzle-orm'
+import { desc, eq, and, sql } from 'drizzle-orm'
 import { randomUUID } from 'crypto'
 import Busboy from 'busboy'
 import { saveFile, getFilePath, deleteFile } from '../lib/storage'
 import bcrypt from 'bcryptjs'
+
+const AI_AGENT_URL = process.env.AI_AGENT_URL || 'http://localhost:8000'
 
 function getSession(req: IncomingMessage) {
   const cookie = req.headers.cookie || ''
@@ -144,6 +148,39 @@ export async function handleApiRequest(req: IncomingMessage, res: ServerResponse
     const id = randomUUID()
     await db.insert(users).values({ id, username: cleanUsername, passwordHash: hash, role: 'viewer', status: 'pending', createdAt: Date.now() })
     json(res, { id, username: cleanUsername, status: 'pending' }, 201)
+    return true
+  }
+
+  // POST /api/auth/change-password
+  if (method === 'POST' && path === '/api/auth/change-password') {
+    const session = getSession(req)
+    if (!session) { json(res, { error: 'unauthenticated' }, 401); return true }
+    const body = await readBody(req)
+    const { oldPassword, newPassword } = body as { oldPassword?: string; newPassword?: string }
+    if (!oldPassword || !newPassword) { json(res, { error: 'oldPassword and newPassword required' }, 400); return true }
+    const [user] = await db.select().from(users).where(eq(users.id, session.userId))
+    if (!user) { json(res, { error: 'user not found' }, 404); return true }
+    if (!bcrypt.compareSync(oldPassword, user.passwordHash)) {
+      json(res, { error: 'Password lama salah' }, 400); return true
+    }
+    const hash = bcrypt.hashSync(newPassword, 10)
+    await db.update(users).set({ passwordHash: hash }).where(eq(users.id, session.userId))
+    json(res, { ok: true })
+    return true
+  }
+
+  // PUT /api/auth/users/:id/reset-password (admin only)
+  const resetPasswordMatch = path.match(/^\/api\/auth\/users\/([^/]+)\/reset-password$/)
+  if (resetPasswordMatch && method === 'PUT') {
+    const session = getSession(req)
+    if (!session || session.role !== 'admin') { json(res, { error: 'forbidden' }, 403); return true }
+    const userId = resetPasswordMatch[1]
+    const body = await readBody(req)
+    const { newPassword } = body as { newPassword?: string }
+    if (!newPassword) { json(res, { error: 'newPassword required' }, 400); return true }
+    const hash = bcrypt.hashSync(newPassword, 10)
+    await db.update(users).set({ passwordHash: hash }).where(eq(users.id, userId))
+    json(res, { ok: true })
     return true
   }
 
@@ -301,7 +338,7 @@ export async function handleApiRequest(req: IncomingMessage, res: ServerResponse
     const [me] = await db.select({ teamId: users.teamId }).from(users).where(eq(users.id, session.userId))
     const myTeamId = me?.teamId ?? null
 
-    let allNotes;
+    let allNotes: any[] = [];
     if (session.role === 'admin') {
       if (scope === 'mine') {
         allNotes = await db.select().from(notes).where(eq(notes.type, 'individual')).orderBy(desc(notes.createdAt))
@@ -800,6 +837,189 @@ export async function handleApiRequest(req: IncomingMessage, res: ServerResponse
       json(res, { ok: true })
       return true
     }
+  }
+
+  // GET /api/ai/chat/history/:id
+  const historyMatch = path.match(/^\/api\/ai\/chat\/history\/([^/]+)$/)
+  if (historyMatch && method === 'GET') {
+    const session = getSession(req)
+    if (!session) { json(res, { error: 'unauthenticated' }, 401); return true }
+    try {
+      const sessionId = historyMatch[1]
+      const forwardRes = await fetch(`${AI_AGENT_URL}/api/chat/history/${sessionId}`)
+      if (!forwardRes.ok) {
+        const errText = await forwardRes.text()
+        json(res, { error: `AI service error: ${errText}` }, forwardRes.status)
+        return true
+      }
+      const data = await forwardRes.json()
+      json(res, data)
+    } catch (err) {
+      json(res, { error: `Failed to communicate with AI agent: ${String(err)}` }, 500)
+    }
+    return true
+  }
+
+  // POST /api/ai/chat/stream
+  if (method === 'POST' && path === '/api/ai/chat/stream') {
+    const session = getSession(req)
+    if (!session) { json(res, { error: 'unauthenticated' }, 401); return true }
+    try {
+      const body = await readBody(req) as any
+      body.user_id = session.userId
+      const payload = JSON.stringify(body)
+
+      const agentUrl = new URL(`${AI_AGENT_URL}/api/chat/stream`)
+      const transport = agentUrl.protocol === 'https:' ? https : http
+
+      await new Promise<void>((resolve, reject) => {
+        const proxyReq = transport.request(
+          {
+            hostname: agentUrl.hostname,
+            port: agentUrl.port || (agentUrl.protocol === 'https:' ? 443 : 80),
+            path: agentUrl.pathname,
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Content-Length': Buffer.byteLength(payload),
+            },
+          },
+          (proxyRes) => {
+            if (proxyRes.statusCode && proxyRes.statusCode >= 400) {
+              let errBody = ''
+              proxyRes.on('data', (chunk: Buffer) => { errBody += chunk.toString() })
+              proxyRes.on('end', () => {
+                json(res, { error: `AI service error: ${errBody}` }, proxyRes.statusCode!)
+                resolve()
+              })
+              return
+            }
+            res.writeHead(200, {
+              'Content-Type': 'text/event-stream',
+              'Cache-Control': 'no-cache',
+              'Connection': 'keep-alive',
+              'x-vercel-ai-ui-stream-event': 'v1',
+              'x-accel-buffering': 'no',
+              'X-Accel-Buffering': 'no',
+            })
+            proxyRes.pipe(res)
+            proxyRes.on('end', resolve)
+            proxyRes.on('error', reject)
+            req.on('close', () => proxyReq.destroy())
+          }
+        )
+        proxyReq.on('error', reject)
+        proxyReq.write(payload)
+        proxyReq.end()
+      })
+    } catch (err) {
+      console.error('[stream error]', err)
+      if (!res.headersSent) {
+        json(res, { error: `Failed to communicate with AI agent: ${String(err)}` }, 500)
+      } else {
+        res.end()
+      }
+    }
+    return true
+  }
+
+  // POST /api/ai/chat
+  if (method === 'POST' && path === '/api/ai/chat') {
+    const session = getSession(req)
+    if (!session) { json(res, { error: 'unauthenticated' }, 401); return true }
+    try {
+      const body = await readBody(req) as any
+      body.user_id = session.userId
+      const forwardRes = await fetch(`${AI_AGENT_URL}/api/chat`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      })
+      if (!forwardRes.ok) {
+        const errText = await forwardRes.text()
+        json(res, { error: `AI service error: ${errText}` }, forwardRes.status)
+        return true
+      }
+      const data = await forwardRes.json()
+      json(res, data)
+    } catch (err) {
+      json(res, { error: `Failed to communicate with AI agent: ${String(err)}` }, 500)
+    }
+    return true
+  }
+
+  // POST /api/ai/chat/approve_or_reject
+  if (method === 'POST' && path === '/api/ai/chat/approve_or_reject') {
+    const session = getSession(req)
+    if (!session) { json(res, { error: 'unauthenticated' }, 401); return true }
+    try {
+      const body = await readBody(req) as any
+      const forwardRes = await fetch(`${AI_AGENT_URL}/api/chat/approve_or_reject`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      })
+      if (!forwardRes.ok) {
+        const errText = await forwardRes.text()
+        json(res, { error: `AI service error: ${errText}` }, forwardRes.status)
+        return true
+      }
+      const data = await forwardRes.json()
+      json(res, data)
+    } catch (err) {
+      json(res, { error: `Failed to communicate with AI agent: ${String(err)}` }, 500)
+    }
+    return true
+  }
+
+  // POST /api/ai/summarize
+  if (method === 'POST' && path === '/api/ai/summarize') {
+    const session = getSession(req)
+    if (!session) { json(res, { error: 'unauthenticated' }, 401); return true }
+    try {
+      const body = await readBody(req) as any
+      body.user_id = session.userId
+      const forwardRes = await fetch(`${AI_AGENT_URL}/api/summarize`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      })
+      if (!forwardRes.ok) {
+        const errText = await forwardRes.text()
+        json(res, { error: `AI service error: ${errText}` }, forwardRes.status)
+        return true
+      }
+      const data = await forwardRes.json()
+      json(res, data)
+    } catch (err) {
+      json(res, { error: `Failed to communicate with AI agent: ${String(err)}` }, 500)
+    }
+    return true
+  }
+
+  // POST /api/ai/tags
+  if (method === 'POST' && path === '/api/ai/tags') {
+    const session = getSession(req)
+    if (!session) { json(res, { error: 'unauthenticated' }, 401); return true }
+    try {
+      const body = await readBody(req) as any
+      body.user_id = session.userId
+      const forwardRes = await fetch(`${AI_AGENT_URL}/api/tags`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      })
+      if (!forwardRes.ok) {
+        const errText = await forwardRes.text()
+        json(res, { error: `AI service error: ${errText}` }, forwardRes.status)
+        return true
+      }
+      const data = await forwardRes.json()
+      json(res, data)
+    } catch (err) {
+      json(res, { error: `Failed to communicate with AI agent: ${String(err)}` }, 500)
+    }
+    return true
   }
 
   return false

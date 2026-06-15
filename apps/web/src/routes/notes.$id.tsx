@@ -4,6 +4,8 @@ import { Editor } from '../components/editor/Editor'
 import { PinLockModal } from '../components/editor/PinLockModal'
 import { useState, useEffect } from 'react'
 import { Check, Loader2, Circle, PanelLeftClose, PanelLeftOpen } from 'lucide-react'
+import { ChatBot } from '../components/chat/ChatBot'
+
 
 export const Route = createFileRoute('/notes/$id')({
   component: NotePageComponent,
@@ -11,12 +13,14 @@ export const Route = createFileRoute('/notes/$id')({
 
 type SaveStatus = 'saved' | 'saving' | 'unsaved'
 
-function SaveIndicator({ status }: { status: SaveStatus }) {
+function SaveIndicator({ status, chatOpen, isMobile }: { status: SaveStatus; chatOpen: boolean; isMobile: boolean }) {
+  if (isMobile && chatOpen) return null
+
   return (
     <div style={{
-      position: 'fixed',
+      position: 'absolute',
       bottom: 20,
-      right: 24,
+      right: chatOpen ? 404 : 24,
       display: 'flex',
       alignItems: 'center',
       gap: 6,
@@ -28,7 +32,7 @@ function SaveIndicator({ status }: { status: SaveStatus }) {
       borderRadius: 20,
       padding: '5px 12px',
       boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
-      transition: 'color 0.2s',
+      transition: 'right 0.2s ease, color 0.2s',
       pointerEvents: 'none',
       zIndex: 50,
     }}>
@@ -51,6 +55,7 @@ function NotePageComponent() {
   const [showUnlockModal, setShowUnlockModal] = useState(false)
   const [sidebarVisible, setSidebarVisible] = useState(true)
   const [isMobile, setIsMobile] = useState(false)
+  const [chatOpen, setChatOpen] = useState(false)
 
   useEffect(() => {
     function checkMobile() {
@@ -174,7 +179,17 @@ function NotePageComponent() {
                 if (locked) setUnlocked(false)
               }}
               shareTrigger={shareTrigger}
+              chatOpen={chatOpen}
+              onToggleChat={() => setChatOpen(v => !v)}
             />
+            {chatOpen && (
+              <ChatBot
+                noteId={id}
+                noteContent={note.content}
+                noteTitle={note.title}
+                onClose={() => setChatOpen(false)}
+              />
+            )}
           </div>
         ) : (
           <div className="flex h-full items-center justify-center flex-col" style={{ gap: 12 }}>
@@ -192,8 +207,8 @@ function NotePageComponent() {
             </button>
           </div>
         )}
+        {!loading && note && isContentVisible && <SaveIndicator status={saveStatus} chatOpen={chatOpen} isMobile={isMobile} />}
       </main>
-      {!loading && note && isContentVisible && <SaveIndicator status={saveStatus} />}
 
       {showUnlockModal && (
         <PinLockModal
