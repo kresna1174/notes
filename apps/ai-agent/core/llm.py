@@ -1,5 +1,6 @@
 import os
 from agents.extensions.models.any_llm_model import AnyLLMModel
+from agents import ModelSettings
 
 # Disable tracing to avoid connection issues with OpenAI dashboard
 os.environ["OPENAI_AGENTS_DISABLE_TRACING"] = "1"
@@ -10,6 +11,8 @@ openrouter_model = AnyLLMModel(
     base_url=os.getenv("OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1"),
     api_key=os.getenv("OPENROUTER_API_KEY"),
 )
+
+default_model_settings = ModelSettings(include_usage=True)
 
 def get_model():
     return openrouter_model

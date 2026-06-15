@@ -91,8 +91,8 @@ function getMessageMetrics(msg: any, prevUserMsgText: string, noteContent: strin
 
   if (usageParts.length > 0) {
     for (const part of usageParts) {
-      promptTokens += (part.prompt_tokens || 0);
-      completionTokens += (part.completion_tokens || 0);
+      promptTokens += (part.promptTokens || part.prompt_tokens || 0);
+      completionTokens += (part.completionTokens || part.completion_tokens || 0);
     }
   }
 
