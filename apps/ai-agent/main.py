@@ -109,21 +109,21 @@ class ApproveRejectRequest(BaseModel):
     call_id: str
     status: str
 
-from custom_tools import write_notes, search_web, extract_web, crawl_web
+from custom_tools import write_notes, create_new_note, update_note_direct, search_web, extract_web, crawl_web
 
 # 1. Definisikan Sub-Agents
 summarizer_sub_agent = Agent(
     name="SummarizerSubAgent",
     instructions="You are a specialized sub-agent that summarizes note content. Provide a concise, bullet-pointed summary.",
     model=get_model(),
-    tools=[write_notes, search_web, extract_web, crawl_web]
+    tools=[write_notes, create_new_note, update_note_direct, search_web, extract_web, crawl_web]
 )
 
 tagger_sub_agent = Agent(
     name="TaggerSubAgent",
     instructions="You are a specialized sub-agent that extracts 3 to 5 relevant tags from the content. Return ONLY a comma-separated list of tags.",
     model=get_model(),
-    tools=[write_notes, search_web, extract_web, crawl_web]
+    tools=[write_notes, create_new_note, update_note_direct, search_web, extract_web, crawl_web]
 )
 
 # 2. Definisikan Parent Agent dengan Sub-Agents sebagai Tools
@@ -132,7 +132,7 @@ parent_agent = Agent(
     instructions="""You are a helpful notes platform assistant. 
     You help the user summarize notes, categorize notes, and answer questions.
     For advanced summarization or tag extraction tasks, delegate to your specialized sub-agents using their tools.
-    You can also search the web, extract content, crawl sites, and write/update notes directly.""",
+    You can also search the web, extract content, crawl sites, write/update notes, create brand new notes, and directly update active notes without approval.""",
     model=get_model(),
     tools=[
         summarizer_sub_agent.as_tool(
@@ -144,6 +144,8 @@ parent_agent = Agent(
             tool_description="Use for extracting tags or keywords from notes or text content.",
         ),
         write_notes,
+        create_new_note,
+        update_note_direct,
         search_web,
         extract_web,
         crawl_web,
@@ -303,6 +305,23 @@ async def chat_event_generator(message: str, session_id: str, user_id: str | Non
             elif event.type == "raw_response_event":
                 data = event.data
                 logger.info(f"  -> Raw response event: data_class={data.__class__.__name__}")
+
+                # Capture actual token usage from completed response events
+                if data.__class__.__name__ == "ResponseCompletedEvent" or hasattr(data, "response"):
+                    resp = getattr(data, "response", None)
+                    if resp and hasattr(resp, "usage") and resp.usage:
+                        usage = resp.usage
+                        input_toks = getattr(usage, "input_tokens", 0) or getattr(usage, "prompt_tokens", 0) or 0
+                        output_toks = getattr(usage, "output_tokens", 0) or getattr(usage, "completion_tokens", 0) or 0
+                        total_toks = getattr(usage, "total_tokens", 0) or (input_toks + output_toks)
+                        
+                        logger.info(f"YIELDING ACTUAL USAGE: input={input_toks}, output={output_toks}, total={total_toks}")
+                        yield sse({
+                            "type": "usage",
+                            "prompt_tokens": input_toks,
+                            "completion_tokens": output_toks,
+                            "total_tokens": total_toks
+                        })
 
                 if hasattr(data, "delta") and data.delta:
                     delta_clean = data.delta.replace("\n", "\\n")
