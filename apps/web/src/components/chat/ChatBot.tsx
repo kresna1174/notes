@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef } from 'react'
-import { Loader2, Trash2, ChevronRight, X, ArrowUp } from 'lucide-react'
+import { Loader2, Trash2, ChevronRight, X, ArrowUp, Paperclip } from 'lucide-react'
 import { useChat } from '@ai-sdk/react'
 import { DefaultChatTransport } from 'ai'
+import { marked } from 'marked'
 
 interface ChatBotProps {
   noteId: string
@@ -21,6 +22,30 @@ function LiveMetrics() {
   )
 }
 
+// ── Markdown renderer component ──────────────────────────────
+function Markdown({ text, style }: { text: string; style?: React.CSSProperties }) {
+  const [html, setHtml] = useState('')
+
+  useEffect(() => {
+    let active = true
+    Promise.resolve(marked.parse(text, { breaks: true, gfm: true })).then(parsed => {
+      if (active) setHtml(parsed)
+    }).catch(err => {
+      console.error(err)
+      if (active) setHtml(text)
+    })
+    return () => { active = false }
+  }, [text])
+
+  return (
+    <div
+      className="markdown-content"
+      dangerouslySetInnerHTML={{ __html: html || text }}
+      style={style}
+    />
+  )
+}
+
 // ── Notion-style toggle block ────────────────────────────────
 function ToggleBlock({
   icon,
@@ -31,7 +56,7 @@ function ToggleBlock({
   children,
   accentColor,
 }: {
-  icon: string
+  icon: React.ReactNode
   label: string
   badge?: string
   defaultOpen?: boolean
@@ -72,7 +97,7 @@ function ToggleBlock({
           color={headerColor}
           style={{ transform: open ? 'rotate(90deg)' : 'none', transition: 'transform 0.15s', flexShrink: 0 }}
         />
-        <span style={{ fontSize: '0.7rem', flexShrink: 0 }}>{icon}</span>
+        <span style={{ display: 'flex', alignItems: 'center', flexShrink: 0, color: headerColor }}>{icon}</span>
         <span
           style={{
             fontSize: '0.72rem',
@@ -170,19 +195,51 @@ function ToolCallBlock({ item, noteId, lastUserPrompt }: { item: any; noteId: st
   const isAnyCallActive = item.calls.some((c: any) => c.state === 'call')
   const [isAuto, setIsAuto] = useState(false)
 
-  const toolLabels: Record<string, string> = {
-    write_notes: 'Perbarui catatan',
-    create_new_note: 'Buat catatan baru',
-    update_note_direct: 'Edit catatan langsung',
-    search_web: 'Cari di web',
-    extract_web: 'Ekstrak konten web',
-    crawl_web: 'Crawl situs',
-    summarize_expert: 'Ringkas (sub-agent)',
-    tagger_expert: 'Ekstrak tag (sub-agent)',
+  const toolMeta: Record<string, { label: string; icon: React.ReactNode }> = {
+    write_notes: {
+      label: 'Updating note',
+      icon: <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>,
+    },
+    create_new_note: {
+      label: 'Creating note',
+      icon: <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg>,
+    },
+    update_note_direct: {
+      label: 'Editing note',
+      icon: <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>,
+    },
+    search_web: {
+      label: 'Searching the web',
+      icon: <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>,
+    },
+    extract_web: {
+      label: 'Extracting web content',
+      icon: <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>,
+    },
+    crawl_web: {
+      label: 'Crawling site',
+      icon: <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>,
+    },
+    summarize_expert: {
+      label: 'Summarizing',
+      icon: <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="21" y1="10" x2="7" y2="10"/><line x1="21" y1="6" x2="3" y2="6"/><line x1="21" y1="14" x2="3" y2="14"/><line x1="21" y1="18" x2="7" y2="18"/></svg>,
+    },
+    tagger_expert: {
+      label: 'Extracting tags',
+      icon: <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>,
+    },
+    execute_python_code: {
+      label: 'Running code',
+      icon: <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>,
+    },
   }
 
-  const icon = isWriteTool ? '✏️' : item.toolName.includes('web') ? '🌐' : item.toolName.includes('expert') ? '🤖' : '⚙️'
-  const label = toolLabels[item.toolName] || item.toolName
+  const fallbackMeta = {
+    label: item.toolName.replace(/_/g, ' '),
+    icon: <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M4.93 4.93a10 10 0 0 0 0 14.14"/></svg>,
+  }
+
+  const { label, icon } = toolMeta[item.toolName] ?? fallbackMeta
 
   const storageKey = `note_approve_state_${noteId}_${JSON.stringify(item.calls[0]?.args || {})}`
   const [approvalState, setApprovalState] = useState<'pending' | 'approved' | 'rejected'>(() => {
@@ -269,8 +326,8 @@ function ToolCallBlock({ item, noteId, lastUserPrompt }: { item: any; noteId: st
   }, [approvalState, item, lastUserPrompt])
 
   const statusBadge =
-    approvalState === 'approved' ? '✓ diterapkan' :
-    approvalState === 'rejected' ? '✗ ditolak' :
+    approvalState === 'approved' ? 'applied' :
+    approvalState === 'rejected' ? 'rejected' :
     undefined
 
   return (
@@ -291,10 +348,10 @@ function ToolCallBlock({ item, noteId, lastUserPrompt }: { item: any; noteId: st
           {call.args && (
             <details style={{ marginBottom: call.result ? 6 : 0 }}>
               <summary style={{ cursor: 'pointer', color: 'var(--fg-subtle)', fontSize: '0.68rem', userSelect: 'none' }}>
-                Parameter {item.calls.length > 1 ? `#${callIdx + 1}` : ''}
+                {item.toolName === 'execute_python_code' ? 'Kode Python' : `Parameter ${item.calls.length > 1 ? `#${callIdx + 1}` : ''}`}
               </summary>
               <pre style={{ margin: '4px 0 0', padding: '5px 6px', background: 'var(--muted)', borderRadius: 4, overflowX: 'auto', fontFamily: 'monospace', fontSize: '0.65rem', whiteSpace: 'pre-wrap' }}>
-                {JSON.stringify(call.args, null, 2)}
+                {item.toolName === 'execute_python_code' && call.args.code ? call.args.code : JSON.stringify(call.args, null, 2)}
               </pre>
             </details>
           )}
@@ -359,6 +416,13 @@ export function ChatBot({ noteId, noteContent, noteTitle, onClose }: ChatBotProp
   const noteStateRef = useRef({ noteId, noteTitle, noteContent })
   noteStateRef.current = { noteId, noteTitle, noteContent }
 
+  const [attachments, setAttachments] = useState<{ filename: string; mimeType: string; filePath: string }[]>([])
+  const [isUploadingFile, setIsUploadingFile] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
+  const attachmentsRef = useRef(attachments)
+  attachmentsRef.current = attachments
+
   const { messages, setMessages, sendMessage, status } = useChat({
     transport: new DefaultChatTransport({
       api: '/api/ai/chat/stream',
@@ -366,6 +430,7 @@ export function ChatBot({ noteId, noteContent, noteTitle, onClose }: ChatBotProp
         session_id: noteStateRef.current.noteId,
         note_title: noteStateRef.current.noteTitle,
         note_content: noteStateRef.current.noteContent,
+        attachments: attachmentsRef.current,
       }),
     }),
   })
@@ -415,10 +480,55 @@ export function ChatBot({ noteId, noteContent, noteTitle, onClose }: ChatBotProp
   useEffect(() => { adjustHeight() }, [inputValue])
 
   const handleSend = () => {
-    if (!inputValue.trim() || isLoading) return
-    sendMessage({ text: inputValue })
+    if ((!inputValue.trim() && attachments.length === 0) || isLoading) return
+    
+    let textToSend = inputValue
+    if (attachments.length > 0) {
+      const attachmentsPrefix = attachments.map(att => 
+        `[Isi Dokumen Terlampir: "${att.filename}" filePath="${att.filePath}" mimeType="${att.mimeType}"]`
+      ).join('\n')
+      textToSend = `${attachmentsPrefix}\n\n${inputValue}`
+    }
+    
+    sendMessage({ text: textToSend })
     setInputValue('')
+    setAttachments([])
     if (textareaRef.current) textareaRef.current.style.height = 'auto'
+  }
+
+  const handleUploadFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files
+    if (!files || files.length === 0) return
+    
+    setIsUploadingFile(true)
+    try {
+      const file = files[0]
+      const form = new FormData()
+      form.append('file', file)
+      form.append('noteId', noteId)
+      
+      const res = await fetch('/api/attachments', {
+        method: 'POST',
+        body: form
+      })
+      if (!res.ok) throw new Error('Gagal mengunggah file')
+      
+      const data = await res.json()
+      setAttachments(prev => [
+        ...prev,
+        {
+          filename: data.filename,
+          mimeType: data.mimeType,
+          filePath: `uploads/${data.storedAs}`
+        }
+      ])
+    } catch (err) {
+      console.error(err)
+      alert(err instanceof Error ? err.message : 'Terjadi kesalahan saat mengunggah file')
+    } finally {
+      setIsUploadingFile(false)
+      if (fileInputRef.current) fileInputRef.current.value = ''
+    }
   }
 
   const handleClearHistory = () => {
@@ -495,6 +605,7 @@ export function ChatBot({ noteId, noteContent, noteTitle, onClose }: ChatBotProp
         style={{
           flex: 1,
           overflowY: 'auto',
+          overflowX: 'hidden',
           minHeight: 0,
           padding: '16px 16px 8px',
           display: 'flex',
@@ -513,23 +624,85 @@ export function ChatBot({ noteId, noteContent, noteTitle, onClose }: ChatBotProp
 
             if (msg.role === 'user') {
               const text = msg.parts?.filter((p: any) => p.type === 'text').map((p: any) => p.text).join('') || ''
+              
+              // Extract attachments metadata from tags
+              const extractedFiles: { filename: string; filePath: string }[] = []
+              const tagRegex = /\[Isi Dokumen Terlampir:\s*\"([^\"]+)\"\s+filePath=\"([^\"]+)\"\s+mimeType=\"([^\"]+)\"\]/g
+              let match
+              while ((match = tagRegex.exec(text)) !== null) {
+                extractedFiles.push({ filename: match[1], filePath: match[2] })
+              }
+              
+              // Clean up the text: remove all tag blocks
+              let cleanText = text.replace(tagRegex, '').trim()
+              
+              // Also support legacy/fallback context parsing just in case
+              cleanText = cleanText.replace(/\[Konteks Catatan:[\s\S]*?\]/g, '').trim()
+              if (cleanText.startsWith('Pertanyaan/Instruksi User:')) {
+                cleanText = cleanText.substring('Pertanyaan/Instruksi User:'.length).trim()
+              }
+
               return (
-                <div key={index} style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 16 }}>
-                  <div
-                    style={{
-                      maxWidth: '80%',
-                      padding: '7px 12px',
-                      borderRadius: '14px',
-                      borderBottomRightRadius: 4,
-                      background: 'var(--muted)',
-                      color: 'var(--fg)',
-                      fontSize: '0.82rem',
-                      lineHeight: 1.5,
-                      whiteSpace: 'pre-wrap',
-                    }}
-                  >
-                    {text}
-                  </div>
+                <div key={index} style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', marginBottom: 16 }}>
+                  {/* Extracted file attachments */}
+                  {extractedFiles.length > 0 && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 6, maxWidth: '80%' }}>
+                      {extractedFiles.map((file, i) => (
+                        <a
+                          key={i}
+                          href={`/${file.filePath}`}
+                          download={file.filename}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 8,
+                            padding: '8px 12px',
+                            borderRadius: 8,
+                            background: 'var(--muted)',
+                            border: '1px solid var(--border)',
+                            fontSize: '0.74rem',
+                            color: 'var(--fg)',
+                            textDecoration: 'none',
+                            cursor: 'pointer',
+                            transition: 'all 0.15s ease',
+                            alignSelf: 'flex-end',
+                            boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
+                          }}
+                          onMouseEnter={e => {
+                            e.currentTarget.style.background = 'var(--accent)'
+                            e.currentTarget.style.borderColor = 'var(--primary)'
+                          }}
+                          onMouseLeave={e => {
+                            e.currentTarget.style.background = 'var(--muted)'
+                            e.currentTarget.style.borderColor = 'var(--border)'
+                          }}
+                        >
+                          <span style={{ fontSize: '1rem' }}>📄</span>
+                          <span style={{ fontWeight: 500, maxWidth: '180px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {file.filename}
+                          </span>
+                          <span style={{ fontSize: '0.62rem', color: 'var(--fg-subtle)' }}>↓ Download</span>
+                        </a>
+                      ))}
+                    </div>
+                  )}
+                  {cleanText && (
+                    <div
+                      style={{
+                        maxWidth: '80%',
+                        padding: '7px 12px',
+                        borderRadius: '14px',
+                        borderBottomRightRadius: 4,
+                        background: 'var(--muted)',
+                        color: 'var(--fg)',
+                        fontSize: '0.82rem',
+                        lineHeight: 1.5,
+                        whiteSpace: 'pre-wrap',
+                      }}
+                    >
+                      {cleanText}
+                    </div>
+                  )}
                 </div>
               )
             }
@@ -612,16 +785,14 @@ export function ChatBot({ noteId, noteContent, noteTitle, onClose }: ChatBotProp
 
                 {/* Assistant prose text — no bubble */}
                 {hasText && (
-                  <div
+                  <Markdown
+                    text={textContent}
                     style={{
                       fontSize: '0.84rem',
                       lineHeight: 1.65,
                       color: 'var(--fg)',
-                      whiteSpace: 'pre-wrap',
                     }}
-                  >
-                    {textContent}
-                  </div>
+                  />
                 )}
 
                 {/* Token metrics — live timer while streaming, static after */}
@@ -688,6 +859,44 @@ export function ChatBot({ noteId, noteContent, noteTitle, onClose }: ChatBotProp
           flexShrink: 0,
         }}
       >
+        {attachments.length > 0 && (
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 8, padding: '0 4px' }}>
+            {attachments.map((file, i) => (
+              <div
+                key={i}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 4,
+                  padding: '4px 8px',
+                  borderRadius: 6,
+                  background: 'var(--muted)',
+                  border: '1px solid var(--border)',
+                  fontSize: '0.72rem',
+                  color: 'var(--fg-muted)',
+                }}
+              >
+                <span>📁 {file.filename}</span>
+                <button
+                  onClick={() => setAttachments(prev => prev.filter((_, idx) => idx !== i))}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    color: 'var(--fg-subtle)',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    padding: 0,
+                  }}
+                  title="Hapus file"
+                >
+                  <X size={12} />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+
         <div
           style={{
             border: '1px solid var(--border)',
@@ -725,24 +934,60 @@ export function ChatBot({ noteId, noteContent, noteTitle, onClose }: ChatBotProp
           <div
             style={{
               display: 'flex',
-              justifyContent: 'flex-end',
+              justifyContent: 'space-between',
+              alignItems: 'center',
               padding: '4px 8px 6px',
             }}
           >
+            <div style={{ display: 'flex', alignItems: 'center' }}>
+              <input
+                type="file"
+                ref={fileInputRef}
+                onChange={handleUploadFile}
+                style={{ display: 'none' }}
+              />
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                disabled={isUploadingFile || isLoading}
+                title="Unggah dokumen (PDF, CSV, Excel, TXT, Gambar)"
+                style={{
+                  width: 28,
+                  height: 28,
+                  borderRadius: 6,
+                  background: 'none',
+                  border: 'none',
+                  color: 'var(--fg-muted)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: isUploadingFile || isLoading ? 'default' : 'pointer',
+                  transition: 'background 0.15s',
+                }}
+                onMouseEnter={e => { if (!isUploadingFile && !isLoading) e.currentTarget.style.background = 'var(--muted)' }}
+                onMouseLeave={e => { e.currentTarget.style.background = 'none' }}
+              >
+                {isUploadingFile ? (
+                  <Loader2 className="animate-spin" size={13} />
+                ) : (
+                  <Paperclip size={13} />
+                )}
+              </button>
+            </div>
+
             <button
               onClick={handleSend}
-              disabled={!inputValue.trim() || isLoading}
+              disabled={(!inputValue.trim() && attachments.length === 0) || isLoading}
               style={{
                 width: 28,
                 height: 28,
                 borderRadius: '50%',
-                background: inputValue.trim() && !isLoading ? 'var(--primary)' : 'var(--border)',
-                color: inputValue.trim() && !isLoading ? 'var(--primary-fg)' : 'var(--fg-subtle)',
+                background: (inputValue.trim() || attachments.length > 0) && !isLoading ? 'var(--primary)' : 'var(--border)',
+                color: (inputValue.trim() || attachments.length > 0) && !isLoading ? 'var(--primary-fg)' : 'var(--fg-subtle)',
                 border: 'none',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                cursor: inputValue.trim() && !isLoading ? 'pointer' : 'default',
+                cursor: (inputValue.trim() || attachments.length > 0) && !isLoading ? 'pointer' : 'default',
                 transition: 'background 0.15s',
               }}
             >
