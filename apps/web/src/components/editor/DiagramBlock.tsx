@@ -9,6 +9,7 @@ import ReactFlow, {
   Background,
   Handle,
   Position,
+  ReactFlowProvider,
   type Connection,
 } from 'reactflow'
 import 'reactflow/dist/style.css'
@@ -129,10 +130,27 @@ function DiamondNode({ data, selected }: any) {
 }
 
 const nodeTypes = {
-  default: RectangleNode, // Fallback mapping so older diagram nodes don't crash the editor
+  default: RectangleNode,
   rectangle: RectangleNode,
   circle: CircleNode,
   diamond: DiamondNode,
+}
+
+/** Compute bounding box of all nodes from their position + estimated size */
+function computeBBox(nodes: any[]) {
+  if (nodes.length === 0) return { spreadH: 0, spreadW: 0 }
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
+  for (const n of nodes) {
+    const x = n.position?.x ?? 0
+    const y = n.position?.y ?? 0
+    const w = (n.width ?? n.style?.width ?? 120) as number
+    const h = (n.height ?? n.style?.height ?? 60) as number
+    minX = Math.min(minX, x)
+    minY = Math.min(minY, y)
+    maxX = Math.max(maxX, x + w)
+    maxY = Math.max(maxY, y + h)
+  }
+  return { spreadH: maxY - minY, spreadW: maxX - minX }
 }
 
 function DiagramNodeView({ node, updateAttributes, deleteNode }: any) {
@@ -205,6 +223,9 @@ function DiagramNodeView({ node, updateAttributes, deleteNode }: any) {
     }])
   }
 
+  const { spreadH } = computeBBox(nodes)
+  const previewH = nodes.length === 0 ? 200 : Math.max(200, Math.min(420, spreadH + 100))
+
   return (
     <NodeViewWrapper>
       <div
@@ -235,7 +256,7 @@ function DiagramNodeView({ node, updateAttributes, deleteNode }: any) {
           }}
           style={{
             border: '1px solid var(--border)', borderRadius: 10,
-            background: 'var(--muted)', height: 250,
+            background: 'var(--muted)', height: previewH,
             cursor: 'pointer', position: 'relative', overflow: 'hidden',
             transition: 'background 0.15s',
           }}
@@ -260,6 +281,7 @@ function DiagramNodeView({ node, updateAttributes, deleteNode }: any) {
                   edges={edges}
                   nodeTypes={nodeTypes}
                   fitView
+                  fitViewOptions={{ padding: 0.15 }}
                   nodesDraggable={false}
                   nodesConnectable={false}
                   elementsSelectable={false}
@@ -268,6 +290,7 @@ function DiagramNodeView({ node, updateAttributes, deleteNode }: any) {
                   zoomOnPinch={false}
                   zoomOnDoubleClick={false}
                   preventScrolling={true}
+                  proOptions={{ hideAttribution: true }}
                 >
                   <Background />
                 </ReactFlow>

@@ -2,6 +2,9 @@ import React, { useState } from 'react'
 import { marked } from 'marked'
 import { FileText, ImageIcon, FileCode, Download, ChevronDown, ChevronUp } from 'lucide-react'
 import { AttachmentPreviewModal, isPreviewable } from './AttachmentPreviewModal'
+import ReactFlow, { Background, ReactFlowProvider, type Node, type Edge } from 'reactflow'
+import { Handle, Position } from 'reactflow'
+import 'reactflow/dist/style.css'
 
 // ── helpers ──────────────────────────────────────────────────
 
@@ -16,6 +19,198 @@ export function parseDiagramCount(data: string) {
     const { nodes = [], edges = [] } = JSON.parse(data || '{}')
     return `${nodes.length} nodes, ${edges.length} edges`
   } catch { return '...' }
+}
+
+// ── Read-only node types (same visuals as editor, no interaction) ──────────
+function RORect({ data }: any) {
+  return (
+    <div style={{ padding: '8px 16px', borderRadius: 6, border: '1.5px solid var(--border,#e9ecef)', background: 'var(--bg,#fff)', color: 'var(--fg,#1a1a2e)', minWidth: 80, textAlign: 'center', fontFamily: 'var(--font-body,sans-serif)', fontSize: '0.82rem', fontWeight: 500, boxShadow: '0 1px 4px rgba(0,0,0,0.07)', position: 'relative' }}>
+      <Handle type="target" position={Position.Top} style={{ opacity: 0, pointerEvents: 'none' }} />
+      <Handle type="target" position={Position.Left} style={{ opacity: 0, pointerEvents: 'none' }} />
+      {data.label}
+      <Handle type="source" position={Position.Bottom} style={{ opacity: 0, pointerEvents: 'none' }} />
+      <Handle type="source" position={Position.Right} style={{ opacity: 0, pointerEvents: 'none' }} />
+    </div>
+  )
+}
+function ROCircle({ data }: any) {
+  return (
+    <div style={{ width: 72, height: 72, borderRadius: '50%', border: '1.5px solid var(--border,#e9ecef)', background: 'var(--bg,#fff)', color: 'var(--fg,#1a1a2e)', display: 'flex', alignItems: 'center', justifyContent: 'center', textAlign: 'center', fontFamily: 'var(--font-body,sans-serif)', fontSize: '0.78rem', fontWeight: 500, boxShadow: '0 1px 4px rgba(0,0,0,0.07)', position: 'relative', padding: 6 }}>
+      <Handle type="target" position={Position.Top} style={{ opacity: 0, pointerEvents: 'none' }} />
+      <Handle type="target" position={Position.Left} style={{ opacity: 0, pointerEvents: 'none' }} />
+      <span style={{ wordBreak: 'break-word' }}>{data.label}</span>
+      <Handle type="source" position={Position.Bottom} style={{ opacity: 0, pointerEvents: 'none' }} />
+      <Handle type="source" position={Position.Right} style={{ opacity: 0, pointerEvents: 'none' }} />
+    </div>
+  )
+}
+function RODiamond({ data }: any) {
+  return (
+    <div style={{ width: 80, height: 80, position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <div style={{ position: 'absolute', inset: 4, transform: 'rotate(45deg)', borderRadius: 4, border: '1.5px solid var(--border,#e9ecef)', background: 'var(--bg,#fff)', boxShadow: '0 1px 4px rgba(0,0,0,0.07)' }} />
+      <div style={{ position: 'relative', zIndex: 1, fontFamily: 'var(--font-body,sans-serif)', fontSize: '0.78rem', fontWeight: 500, color: 'var(--fg,#1a1a2e)', textAlign: 'center', maxWidth: '70%', wordBreak: 'break-word' }}>{data.label}</div>
+      <Handle type="target" position={Position.Top} style={{ opacity: 0, pointerEvents: 'none', top: 0 }} />
+      <Handle type="target" position={Position.Left} style={{ opacity: 0, pointerEvents: 'none', left: 0 }} />
+      <Handle type="source" position={Position.Bottom} style={{ opacity: 0, pointerEvents: 'none', bottom: 0 }} />
+      <Handle type="source" position={Position.Right} style={{ opacity: 0, pointerEvents: 'none', right: 0 }} />
+    </div>
+  )
+}
+
+const RO_NODE_TYPES = { default: RORect, rectangle: RORect, circle: ROCircle, diamond: RODiamond }
+
+/** Compute bounding box of all nodes to determine canvas height needed */
+function computeBBox(nodes: Node[]) {
+  if (nodes.length === 0) return { minX: 0, minY: 0, maxX: 400, maxY: 240 }
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
+  for (const n of nodes) {
+    const x = n.position?.x ?? 0
+    const y = n.position?.y ?? 0
+    const w = (n.width ?? n.style?.width ?? 120) as number
+    const h = (n.height ?? n.style?.height ?? 60) as number
+    minX = Math.min(minX, x)
+    minY = Math.min(minY, y)
+    maxX = Math.max(maxX, x + w)
+    maxY = Math.max(maxY, y + h)
+  }
+  return { minX, minY, maxX, maxY }
+}
+
+function DiagramPreview({ data }: { data: string }) {
+  const [expanded, setExpanded] = useState(false)
+  const parsed = (() => { try { return JSON.parse(data || '{}') } catch { return { nodes: [], edges: [] } } })()
+  const nodes: Node[] = parsed.nodes || []
+  const edges: Edge[] = parsed.edges || []
+
+  if (nodes.length === 0) {
+    return (
+      <div style={{ border: '1px dashed var(--border,#e9ecef)', borderRadius: 8, padding: '20px', margin: '8px 0', textAlign: 'center', fontSize: '0.82rem', color: 'var(--fg-muted,#6c757d)', fontFamily: 'var(--font-body,sans-serif)' }}>
+        📊 Diagram kosong
+      </div>
+    )
+  }
+
+  // Compute diagram spread to size the container appropriately
+  const bbox = computeBBox(nodes)
+  const spreadH = bbox.maxY - bbox.minY
+  const spreadW = bbox.maxX - bbox.minX
+  // Height: proportional to vertical spread, clamped 260–480px
+  const height = Math.max(260, Math.min(480, spreadH + 120))
+  // Aspect: if diagram is very wide, show helper text
+  const isWide = spreadW > 700
+
+  return (
+    <div style={{
+      border: '1px solid var(--border,#e9ecef)',
+      borderRadius: 12,
+      margin: '12px 0',
+      background: 'var(--card-bg,#fff)',
+      overflow: 'hidden',
+      boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
+      transition: 'border-color 0.15s, box-shadow 0.15s',
+    }}
+    onMouseEnter={e => {
+      e.currentTarget.style.borderColor = 'var(--primary,#3b5bdb)'
+      e.currentTarget.style.boxShadow = '0 4px 16px rgba(0,0,0,0.06)'
+    }}
+    onMouseLeave={e => {
+      e.currentTarget.style.borderColor = 'var(--border,#e9ecef)'
+      e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.04)'
+    }}
+    >
+      {/* Accordion Trigger Header */}
+      <button
+        onClick={() => setExpanded(v => !v)}
+        style={{
+          width: '100%',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          padding: '14px 18px',
+          background: 'var(--bg,#fff)',
+          border: 'none',
+          cursor: 'pointer',
+          fontFamily: 'var(--font-body,sans-serif)',
+          textAlign: 'left',
+          outline: 'none',
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          {/* Custom inline flowchart icon */}
+          <div style={{
+            width: 32, height: 32, borderRadius: 8,
+            background: 'var(--accent,#e8edff)',
+            display: 'flex', alignItems: 'center',
+            justifyContent: 'center',
+            color: 'var(--primary,#3b5bdb)',
+            flexShrink: 0
+          }}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="3" y="3" width="7" height="7" rx="1" />
+              <rect x="14" y="14" width="7" height="7" rx="1" />
+              <path d="M10 6.5h4c1 0 2 1 2 2v5.5" />
+            </svg>
+          </div>
+          <div>
+            <p style={{ margin: 0, fontSize: '0.85rem', fontWeight: 600, color: 'var(--fg,#1a1a2e)' }}>
+              Diagram Alir
+            </p>
+            <p style={{ margin: '2px 0 0', fontSize: '0.72rem', color: 'var(--fg-muted,#6c757d)' }}>
+              {nodes.length} node · {edges.length} hubungan
+            </p>
+          </div>
+        </div>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '0.78rem', fontWeight: 600, color: 'var(--primary,#3b5bdb)' }}>
+          <span>{expanded ? 'Sembunyikan' : 'Tampilkan'}</span>
+          {expanded ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
+        </div>
+      </button>
+
+      {/* Accordion Content */}
+      {expanded && (
+        <div style={{
+          borderTop: '1px solid var(--border,#e9ecef)',
+          position: 'relative',
+          height,
+          background: 'var(--muted,#f8f9fa)',
+          cursor: 'grab',
+        }}>
+          <div style={{
+            position: 'absolute', top: 8, right: 8, zIndex: 10,
+            fontSize: '0.68rem', color: 'var(--fg-muted,#6c757d)',
+            background: 'var(--bg,#fff)', border: '1px solid var(--border,#e9ecef)',
+            borderRadius: 6, padding: '2px 8px', pointerEvents: 'none',
+            fontFamily: 'var(--font-body,sans-serif)',
+            boxShadow: '0 1px 4px rgba(0,0,0,0.05)'
+          }}>
+            Drag untuk geser {isWide && '· Cubit untuk zoom'}
+          </div>
+          <ReactFlowProvider>
+            <ReactFlow
+              nodes={nodes}
+              edges={edges}
+              nodeTypes={RO_NODE_TYPES}
+              fitView
+              fitViewOptions={{ padding: 0.18 }}
+              nodesDraggable={false}
+              nodesConnectable={false}
+              elementsSelectable={false}
+              panOnDrag={true}
+              panOnScroll={false}
+              zoomOnScroll={false}
+              zoomOnPinch={true}
+              zoomOnDoubleClick={false}
+              preventScrolling={false}
+              proOptions={{ hideAttribution: true }}
+            >
+              <Background gap={16} size={1} color="var(--border,#e9ecef)" />
+            </ReactFlow>
+          </ReactFlowProvider>
+        </div>
+      )}
+    </div>
+  )
 }
 
 function esc(s: string) {
@@ -298,15 +493,7 @@ export function DocContent({ segments }: { segments: Segment[] }) {
           return <AttachmentPreview key={i} {...seg} />
         }
         if (seg.kind === 'diagram') {
-          return (
-            <div key={i} style={{
-              border: '1px solid var(--border, #e9ecef)', borderRadius: 8, padding: '10px 14px',
-              background: 'var(--muted, #f1f3f5)', margin: '8px 0', fontSize: '0.85rem',
-              color: 'var(--fg-muted, #6c757d)', fontFamily: 'var(--font-body, sans-serif)',
-            }}>
-              📊 Diagram block — {parseDiagramCount(seg.data)}
-            </div>
-          )
+          return <DiagramPreview key={i} data={seg.data} />
         }
         return null
       })}
