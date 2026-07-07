@@ -2,7 +2,7 @@ import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { useState, useEffect, useRef } from 'react'
 import { useAuth } from '../lib/auth'
 import { useTheme } from '../lib/theme'
-import { Eye, EyeOff, Sun, Moon, Beer, Zap } from 'lucide-react'
+import { Eye, EyeOff, Sun, Moon, Brain, Zap } from 'lucide-react'
 import { AboutModal } from '../components/ui/AboutModal'
 
 export const Route = createFileRoute('/login')({
@@ -10,34 +10,33 @@ export const Route = createFileRoute('/login')({
 })
 
 const TERMINAL_STEPS = [
-  { action: 'type', text: 'brew install homebrew-notes', delay: 45 },
-  { action: 'print', text: '==> Downloading https://formulae.brew.sh/api/formula/homebrew-notes.json', delay: 200 },
-  { action: 'print', text: '==> Downloading source tarball...', delay: 150 },
-  { action: 'print', text: 'Already downloaded: /Users/krisna/Library/Caches/Homebrew/downloads/homebrew-notes--1.2.0.tar.gz', delay: 100 },
-  { action: 'print', text: '==> Installing homebrew-notes', delay: 100 },
-  { action: 'print', text: '==> Pouring homebrew-notes--1.2.0.arm64_sonoma.bottle.1.tar.gz', delay: 150 },
-  { action: 'print', text: '🍺  /opt/homebrew/Cellar/homebrew-notes/1.2.0: 18 files, 4.2MB', delay: 200 },
+  { action: 'type', text: 'npx create-mindspace-app --init', delay: 45 },
+  { action: 'print', text: '==> Fetching https://registry.npmjs.org/create-mindspace-app.json', delay: 200 },
+  { action: 'print', text: '==> Initializing Mindspace workspace environment...', delay: 150 },
+  { action: 'print', text: 'Already downloaded: /Users/krisna/Library/Caches/Mindspace/create-mindspace-app--1.2.0.tgz', delay: 100 },
+  { action: 'print', text: '==> Preparing local SQLite database schemas...', delay: 100 },
+  { action: 'print', text: '==> Establishing secure local keypairs...', delay: 150 },
+  { action: 'print', text: '🧠  ~/.config/mindspace: 12 workspace files configured', delay: 200 },
   { action: 'wait', delay: 500 },
-  { action: 'type', text: 'notes-app --init-db', delay: 45 },
-  { action: 'print', text: '==> Initializing local SQLite database...', delay: 200 },
-  { action: 'print', text: '==> Creating schema tables (users, notes, teams, locks)...', delay: 100 },
-  { action: 'print', text: '✔ Database initialized successfully at ~/.config/homebrew-notes/db.sqlite', delay: 250 },
+  { action: 'type', text: 'mindspace-db --migrate', delay: 45 },
+  { action: 'print', text: '==> Initializing SQLite tables (users, notes, teams, locks)...', delay: 200 },
+  { action: 'print', text: '✔ Database connection established at ~/.config/mindspace/db.sqlite', delay: 250 },
   { action: 'wait', delay: 500 },
-  { action: 'type', text: 'notes-app start', delay: 45 },
-  { action: 'print', text: '🚀 Starting Homebrew Notes daemon...', delay: 150 },
-  { action: 'print', text: '📡 Server running at http://localhost:3000', delay: 80 },
-  { action: 'print', text: '🔑 Secure session key generated.', delay: 80 },
+  { action: 'type', text: 'mindspace start --secure', delay: 45 },
+  { action: 'print', text: '🚀 Starting Mindspace local workspace server...', delay: 150 },
+  { action: 'print', text: '📡 Collaborative websocket active at http://localhost:3000', delay: 80 },
+  { action: 'print', text: '🔑 Secure encrypted session keypair loaded.', delay: 80 },
   { action: 'print', text: '----------------------------------------', delay: 40 },
-  { action: 'print', text: '📝 [Note] Homebrew Beer Recipe 🍺', delay: 80 },
-  { action: 'print', text: '📊 [Flow] Drizzle DB System Schema', delay: 80 },
-  { action: 'print', text: '🔒 [Lock] Secret Crypto Wallet Passphrase', delay: 80 },
+  { action: 'print', text: '📝 [Space] Product Roadmap & Ideas 💡', delay: 80 },
+  { action: 'print', text: '📊 [Flow] Collaborative App Flowchart', delay: 80 },
+  { action: 'print', text: '🔒 [Lock] Secured personal crypto passphrase', delay: 80 },
   { action: 'print', text: '----------------------------------------', delay: 40 },
-  { action: 'print', text: '==> Ready for user authentication...', delay: 80 },
+  { action: 'print', text: '==> Client ready for secure authentication...', delay: 80 },
   { action: 'wait', delay: 4000 },
   { action: 'clear', delay: 300 }
 ]
 
-function HomebrewTerminal() {
+function MindspaceTerminal() {
   const [lines, setLines] = useState<Array<{ text: string; isCommand?: boolean }>>([])
   const [currentInput, setCurrentInput] = useState('')
   const [stepIndex, setStepIndex] = useState(0)
@@ -101,8 +100,8 @@ function HomebrewTerminal() {
     <div 
       className="w-full max-w-[500px] rounded-xl overflow-hidden shadow-2xl border"
       style={{
-        background: '#22170d',
-        borderColor: '#3a2717',
+        background: '#0d1117',
+        borderColor: '#21262d',
         fontFamily: 'Courier New, Courier, monospace',
         display: 'flex',
         flexDirection: 'column',
@@ -112,11 +111,11 @@ function HomebrewTerminal() {
       {/* Terminal Title Bar */}
       <div 
         style={{
-          background: '#2c1e11',
+          background: '#161b22',
           padding: '10px 16px',
           display: 'flex',
           alignItems: 'center',
-          borderBottom: '1px solid #3a2717',
+          borderBottom: '1px solid #21262d',
           position: 'relative',
         }}
       >
@@ -135,11 +134,11 @@ function HomebrewTerminal() {
             alignItems: 'center',
             justifyContent: 'center',
             fontSize: '0.72rem',
-            color: '#a6927d',
+            color: '#8b949e',
             fontWeight: 500,
           }}
         >
-          krisna@homebrew-notes: ~
+          krisna@mindspace: ~
         </div>
       </div>
 
@@ -152,18 +151,18 @@ function HomebrewTerminal() {
           overflowY: 'auto',
           fontSize: '0.8rem',
           lineHeight: '1.45',
-          color: '#ebdcb9',
+          color: '#e6edf3',
           textAlign: 'left',
         }}
       >
         {lines.map((line, idx) => {
-          let color = '#ebdcb9'
+          let color = '#e6edf3'
           if (line.isCommand) {
-            color = '#ffffff'
-          } else if (line.text.startsWith('🍺') || line.text.startsWith('✔') || line.text.startsWith('🚀') || line.text.startsWith('📡')) {
-            color = '#f2d472'
+            color = '#58a6ff'
+          } else if (line.text.startsWith('🧠') || line.text.startsWith('✔') || line.text.startsWith('🚀') || line.text.startsWith('📡')) {
+            color = '#39d353'
           } else if (line.text.startsWith('==>') || line.text.startsWith('┌') || line.text.startsWith('└') || line.text.startsWith('│')) {
-            color = '#a6927d'
+            color = '#8b949e'
           }
           return (
             <div 
@@ -181,7 +180,7 @@ function HomebrewTerminal() {
         })}
         
         {/* Current typing line */}
-        <div style={{ color: '#ffffff', fontWeight: 600, display: 'flex', alignItems: 'center' }}>
+        <div style={{ color: '#58a6ff', fontWeight: 600, display: 'flex', alignItems: 'center' }}>
           {stepIndex < TERMINAL_STEPS.length && TERMINAL_STEPS[stepIndex].action === 'type' && (
             <span>$ {currentInput}</span>
           )}
@@ -190,7 +189,7 @@ function HomebrewTerminal() {
               marginLeft: 2,
               width: 7,
               height: 13,
-              background: '#c27d0c',
+              background: '#58a6ff',
               display: 'inline-block',
               animation: 'blink 1s step-end infinite',
             }}
@@ -207,7 +206,7 @@ const MOCK_GIT_LOG = [
   'Date:   Sat Jun 13 09:38:01 2026 +0700',
   '',
   '  * style: split-screen login page',
-  '  * feat: add HomebrewTerminal animation',
+  '  * feat: add MindspaceTerminal animation',
   '  * docs: update changelog v1.3.2'
 ]
 
@@ -350,41 +349,22 @@ function LoginPage() {
   const [loading, setLoading] = useState(false)
   const [showAbout, setShowAbout] = useState(false)
 
-  const cardRef = useRef<HTMLDivElement>(null)
-  const [transformStyle, setTransformStyle] = useState('perspective(1000px) rotateX(0deg) rotateY(0deg)')
-  const [transitionStyle, setTransitionStyle] = useState('transform 0.5s ease')
-  const [glowStyle, setGlowStyle] = useState({ opacity: 0, x: 0, y: 0 })
+  const isDark = theme === 'dark'
+  
+  // Custom theme colors for high professional layout matching screenshot, integrated with app theme variables
+  const textTitle = 'var(--fg)'
+  const textMuted = 'var(--fg-muted)'
+  const bgInput = isDark ? '#18181b' : '#ffffff'
+  const borderInput = 'var(--border)'
+  const textInput = 'var(--fg)'
+  const borderFocus = 'var(--primary)'
+  const bgSocial = isDark ? '#18181b' : '#ffffff'
+  const borderSocial = 'var(--border)'
+  const bgSocialHover = 'var(--muted)'
+  const dividerLine = 'var(--border)'
 
   const getThemeIcon = (t: string) => {
-    switch (t) {
-      case 'light': return <Sun size={18} />
-      case 'dark': return <Moon size={18} />
-      case 'homebrew': return <Beer size={18} />
-      case 'reactor': return <Zap size={18} />
-      default: return <Sun size={18} />
-    }
-  }
-
-  function handleMouseMove(e: React.MouseEvent<HTMLDivElement>) {
-    const card = cardRef.current
-    if (!card) return
-    const rect = card.getBoundingClientRect()
-    const x = e.clientX - rect.left
-    const y = e.clientY - rect.top
-    const centerX = rect.width / 2
-    const centerY = rect.height / 2
-    const rotateX = ((centerY - y) / centerY) * 6
-    const rotateY = ((x - centerX) / centerX) * 6
-
-    setTransitionStyle('transform 0.15s ease-out')
-    setTransformStyle(`perspective(1000px) rotateX(${rotateX}deg) rotateY(${rotateY}deg)`)
-    setGlowStyle({ opacity: 1, x, y })
-  }
-
-  function handleMouseLeave() {
-    setTransitionStyle('transform 0.5s cubic-bezier(0.25, 1, 0.5, 1)')
-    setTransformStyle('perspective(1000px) rotateX(0deg) rotateY(0deg)')
-    setGlowStyle({ opacity: 0, x: 0, y: 0 })
+    return t === 'dark' ? <Sun size={18} /> : <Moon size={18} />
   }
 
   if (user) {
@@ -432,12 +412,12 @@ function LoginPage() {
 
   const inputBase: React.CSSProperties = {
     width: '100%', boxSizing: 'border-box',
-    padding: '9px 13px', fontSize: '0.9rem',
+    padding: '12px 16px', fontSize: '0.875rem',
     fontFamily: 'var(--font-body)',
-    border: '1px solid var(--border)', borderRadius: 8,
-    outline: 'none', color: 'var(--fg)',
-    background: 'var(--input-bg)',
-    transition: 'border-color 0.15s, box-shadow 0.15s',
+    border: `1px solid ${borderInput}`, borderRadius: 8,
+    outline: 'none', color: textInput,
+    background: bgInput,
+    transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
   }
 
   return (
@@ -445,7 +425,7 @@ function LoginPage() {
       {/* Floating Theme Toggle */}
       <button
         onClick={toggle}
-        title={`Switch theme (Current: ${theme})`}
+        title={theme === 'dark' ? 'Ubah ke mode terang' : 'Ubah ke mode gelap'}
         style={{
           position: 'absolute',
           top: 20,
@@ -551,8 +531,12 @@ function LoginPage() {
             marginBottom: 8,
             textAlign: 'center',
             letterSpacing: '-0.02em',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '8px'
           }}>
-            🍺 Homebrew Notes
+            <Brain size={28} /> Mindspace
           </h1>
           <p style={{
             fontFamily: 'var(--font-body)',
@@ -562,10 +546,10 @@ function LoginPage() {
             textAlign: 'center',
             lineHeight: '1.5',
           }}>
-            A secure workspace to write creative ideas, collaborate with teams, and design interactive flowcharts instantly.
+            A premium collaborative workspace to capture ideas, structure thoughts, and organize your digital mind space.
           </p>
 
-          <HomebrewTerminal />
+          <MindspaceTerminal />
         </div>
       </div>
 
@@ -576,6 +560,7 @@ function LoginPage() {
           background: 'var(--bg-app)',
           backgroundImage: 'radial-gradient(var(--border) 1px, transparent 1px)',
           backgroundSize: '20px 20px',
+          transition: 'background 0.2s',
         }}
       >
         {/* Cascade entrance wrapper */}
@@ -588,126 +573,93 @@ function LoginPage() {
           }}
         >
           <div 
-            ref={cardRef}
-            onMouseMove={handleMouseMove}
-            onMouseLeave={handleMouseLeave}
             style={{
-              background: 'color-mix(in srgb, var(--card-bg) 82%, transparent)',
-              backdropFilter: 'blur(12px)',
-              WebkitBackdropFilter: 'blur(12px)',
-              border: '1px solid var(--border)',
-              borderRadius: 16, 
-              width: '100%', maxWidth: 400,
-              boxShadow: '0 12px 40px rgba(0,0,0,0.15)',
-              overflow: 'hidden',
+              width: '100%',
+              maxWidth: 400,
               display: 'flex',
               flexDirection: 'column',
               zIndex: 10,
-              transform: transformStyle,
-              transition: transitionStyle,
-              transformStyle: 'preserve-3d',
               position: 'relative',
+              padding: '24px 0',
             }}
           >
-          {/* Mouse glow overlay */}
-          <div 
-            style={{
-              position: 'absolute',
-              inset: 0,
-              background: `radial-gradient(350px circle at ${glowStyle.x}px ${glowStyle.y}px, color-mix(in srgb, var(--primary) 15%, transparent), transparent 80%)`,
-              opacity: glowStyle.opacity,
-              pointerEvents: 'none',
-              transition: 'opacity 0.2s ease',
-              zIndex: 1,
-            }}
-          />
+            <h1 style={{
+              fontFamily: 'var(--font-heading)',
+              fontSize: '2rem',
+              fontWeight: 700,
+              color: textTitle,
+              letterSpacing: '-0.025em',
+              margin: '0 0 6px'
+            }}>
+              {isRegister ? 'Welcome to Mindspace' : 'Welcome back'}
+            </h1>
+            <p style={{ fontSize: '0.875rem', color: textMuted, margin: '0 0 28px' }}>
+              {isRegister ? 'Create an account to get started' : 'Sign in to your account'}
+            </p>
 
-          {/* Terminal-style Card Header */}
-          <div 
-            style={{
-              background: 'color-mix(in srgb, var(--muted) 40%, transparent)',
-              padding: '12px 20px',
-              display: 'flex',
-              alignItems: 'center',
-              borderBottom: '1px solid var(--border)',
-              position: 'relative',
-              zIndex: 2,
-            }}
-          >
-            {/* Traffic lights */}
-            <div style={{ display: 'flex', gap: 6, zIndex: 2 }}>
-              <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#ff5f56' }} />
-              <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#ffbd2e' }} />
-              <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#27c93f' }} />
-            </div>
-            {/* Title */}
-            <div 
+            {/* Social Logins */}
+            <button
+              type="button"
               style={{
-                position: 'absolute',
-                inset: 0,
+                width: '100%',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                fontSize: '0.75rem',
-                color: 'var(--fg-muted)',
-                fontWeight: 600,
-                fontFamily: 'Courier New, Courier, monospace',
-                zIndex: 2,
+                gap: 10,
+                padding: '11px 16px',
+                background: bgSocial,
+                border: `1px solid ${borderSocial}`,
+                borderRadius: 8,
+                color: textTitle,
+                fontSize: '0.875rem',
+                fontWeight: 500,
+                cursor: 'pointer',
+                marginBottom: 12,
+                transition: 'background 0.2s',
               }}
+              onMouseEnter={e => e.currentTarget.style.background = bgSocialHover}
+              onMouseLeave={e => e.currentTarget.style.background = bgSocial}
             >
-              auth-session.sh
-            </div>
-          </div>
+              <svg width="16" height="16" viewBox="0 0 24 24">
+                <path fill={textTitle} d="M12.24 10.285V13.4h6.887c-.275 1.565-1.88 4.604-6.887 4.604-4.33 0-7.859-3.578-7.859-8s3.53-8 7.859-8c2.46 0 4.105 1.025 5.047 1.926l2.427-2.334C17.955 2.192 15.34 1 12.24 1 6.033 1 1 6.033 1 12.24s5.033 11.24 11.24 11.24c6.478 0 10.793-4.537 10.793-10.982 0-.74-.08-1.302-.176-1.865H12.24z"/>
+              </svg>
+              Continue with Google
+            </button>
 
-          {/* Terminal Form Body */}
-          <div style={{ padding: '32px 28px 28px 28px', position: 'relative', zIndex: 2 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 24 }}>
-              <img
-                src="/logo192.png"
-                alt="Homebrew Notes Logo"
-                style={{ width: 36, height: 36, borderRadius: 10, objectFit: 'contain' }}
-              />
-              <span style={{ fontFamily: 'var(--font-heading)', fontWeight: 700, fontSize: '1.125rem', color: 'var(--fg)' }}>
-                Homebrew Notes
-              </span>
-            </div>
+            <button
+              type="button"
+              style={{
+                width: '100%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 10,
+                padding: '11px 16px',
+                background: bgSocial,
+                border: `1px solid ${borderSocial}`,
+                borderRadius: 8,
+                color: textTitle,
+                fontSize: '0.875rem',
+                fontWeight: 500,
+                cursor: 'pointer',
+                marginBottom: 20,
+                transition: 'background 0.2s',
+              }}
+              onMouseEnter={e => e.currentTarget.style.background = bgSocialHover}
+              onMouseLeave={e => e.currentTarget.style.background = bgSocial}
+            >
+              <svg width="16" height="16" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12"/>
+              </svg>
+              Continue with GitHub
+            </button>
 
-            {/* Tab Switcher */}
-            <div style={{ display: 'flex', gap: 4, background: 'var(--muted)', borderRadius: 8, padding: 3, marginBottom: 24 }}>
-              <button
-                onClick={() => { setIsRegister(false); setError(null); setSuccessMsg(null) }}
-                style={{
-                  flex: 1, padding: '6px 0', fontSize: '0.8rem', fontWeight: !isRegister ? 600 : 400,
-                  border: 'none', borderRadius: 6, cursor: 'pointer', fontFamily: 'var(--font-body)',
-                  background: !isRegister ? 'var(--bg)' : 'transparent',
-                  color: !isRegister ? 'var(--fg)' : 'var(--fg-muted)',
-                  boxShadow: !isRegister ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
-                  transition: 'all 0.15s',
-                }}
-              >
-                Sign In
-              </button>
-              <button
-                onClick={() => { setIsRegister(true); setError(null); setSuccessMsg(null) }}
-                style={{
-                  flex: 1, padding: '6px 0', fontSize: '0.8rem', fontWeight: isRegister ? 600 : 400,
-                  border: 'none', borderRadius: 6, cursor: 'pointer', fontFamily: 'var(--font-body)',
-                  background: isRegister ? 'var(--bg)' : 'transparent',
-                  color: isRegister ? 'var(--fg)' : 'var(--fg-muted)',
-                  boxShadow: isRegister ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
-                  transition: 'all 0.15s',
-                }}
-              >
-                Register
-              </button>
+            {/* Divider OR */}
+            <div style={{ display: 'flex', alignItems: 'center', margin: '12px 0 24px', gap: 12 }}>
+              <div style={{ flex: 1, height: 1, background: dividerLine }} />
+              <span style={{ fontSize: '0.75rem', color: textMuted, fontWeight: 600, letterSpacing: '0.05em' }}>OR</span>
+              <div style={{ flex: 1, height: 1, background: dividerLine }} />
             </div>
-
-            <h1 style={{ fontFamily: 'var(--font-heading)', fontWeight: 700, fontSize: '1.375rem', color: 'var(--fg)', margin: '0 0 6px' }}>
-              {isRegister ? 'Create New Account' : 'Welcome Back'}
-            </h1>
-            <p style={{ fontSize: '0.875rem', color: 'var(--fg-muted)', margin: '0 0 28px' }}>
-              {isRegister ? 'Registration requires admin approval' : 'Sign in to your account'}
-            </p>
 
             {successMsg && (
               <div style={{
@@ -720,38 +672,58 @@ function LoginPage() {
               </div>
             )}
 
-            <form onSubmit={isRegister ? handleRegister : handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            <form onSubmit={isRegister ? handleRegister : handleSubmit} autoComplete="off" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
               <div>
-                <label style={{ display: 'block', fontSize: '0.8125rem', fontWeight: 500, color: 'var(--fg-muted)', marginBottom: 6 }}>
+                <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: 600, color: textTitle, marginBottom: 8 }}>
                   Username
                 </label>
                 <input
                   autoFocus type="text" value={username} required
                   onChange={e => setUsername(e.target.value)}
-                  placeholder="Enter username"
+                  placeholder="Enter your username"
+                  autoComplete="off"
                   style={inputBase}
-                  onFocus={e => { e.currentTarget.style.borderColor = 'var(--primary)'; e.currentTarget.style.boxShadow = '0 0 0 3px var(--accent)' }}
-                  onBlur={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.boxShadow = 'none' }}
+                  onFocus={e => { e.currentTarget.style.borderColor = borderFocus; e.currentTarget.style.boxShadow = `0 0 0 1px ${borderFocus}` }}
+                  onBlur={e => { e.currentTarget.style.borderColor = borderInput; e.currentTarget.style.boxShadow = 'none' }}
                 />
               </div>
 
               <div>
-                <label style={{ display: 'block', fontSize: '0.8125rem', fontWeight: 500, color: 'var(--fg-muted)', marginBottom: 6 }}>
-                  Password
-                </label>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                  <label style={{ fontSize: '0.875rem', fontWeight: 600, color: textTitle }}>
+                    Password
+                  </label>
+                  {!isRegister && (
+                    <button
+                      type="button"
+                      style={{
+                        background: 'none', border: 'none',
+                        fontSize: '0.8125rem', color: textMuted,
+                        cursor: 'pointer', fontFamily: 'var(--font-body)',
+                        transition: 'color 0.2s',
+                        padding: 0,
+                      }}
+                      onMouseEnter={e => e.currentTarget.style.color = textTitle}
+                      onMouseLeave={e => e.currentTarget.style.color = textMuted}
+                    >
+                      Forgot password?
+                    </button>
+                  )}
+                </div>
                 <div style={{ position: 'relative' }}>
                   <input
                     type={showPw ? 'text' : 'password'} value={password} required
                     onChange={e => setPassword(e.target.value)}
-                    placeholder="Enter password"
-                    style={{ ...inputBase, padding: '9px 40px 9px 13px' }}
-                    onFocus={e => { e.currentTarget.style.borderColor = 'var(--primary)'; e.currentTarget.style.boxShadow = '0 0 0 3px var(--accent)' }}
-                    onBlur={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.boxShadow = 'none' }}
+                    placeholder="Enter your password"
+                    autoComplete="new-password"
+                    style={{ ...inputBase, padding: '12px 40px 12px 16px' }}
+                    onFocus={e => { e.currentTarget.style.borderColor = borderFocus; e.currentTarget.style.boxShadow = `0 0 0 1px ${borderFocus}` }}
+                    onBlur={e => { e.currentTarget.style.borderColor = borderInput; e.currentTarget.style.boxShadow = 'none' }}
                   />
                   <button
                     type="button" onClick={() => setShowPw(v => !v)}
                     style={{
-                      position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)',
+                      position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)',
                       background: 'none', border: 'none', cursor: 'pointer', padding: 4,
                       color: 'var(--fg-subtle)', display: 'flex', alignItems: 'center',
                     }}
@@ -773,33 +745,68 @@ function LoginPage() {
 
               <button
                 type="submit" disabled={loading}
+                onMouseEnter={e => { if (!loading) { e.currentTarget.style.opacity = '0.9'; e.currentTarget.style.transform = 'translateY(-1px)' } }}
+                onMouseLeave={e => { e.currentTarget.style.opacity = '1'; e.currentTarget.style.transform = 'translateY(0)' }}
                 style={{
-                  marginTop: 4, padding: '10px',
+                  marginTop: 8, padding: '12px 16px',
                   background: 'var(--primary)', color: 'var(--primary-fg)',
                   border: 'none', borderRadius: 8,
-                  fontSize: '0.9375rem', fontWeight: 600,
+                  fontSize: '0.875rem', fontWeight: 600,
                   fontFamily: 'var(--font-body)',
                   cursor: loading ? 'not-allowed' : 'pointer',
                   opacity: loading ? 0.7 : 1,
-                  transition: 'opacity 0.15s',
+                  transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
+                  width: '100%',
                 }}
               >
-                {isRegister ? (loading ? 'Registering…' : 'Register') : (loading ? 'Signing in…' : 'Sign In')}
+                {isRegister ? (loading ? 'Creating Account…' : 'Sign Up') : (loading ? 'Signing In…' : 'Sign In')}
               </button>
             </form>
 
-            <div style={{ marginTop: 24, textAlign: 'center' }}>
+            {/* Bottom Link to toggle Register/Login */}
+            <div style={{ marginTop: 24, textAlign: 'center', fontSize: '0.875rem', color: textMuted, fontFamily: 'var(--font-body)' }}>
+              {isRegister ? (
+                <>
+                  Already have an account?{' '}
+                  <button
+                    type="button"
+                    onClick={() => { setIsRegister(false); setError(null); setSuccessMsg(null) }}
+                    style={{ background: 'none', border: 'none', color: textTitle, fontWeight: 600, cursor: 'pointer', padding: 0, textDecoration: 'none' }}
+                    onMouseEnter={e => e.currentTarget.style.textDecoration = 'underline'}
+                    onMouseLeave={e => e.currentTarget.style.textDecoration = 'none'}
+                  >
+                    Sign in
+                  </button>
+                </>
+              ) : (
+                <>
+                  Don't have an account?{' '}
+                  <button
+                    type="button"
+                    onClick={() => { setIsRegister(true); setError(null); setSuccessMsg(null) }}
+                    style={{ background: 'none', border: 'none', color: textTitle, fontWeight: 600, cursor: 'pointer', padding: 0, textDecoration: 'none' }}
+                    onMouseEnter={e => e.currentTarget.style.textDecoration = 'underline'}
+                    onMouseLeave={e => e.currentTarget.style.textDecoration = 'none'}
+                  >
+                    Sign up
+                  </button>
+                </>
+              )}
+            </div>
+
+            {/* Info release notes */}
+            <div style={{ marginTop: 32, textAlign: 'center' }}>
               <button
                 type="button"
                 onClick={() => setShowAbout(true)}
                 style={{
                   background: 'none', border: 'none',
-                  fontSize: '0.75rem', color: 'var(--fg-muted)',
+                  fontSize: '0.75rem', color: textMuted,
                   cursor: 'pointer', textDecoration: 'underline',
                   fontFamily: 'var(--font-body)'
                 }}
-                onMouseEnter={e => (e.currentTarget.style.color = 'var(--primary)')}
-                onMouseLeave={e => (e.currentTarget.style.color = 'var(--fg-muted)')}
+                onMouseEnter={e => (e.currentTarget.style.color = textTitle)}
+                onMouseLeave={e => (e.currentTarget.style.color = textMuted)}
               >
                 About & Release Notes
               </button>
@@ -807,7 +814,6 @@ function LoginPage() {
           </div>
         </div>
       </div>
-    </div>
 
       <AboutModal open={showAbout} onOpenChange={setShowAbout} />
 

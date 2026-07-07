@@ -1,0 +1,45 @@
+# https://moonrepo.dev/docs/config/project
+$schema: 'https://moonrepo.dev/schemas/project.json'
+
+language: 'typescript'
+
+tasks:
+  generate-routes:
+    command: 'npx tsr generate'
+    inputs:
+      - 'src/routes/**/*'
+      - 'tsr.config.json'
+    outputs:
+      - 'src/routeTree.gen.ts'
+
+  dev:
+    command: 'npx vite dev --port 3000'
+    options:
+      persistent: true
+    deps:
+      - 'generate-routes'
+
+  build:
+    command: 'npx vite build'
+    inputs:
+      - 'src/**/*'
+      - 'vite.config.ts'
+      - 'tsconfig.json'
+    outputs:
+      - 'dist'
+    deps:
+      - 'generate-routes'
+
+  start:
+    command: 'npx tsx server.ts'
+    options:
+      persistent: true
+    deps:
+      - 'build'
+
+  test:
+    command: 'npx vitest run'
+    inputs:
+      - 'src/**/*'
+    deps:
+      - 'generate-routes'

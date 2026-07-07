@@ -9,6 +9,7 @@ import ReactFlow, {
   Background,
   Handle,
   Position,
+  ReactFlowProvider,
   type Connection,
 } from 'reactflow'
 import 'reactflow/dist/style.css'
@@ -129,22 +130,40 @@ function DiamondNode({ data, selected }: any) {
 }
 
 const nodeTypes = {
-  default: RectangleNode, // Fallback mapping so older diagram nodes don't crash the editor
+  default: RectangleNode,
   rectangle: RectangleNode,
   circle: CircleNode,
   diamond: DiamondNode,
 }
 
-function DiagramNodeView({ node, updateAttributes, deleteNode }: any) {
-  const [open, setOpen] = useState(false)
+/** Compute bounding box of all nodes from their position + estimated size */
+function computeBBox(nodes: any[]) {
+  if (!nodes || !Array.isArray(nodes) || nodes.length === 0) return { spreadH: 0, spreadW: 0 }
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
+  for (const n of nodes) {
+    if (!n) continue
+    const pos = n.position || { x: 0, y: 0 }
+    const x = pos.x ?? 0
+    const y = pos.y ?? 0
+    const w = (n.width ?? n.style?.width ?? 120) as number
+    const h = (n.height ?? n.style?.height ?? 60) as number
+    minX = Math.min(minX, x)
+    minY = Math.min(minY, y)
+    maxX = Math.max(maxX, x + w)
+    maxY = Math.max(maxY, y + h)
+  }
+  return { spreadH: maxY - minY, spreadW: maxX - minX }
+}
+
+function DiagramNodeView({ node, updateAttributes, deleteNode, editor }: any) {
   const [hovered, setHovered] = useState(false)
 
   const parsed = (() => {
     try { return JSON.parse(node.attrs.data) } catch { return { nodes: [], edges: [] } }
   })()
 
-  const [nodes, setNodes, onNodesChange] = useNodesState(parsed.nodes)
-  const [edges, setEdges, onEdgesChange] = useEdgesState(parsed.edges)
+  const [nodes, setNodes] = useNodesState(parsed.nodes)
+  const [edges, setEdges] = useEdgesState(parsed.edges)
 
   // Sync state whenever node attributes change
   useEffect(() => {
@@ -158,51 +177,21 @@ function DiagramNodeView({ node, updateAttributes, deleteNode }: any) {
     }
   }, [node.attrs.data, setNodes, setEdges])
 
-  const onConnect = useCallback(
-    (params: Connection) => setEdges(eds => addEdge(params, eds)),
-    [setEdges]
-  )
+  const safeNodes = Array.isArray(nodes) ? nodes : []
+  const { spreadH } = computeBBox(safeNodes)
+  const previewH = safeNodes.length === 0 ? 200 : Math.max(200, Math.min(420, spreadH + 100))
 
-  const onNodeDoubleClick = useCallback(
-    (_event: React.MouseEvent, flowNode: any) => {
-      const newLabel = prompt('Ganti label node:', flowNode.data.label)
-      if (newLabel !== null) {
-        setNodes(ns =>
-          ns.map(n => (n.id === flowNode.id ? { ...n, data: { ...n.data, label: newLabel } } : n))
-        )
+  const handleOpenEditor = () => {
+    if (editor.storage.diagram?.openEditor) {
+      let nodeId = node.attrs.id
+      if (!nodeId) {
+        nodeId = typeof crypto !== 'undefined' && crypto.randomUUID
+          ? crypto.randomUUID()
+          : Math.random().toString(36).substring(2, 15)
+        updateAttributes({ id: nodeId })
       }
-    },
-    [setNodes]
-  )
-
-  function handleCancel() {
-    try {
-      const fresh = JSON.parse(node.attrs.data)
-      setNodes(fresh.nodes || [])
-      setEdges(fresh.edges || [])
-    } catch {
-      setNodes([])
-      setEdges([])
+      editor.storage.diagram.openEditor(nodeId, node.attrs.data)
     }
-    setOpen(false)
-  }
-
-  function save() {
-    updateAttributes({ data: JSON.stringify({ nodes, edges }) })
-    setOpen(false)
-  }
-
-  function addNode(type: string) {
-    const id = typeof crypto !== 'undefined' && crypto.randomUUID
-      ? crypto.randomUUID()
-      : Math.random().toString(36).substring(2, 15)
-    setNodes(ns => [...ns, {
-      id,
-      type, // Use custom node type: 'rectangle', 'circle', or 'diamond'
-      position: { x: 100 + ns.length * 60, y: 100 },
-      data: { label: type.toUpperCase() },
-      style: {},
-    }])
   }
 
   return (
@@ -231,11 +220,16 @@ function DiagramNodeView({ node, updateAttributes, deleteNode }: any) {
           onMouseDown={e => {
             e.preventDefault()
             e.stopPropagation()
-            setOpen(true)
+            handleOpenEditor()
+          }}
+          onClick={e => {
+            e.preventDefault()
+            e.stopPropagation()
+            handleOpenEditor()
           }}
           style={{
             border: '1px solid var(--border)', borderRadius: 10,
-            background: 'var(--muted)', height: 250,
+            background: 'var(--muted)', height: previewH,
             cursor: 'pointer', position: 'relative', overflow: 'hidden',
             transition: 'background 0.15s',
           }}
@@ -260,6 +254,7 @@ function DiagramNodeView({ node, updateAttributes, deleteNode }: any) {
                   edges={edges}
                   nodeTypes={nodeTypes}
                   fitView
+                  fitViewOptions={{ padding: 0.15 }}
                   nodesDraggable={false}
                   nodesConnectable={false}
                   elementsSelectable={false}
@@ -268,6 +263,7 @@ function DiagramNodeView({ node, updateAttributes, deleteNode }: any) {
                   zoomOnPinch={false}
                   zoomOnDoubleClick={false}
                   preventScrolling={true}
+                  proOptions={{ hideAttribution: true }}
                 >
                   <Background />
                 </ReactFlow>
@@ -281,6 +277,7 @@ function DiagramNodeView({ node, updateAttributes, deleteNode }: any) {
                   opacity: 0, transition: 'opacity 0.2s',
                   color: '#fff', fontSize: '0.9rem', fontWeight: 600,
                   fontFamily: 'var(--font-body)',
+                  pointerEvents: 'none',
                 }}
               >
                 Klik untuk Edit Diagram
@@ -289,91 +286,172 @@ function DiagramNodeView({ node, updateAttributes, deleteNode }: any) {
           )}
         </div>
       </div>
+    </NodeViewWrapper>
+  )
+}
 
-      <Dialog open={open} onOpenChange={(v) => { if (!v) handleCancel() }}>
-        <DialogContent
-          aria-describedby={undefined}
-          style={{
-            maxWidth: '96vw', width: '96vw', height: '92vh',
-            display: 'flex', flexDirection: 'column',
-            padding: 0, gap: 0, overflow: 'hidden',
-            background: 'var(--card-bg)', color: 'var(--fg)',
-            borderRadius: 16, border: '1px solid var(--border)',
-            boxShadow: '0 24px 64px rgba(0,0,0,0.25)',
-          }}
-        >
-          <DialogHeader style={{ padding: '16px 20px 12px', borderBottom: '1px solid var(--border)', flexShrink: 0 }}>
-            <DialogTitle style={{ fontSize: '0.9375rem', color: 'var(--fg)', fontFamily: 'var(--font-heading)' }}>
-              Edit Diagram (Double Click node untuk mengubah label)
-            </DialogTitle>
-          </DialogHeader>
+export function EditDiagramDialog({
+  editor,
+  data,
+  onClose,
+}: {
+  editor: any
+  data: { id: string; initialData: string }
+  onClose: () => void
+}) {
+  const [open, setOpen] = useState(true)
+  const parsed = (() => {
+    try { return JSON.parse(data.initialData) } catch { return { nodes: [], edges: [] } }
+  })()
 
-          <div style={{ display: 'flex', gap: 8, padding: '10px 20px', borderBottom: '1px solid var(--border)', flexShrink: 0 }}>
-            {NODE_TYPES_AVAILABLE.map(t => (
-              <button
-                key={t}
-                onClick={() => addNode(t)}
-                style={{
-                  padding: '4px 12px', fontSize: '0.8125rem',
-                  fontFamily: 'var(--font-body)',
-                  border: '1px solid var(--border)', borderRadius: 6,
-                  background: 'var(--bg)', cursor: 'pointer', color: 'var(--fg)',
-                }}
-                onMouseEnter={e => (e.currentTarget.style.background = 'var(--accent)')}
-                onMouseLeave={e => (e.currentTarget.style.background = 'var(--bg)')}
-              >
-                + {t}
-              </button>
-            ))}
-          </div>
+  const [nodes, setNodes, onNodesChange] = useNodesState(parsed.nodes)
+  const [edges, setEdges, onEdgesChange] = useEdgesState(parsed.edges)
 
-          <div style={{ flex: 1, minHeight: 0 }}>
-            <div style={{ width: '100%', height: '100%' }}>
-              <ReactFlow
-                nodes={nodes}
-                edges={edges}
-                nodeTypes={nodeTypes}
-                onNodesChange={onNodesChange}
-                onEdgesChange={onEdgesChange}
-                onConnect={onConnect}
-                onNodeDoubleClick={onNodeDoubleClick}
-                fitView
-              >
-                <Controls />
-                <MiniMap />
-                <Background />
-              </ReactFlow>
-            </div>
-          </div>
+  const onConnect = useCallback(
+    (params: Connection) => setEdges(eds => addEdge(params, eds)),
+    [setEdges]
+  )
 
-          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, padding: '12px 20px', borderTop: '1px solid var(--border)', flexShrink: 0 }}>
+  const onNodeDoubleClick = useCallback(
+    (_event: React.MouseEvent, flowNode: any) => {
+      const newLabel = prompt('Ganti label node:', flowNode.data.label)
+      if (newLabel !== null) {
+        setNodes(ns =>
+          ns.map(n => (n.id === flowNode.id ? { ...n, data: { ...n.data, label: newLabel } } : n))
+        )
+      }
+    },
+    [setNodes]
+  )
+
+  function handleCancel() {
+    onClose()
+  }
+
+  function save() {
+    let foundPos = -1
+    editor.state.doc.descendants((node: any, pos: number) => {
+      if (node.type.name === 'diagram' && node.attrs.id === data.id) {
+        foundPos = pos
+        return false // Stop traversing
+      }
+    })
+
+    if (foundPos !== -1) {
+      const node = editor.state.doc.nodeAt(foundPos)
+      if (node) {
+        editor.view.dispatch(
+          editor.state.tr.setNodeMarkup(foundPos, null, {
+            ...node.attrs,
+            data: JSON.stringify({ nodes, edges })
+          })
+        )
+      }
+    } else {
+      console.error('Could not find diagram node with ID:', data.id)
+    }
+    onClose()
+  }
+
+  function addNode(type: string) {
+    const id = typeof crypto !== 'undefined' && crypto.randomUUID
+      ? crypto.randomUUID()
+      : Math.random().toString(36).substring(2, 15)
+    setNodes(ns => [...ns, {
+      id,
+      type,
+      position: { x: 100 + ns.length * 60, y: 100 },
+      data: { label: type.toUpperCase() },
+      style: {},
+    }])
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={(v) => { if (!v) onClose() }}>
+      <DialogContent
+        aria-describedby={undefined}
+        onPointerDownOutside={e => e.preventDefault()}
+        onInteractOutside={e => e.preventDefault()}
+        style={{
+          maxWidth: '96vw', width: '96vw', height: '92vh',
+          display: 'flex', flexDirection: 'column',
+          padding: 0, gap: 0, overflow: 'hidden',
+          background: 'var(--card-bg)', color: 'var(--fg)',
+          borderRadius: 16, border: '1px solid var(--border)',
+          boxShadow: '0 24px 64px rgba(0,0,0,0.25)',
+        }}
+      >
+        <DialogHeader style={{ padding: '16px 20px 12px', borderBottom: '1px solid var(--border)', flexShrink: 0 }}>
+          <DialogTitle style={{ fontSize: '0.9375rem', color: 'var(--fg)', fontFamily: 'var(--font-heading)' }}>
+            Edit Diagram (Double Click node untuk mengubah label)
+          </DialogTitle>
+        </DialogHeader>
+
+        <div style={{ display: 'flex', gap: 8, padding: '10px 20px', borderBottom: '1px solid var(--border)', flexShrink: 0 }}>
+          {NODE_TYPES_AVAILABLE.map(t => (
             <button
-              onClick={handleCancel}
+              key={t}
+              onClick={() => addNode(t)}
               style={{
-                padding: '6px 16px', fontSize: '0.875rem',
+                padding: '4px 12px', fontSize: '0.8125rem',
                 fontFamily: 'var(--font-body)',
                 border: '1px solid var(--border)', borderRadius: 6,
-                background: 'var(--bg)', cursor: 'pointer', color: 'var(--fg-muted)',
+                background: 'var(--bg)', cursor: 'pointer', color: 'var(--fg)',
               }}
+              onMouseEnter={e => (e.currentTarget.style.background = 'var(--accent)')}
+              onMouseLeave={e => (e.currentTarget.style.background = 'var(--bg)')}
             >
-              Cancel
+              + {t}
             </button>
-            <button
-              onClick={save}
-              style={{
-                padding: '6px 16px', fontSize: '0.875rem',
-                fontFamily: 'var(--font-body)',
-                border: 'none', borderRadius: 6,
-                background: 'var(--primary)', cursor: 'pointer',
-                color: 'var(--primary-fg)', fontWeight: 500,
-              }}
+          ))}
+        </div>
+
+        <div style={{ flex: 1, minHeight: 0 }}>
+          <div style={{ width: '100%', height: '100%' }}>
+            <ReactFlow
+              nodes={nodes}
+              edges={edges}
+              nodeTypes={nodeTypes}
+              onNodesChange={onNodesChange}
+              onEdgesChange={onEdgesChange}
+              onConnect={onConnect}
+              onNodeDoubleClick={onNodeDoubleClick}
+              fitView
             >
-              Save
-            </button>
+              <Controls />
+              <MiniMap />
+              <Background />
+            </ReactFlow>
           </div>
-        </DialogContent>
-      </Dialog>
-    </NodeViewWrapper>
+        </div>
+
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, padding: '12px 20px', borderTop: '1px solid var(--border)', flexShrink: 0 }}>
+          <button
+            onClick={handleCancel}
+            style={{
+              padding: '6px 16px', fontSize: '0.875rem',
+              fontFamily: 'var(--font-body)',
+              border: '1px solid var(--border)', borderRadius: 6,
+              background: 'var(--bg)', cursor: 'pointer', color: 'var(--fg-muted)',
+            }}
+          >
+            Cancel
+          </button>
+          <button
+            onClick={save}
+            style={{
+              padding: '6px 16px', fontSize: '0.875rem',
+              fontFamily: 'var(--font-body)',
+              border: 'none', borderRadius: 6,
+              background: 'var(--primary)', cursor: 'pointer',
+              color: 'var(--primary-fg)', fontWeight: 500,
+            }}
+          >
+            Save
+          </button>
+        </div>
+      </DialogContent>
+    </Dialog>
   )
 }
 
@@ -381,12 +459,29 @@ export const DiagramBlock = Node.create({
   name: 'diagram',
   group: 'block',
   atom: true,
+  selectable: false,
+  addStorage() {
+    return {
+      openEditor: null as ((id: string, initialData: string) => void) | null,
+    }
+  },
   addAttributes() {
-    return { data: { default: JSON.stringify({ nodes: [], edges: [] }) } }
+    return {
+      id: {
+        default: () => typeof crypto !== 'undefined' && crypto.randomUUID
+          ? crypto.randomUUID()
+          : Math.random().toString(36).substring(2, 15),
+      },
+      data: { default: JSON.stringify({ nodes: [], edges: [] }) }
+    }
   },
   parseHTML() { return [{ tag: 'div[data-type="diagram"]' }] },
   renderHTML({ HTMLAttributes }) {
     return ['div', mergeAttributes(HTMLAttributes, { 'data-type': 'diagram' })]
   },
-  addNodeView() { return ReactNodeViewRenderer(DiagramNodeView) },
+  addNodeView() {
+    return ReactNodeViewRenderer(DiagramNodeView, {
+      update: () => true,
+    })
+  },
 })

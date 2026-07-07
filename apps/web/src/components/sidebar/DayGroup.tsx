@@ -4,7 +4,7 @@ import { ChevronDown, ChevronRight, FileText, Trash2, AlertTriangle, Globe } fro
 import { useState, useRef, useEffect } from 'react'
 import { cn } from '../../lib/utils'
 
-interface Note { id: string; title: string; createdAt: number; shareToken?: string | null }
+interface Note { id: string; title: string; createdAt: number; shareToken?: string | null; icon?: string | null }
 
 interface DayGroupProps {
   label: string
@@ -80,7 +80,11 @@ export function DayGroup({ label, notes, activeNoteId, onSelect, onRename, onDel
               setContextMenu({ x: e.clientX, y: e.clientY, note })
             }}
           >
-            <FileText className="h-3.5 w-3.5 shrink-0" style={{ color: activeNoteId === note.id ? 'var(--primary)' : 'var(--fg-subtle)' }} />
+            {note.icon ? (
+              <span className="h-3.5 w-3.5 shrink-0 flex items-center justify-center text-sm" style={{ marginRight: '1px' }}>{note.icon}</span>
+            ) : (
+              <FileText className="h-3.5 w-3.5 shrink-0" style={{ color: activeNoteId === note.id ? 'var(--primary)' : 'var(--fg-subtle)' }} />
+            )}
             {editingId === note.id ? (
               <input
                 ref={inputRef}

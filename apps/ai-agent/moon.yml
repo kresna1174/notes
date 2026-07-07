@@ -1,0 +1,17 @@
+# https://moonrepo.dev/docs/config/project
+$schema: 'https://moonrepo.dev/schemas/project.json'
+
+language: 'python'
+
+tasks:
+  dev:
+    command: 'uv run uvicorn main:app --host 0.0.0.0 --port 8000 --reload'
+    toolchain: 'system'
+    options:
+      persistent: true
+
+  celery:
+    command: 'uv run celery -A tasks.celery_app worker --loglevel=info'
+    toolchain: 'system'
+    options:
+      persistent: true

@@ -18,7 +18,18 @@ function fmt(ts: number) {
 function ShareViewComponent() {
   const { token } = Route.useParams()
   const { theme, toggle } = useTheme()
-  const [note, setNote] = useState<{ id: string; title: string; content: string; createdAt: number; updatedAt: number; hasPinProtection: boolean; createdByUsername?: string | null; updatedByUsername?: string | null } | null>(null)
+  const [note, setNote] = useState<{
+    id: string
+    title: string
+    content: string
+    createdAt: number
+    updatedAt: number
+    hasPinProtection: boolean
+    createdByUsername?: string | null
+    updatedByUsername?: string | null
+    coverImage?: string | null
+    icon?: string | null
+  } | null>(null)
   const [loading, setLoading] = useState(true)
   const [notFound, setNotFound] = useState(false)
   const [unlocked, setUnlocked] = useState(false)
@@ -145,26 +156,52 @@ function ShareViewComponent() {
       </div>
 
       {unlocked ? (
-        <div style={{ maxWidth: 960, margin: '0 auto', padding: isMobile ? '24px 16px' : '48px 48px' }}>
-          <h1 style={{
-            fontSize: isMobile ? '1.75rem' : '2rem', fontWeight: 700, letterSpacing: '-0.02em', lineHeight: 1.2,
-            color: 'var(--fg, #1a1a2e)', fontFamily: 'var(--font-heading, sans-serif)',
-            marginBottom: 10,
-          }}>
-            {note?.title || 'Untitled'}
-          </h1>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px 16px', marginBottom: 36, fontSize: '0.75rem', color: 'var(--fg-subtle, #adb5bd)', fontFamily: 'var(--font-body, sans-serif)' }}>
-            <span>
-              Dibuat <span style={{ color: 'var(--fg-muted, #6c757d)' }}>{note ? fmt(note.createdAt) : ''}</span>
-              {note?.createdByUsername && <> oleh <span style={{ color: 'var(--fg-muted, #6c757d)', fontWeight: 500 }}>{note.createdByUsername}</span></>}
-            </span>
-            <span>·</span>
-            <span>
-              Diperbarui <span style={{ color: 'var(--fg-muted, #6c757d)' }}>{note ? fmt(note.updatedAt) : ''}</span>
-              {note?.updatedByUsername && <> oleh <span style={{ color: 'var(--fg-muted, #6c757d)', fontWeight: 500 }}>{note.updatedByUsername}</span></>}
-            </span>
+        <div style={{ position: 'relative' }}>
+          {/* Cover Image Banner */}
+          {note?.coverImage && (
+            <div
+              style={{
+                width: '100%',
+                height: isMobile ? '120px' : '180px',
+                backgroundImage: note.coverImage.startsWith('linear-gradient') ? note.coverImage : `url(${note.coverImage})`,
+                backgroundSize: 'cover',
+                backgroundPosition: 'center',
+                position: 'relative',
+              }}
+            />
+          )}
+
+          <div style={{ maxWidth: 960, margin: '0 auto', padding: isMobile ? '24px 16px' : '48px 48px', position: 'relative' }}>
+            {/* Page Icon */}
+            {note?.icon && (
+              <div style={{ marginTop: note.coverImage ? '-75px' : '0', marginBottom: '16px', position: 'relative', zIndex: 10, display: 'inline-block' }}>
+                <div style={{ fontSize: '70px', lineHeight: '70px' }}>
+                  {note.icon}
+                </div>
+              </div>
+            )}
+
+            <h1 style={{
+              fontSize: isMobile ? '1.75rem' : '2rem', fontWeight: 700, letterSpacing: '-0.02em', lineHeight: 1.2,
+              color: 'var(--fg, #1a1a2e)', fontFamily: 'var(--font-heading, sans-serif)',
+              marginBottom: 10,
+              marginTop: (!note?.coverImage && note?.icon) ? '0' : undefined
+            }}>
+              {note?.title || 'Untitled'}
+            </h1>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px 16px', marginBottom: 36, fontSize: '0.75rem', color: 'var(--fg-subtle, #adb5bd)', fontFamily: 'var(--font-body, sans-serif)' }}>
+              <span>
+                Dibuat <span style={{ color: 'var(--fg-muted, #6c757d)' }}>{note ? fmt(note.createdAt) : ''}</span>
+                {note?.createdByUsername && <> oleh <span style={{ color: 'var(--fg-muted, #6c757d)', fontWeight: 500 }}>{note.createdByUsername}</span></>}
+              </span>
+              <span>·</span>
+              <span>
+                Diperbarui <span style={{ color: 'var(--fg-muted, #6c757d)' }}>{note ? fmt(note.updatedAt) : ''}</span>
+                {note?.updatedByUsername && <> oleh <span style={{ color: 'var(--fg-muted, #6c757d)', fontWeight: 500 }}>{note.updatedByUsername}</span></>}
+              </span>
+            </div>
+            <DocContent segments={segments} />
           </div>
-          <DocContent segments={segments} />
         </div>
       ) : (
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 'calc(100vh - 57px)', flexDirection: 'column', gap: 12 }}>

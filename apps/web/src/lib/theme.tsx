@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, useEffect, type ReactNode } from 'react'
 
-type Theme = 'light' | 'dark' | 'homebrew' | 'reactor'
+type Theme = 'light' | 'dark'
 
 interface ThemeContextValue {
   theme: Theme
@@ -24,12 +24,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     document.documentElement.setAttribute('data-theme', theme)
   }, [])
 
-  const toggle = () => setTheme(t => {
-    if (t === 'light') return 'dark'
-    if (t === 'dark') return 'homebrew'
-    if (t === 'homebrew') return 'reactor'
-    return 'light'
-  })
+  const toggle = () => setTheme(t => t === 'light' ? 'dark' : 'light')
 
   return <ThemeContext.Provider value={{ theme, toggle }}>{children}</ThemeContext.Provider>
 }

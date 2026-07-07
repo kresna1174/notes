@@ -1,6 +1,6 @@
 import { createFileRoute, redirect, useNavigate } from '@tanstack/react-router'
 import { Sidebar } from '../components/sidebar/Sidebar'
-import { Plus } from 'lucide-react'
+import { Plus, Brain } from 'lucide-react'
 
 export const Route = createFileRoute('/')({
   loader: async () => {
@@ -21,7 +21,7 @@ function EmptyPage() {
     const res = await fetch('/api/notes', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ teamId: null }),
+      body: JSON.stringify({ title: 'Untitled', content: '{}' }),
     })
     if (!res.ok) return
     const note = await res.json()
@@ -33,8 +33,8 @@ function EmptyPage() {
       <Sidebar activeNoteId={null} />
       <main className="flex-1 flex items-center justify-center" style={{ background: 'var(--bg)' }}>
         <div className="text-center">
-          <div className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4" style={{ background: 'var(--accent)' }}>
-            <img src="/logo192.png" alt="Homebrew Notes Logo" className="w-10 h-10 object-contain" />
+          <div className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4" style={{ background: 'var(--accent)', color: 'var(--primary)' }}>
+            <Brain size={32} />
           </div>
           <p className="font-semibold mb-1" style={{ color: 'var(--fg)', fontSize: '0.9375rem' }}>Belum ada catatan</p>
           <p className="text-sm mb-5" style={{ color: 'var(--fg-muted)' }}>Buat catatan pertamamu sekarang</p>

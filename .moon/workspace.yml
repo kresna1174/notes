@@ -1,0 +1,12 @@
+# https://moonrepo.dev/docs/config/workspace
+$schema: 'https://moonrepo.dev/schemas/workspace.json'
+
+# Define the projects in the monorepo
+projects:
+  web: 'apps/web'
+  ai-agent: 'apps/ai-agent'
+
+# Version control settings
+vcs:
+  client: 'git'
+  defaultBranch: 'main'

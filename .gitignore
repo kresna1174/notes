@@ -13,3 +13,17 @@ dist-ssr
 .vinxi
 __unconfig*
 todos.json
+
+# Python Cache
+__pycache__/
+*.pyc
+
+# Database & Logs
+*.db
+*.db-shm
+*.db-wal
+*.log
+
+# Build Caches & Screenshots
+.moon/cache/
+Screenshot*.png

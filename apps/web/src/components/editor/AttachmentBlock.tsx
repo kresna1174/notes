@@ -2,6 +2,7 @@ import { Node, mergeAttributes } from '@tiptap/core'
 import { ReactNodeViewRenderer, NodeViewWrapper } from '@tiptap/react'
 import { useRef, useState } from 'react'
 import { Paperclip, Download, Trash2, FileText, Image as ImageIcon } from 'lucide-react'
+import { AttachmentPreviewModal, isPreviewable } from './AttachmentPreviewModal'
 
 function formatBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`
@@ -17,6 +18,7 @@ function AttachmentNodeView({ node, updateAttributes, deleteNode, editor }: any)
   const inputRef = useRef<HTMLInputElement>(null)
   const [uploading, setUploading] = useState(false)
   const [dragging, setDragging] = useState(false)
+  const [previewOpen, setPreviewOpen] = useState(false)
   const { attachmentId, filename, mimeType, size } = node.attrs
 
   async function upload(file: File) {
@@ -147,7 +149,8 @@ function AttachmentNodeView({ node, updateAttributes, deleteNode, editor }: any)
           <img
             src={`/api/attachments/${attachmentId}/inline`}
             alt={filename}
-            style={{ maxWidth: '100%', borderRadius: 8, display: 'block', border: '1px solid var(--border)' }}
+            style={{ maxWidth: '100%', borderRadius: 8, display: 'block', border: '1px solid var(--border)', cursor: 'pointer' }}
+            onClick={() => setPreviewOpen(true)}
           />
           <div style={{
             position: 'absolute', top: 6, right: 6,
@@ -175,12 +178,40 @@ function AttachmentNodeView({ node, updateAttributes, deleteNode, editor }: any)
             </button>
           </div>
           <div style={{ fontSize: '0.72rem', color: 'var(--fg-subtle)', marginTop: 4, fontFamily: 'var(--font-body)' }}>
-            {filename} · {formatBytes(size)}
+            <span
+              onClick={() => setPreviewOpen(true)}
+              style={{
+                color: 'var(--primary)',
+                cursor: 'pointer',
+                textDecoration: 'underline decoration-dotted',
+              }}
+              onMouseEnter={e => {
+                e.currentTarget.style.color = 'var(--primary-hover, #2b4cc4)'
+                e.currentTarget.style.textDecoration = 'underline'
+              }}
+              onMouseLeave={e => {
+                e.currentTarget.style.color = 'var(--primary)'
+                e.currentTarget.style.textDecoration = 'underline decoration-dotted'
+              }}
+            >
+              {filename}
+            </span>
+            <span> · {formatBytes(size)}</span>
           </div>
         </div>
+        <AttachmentPreviewModal
+          isOpen={previewOpen}
+          onClose={() => setPreviewOpen(false)}
+          attachmentId={attachmentId}
+          filename={filename}
+          mimeType={mimeType}
+          size={size}
+        />
       </NodeViewWrapper>
     )
   }
+
+  const canPreview = isPreviewable(mimeType, filename)
 
   return (
     <NodeViewWrapper>
@@ -195,7 +226,34 @@ function AttachmentNodeView({ node, updateAttributes, deleteNode, editor }: any)
           : <FileText size={28} style={{ color: 'var(--fg-muted)', flexShrink: 0 }} />
         }
         <div style={{ flex: 1, minWidth: 0 }}>
-          <p style={{ margin: 0, fontSize: '0.875rem', fontWeight: 500, color: 'var(--fg)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{filename}</p>
+          <p
+            onClick={() => canPreview && setPreviewOpen(true)}
+            style={{
+              margin: 0,
+              fontSize: '0.875rem',
+              fontWeight: 500,
+              color: canPreview ? 'var(--primary)' : 'var(--fg)',
+              cursor: canPreview ? 'pointer' : 'default',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
+              textDecoration: canPreview ? 'underline decoration-dotted' : 'none'
+            }}
+            onMouseEnter={e => {
+              if (canPreview) {
+                e.currentTarget.style.color = 'var(--primary-hover, #2b4cc4)'
+                e.currentTarget.style.textDecoration = 'underline'
+              }
+            }}
+            onMouseLeave={e => {
+              if (canPreview) {
+                e.currentTarget.style.color = 'var(--primary)'
+                e.currentTarget.style.textDecoration = 'underline decoration-dotted'
+              }
+            }}
+          >
+            {filename}
+          </p>
           <p style={{ margin: 0, fontSize: '0.75rem', color: 'var(--fg-muted)' }}>{formatBytes(size)} · {mimeType}</p>
         </div>
         <a href={`/api/attachments/${attachmentId}`} download={filename}
@@ -213,6 +271,14 @@ function AttachmentNodeView({ node, updateAttributes, deleteNode, editor }: any)
           <Trash2 size={15} />
         </button>
       </div>
+      <AttachmentPreviewModal
+        isOpen={previewOpen}
+        onClose={() => setPreviewOpen(false)}
+        attachmentId={attachmentId}
+        filename={filename}
+        mimeType={mimeType}
+        size={size}
+      />
     </NodeViewWrapper>
   )
 }

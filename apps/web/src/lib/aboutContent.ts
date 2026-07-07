@@ -1,6 +1,6 @@
-export const ABOUT_MARKDOWN = `# 📝 Homebrew Notes
+export const ABOUT_MARKDOWN = `# 📝 Mindspace
 
-**Homebrew Notes** adalah aplikasi catatan modern, interaktif, kolaboratif, dan aman yang dikembangkan menggunakan **React, TypeScript, SQLite, Drizzle ORM, TailwindCSS, dan TanStack Router**. Aplikasi ini mengedepankan antarmuka premium, integrasi diagram alir dinamis, penguncian enkripsi berkas mandiri, serta manajemen persetujuan akses pengguna.
+**Mindspace** adalah aplikasi catatan modern, interaktif, kolaboratif, dan aman yang dikembangkan menggunakan **React, TypeScript, SQLite, Drizzle ORM, TailwindCSS, dan TanStack Router**. Aplikasi ini mengedepankan antarmuka premium, integrasi diagram alir dinamis, penguncian enkripsi berkas mandiri, serta manajemen persetujuan akses pengguna.
 
 ---
 
@@ -15,8 +15,8 @@ export const ABOUT_MARKDOWN = `# 📝 Homebrew Notes
 ### 2. Diagram Alir ReactFlow
 *   Sisipkan dan hubungkan node diagram persegi panjang, lingkaran, atau belah ketupat langsung di dalam tulisan Anda.
 
-### 3. Kolaborasi & Ruang Kerja Tim
-*   Workspace terpisah antara **Saya (Pribadi)** dan **Tim (Kolaboratif)** lengkap dengan validasi ganda untuk mencegah duplikasi catatan saat proses salin antar workspace.
+### 3. Kolaborasi & Ruang Kerja Organisasi
+*   Workspace terpisah antara **Saya (Pribadi)** dan **Organisasi** lengkap dengan validasi ganda untuk mencegah duplikasi catatan saat proses salin antar workspace.
 
 ### 4. Publikasi & Tautan Publik
 *   Publikasikan catatan secara instan ke tautan publik dengan tag **Public** biru berikon Globe di sidebar Anda.
@@ -48,11 +48,9 @@ export const ABOUT_MARKDOWN = `# 📝 Homebrew Notes
     *   Dukungan *double-click* langsung pada node diagram untuk mengganti label teks.
 
 ### v1.3.0 (Juni 2026)
-*   ✨ **Daily Log Tracker**:
-    *   Tombol "Daily Log Hari Ini" di sidebar untuk membuat/membuka catatan harian otomatis.
-    *   Template terstruktur (Timeline + Catatan) dibuat otomatis per hari.
-    *   Bar tambah aktivitas dengan time picker jam & menit (default = jam sekarang) langsung append ke section Timeline.
-    *   URL yang di-paste di aktivitas otomatis menjadi tautan klik.
+*   ✨ **Ruang Kerja Multi-Organisasi**:
+    *   Sistem workspace dinamis yang terpisah berdasarkan keanggotaan organisasi (multi-organization assignment).
+    *   Selector ruang kerja (dropdown) di sidebar untuk menyaring catatan.
 *   ✨ **Import Dokumen Office**:
     *   Import file \`.docx\` langsung ke editor (heading, tabel, bold/italic preserved via mammoth).
     *   Import file \`.xlsx\`/\`.xls\` — setiap sheet menjadi heading + tabel di catatan.
@@ -80,7 +78,7 @@ export const ABOUT_MARKDOWN = `# 📝 Homebrew Notes
 
 ### v1.1.0 (Mei 2026)
 *   ✨ **Diagram Alir Terintegrasi**: Integrasi komponen ReactFlow untuk menyisipkan diagram visual ke editor.
-*   ✨ **Workspace Saya & Tim**: Ruang kerja terpisah untuk catatan pribadi vs catatan kolaboratif tim.
+*   ✨ **Workspace Saya & Organisasi**: Ruang kerja terpisah untuk catatan pribadi vs catatan kolaboratif organisasi.
 *   ✨ **Pengunci PIN Catatan**: Melindungi isi catatan individual dari akses tanpa izin.
 
 ### v1.0.0 (Maret 2026)

@@ -1,28 +1,29 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { db } from '../lib/db'
-import { notes, users, teams } from '../../drizzle/schema'
+import { notes, users, organizations, userOrganizations } from '../../drizzle/schema'
 import { eq, and } from 'drizzle-orm'
 import { randomUUID } from 'crypto'
 
 describe('Copy Note Two-Way Duplicate Verification', () => {
   let userId: string
-  let teamId: string
+  let orgId: string
   let adminId: string
 
   beforeEach(async () => {
     // Clean up notes for clean tests
     await db.delete(notes)
     await db.delete(users)
-    await db.delete(teams)
+    await db.delete(userOrganizations)
+    await db.delete(organizations)
 
     userId = randomUUID()
-    teamId = randomUUID()
+    orgId = randomUUID()
     adminId = randomUUID()
 
-    // Insert dummy team and users
-    await db.insert(teams).values({
-      id: teamId,
-      name: 'Test Team',
+    // Insert dummy organization and users
+    await db.insert(organizations).values({
+      id: orgId,
+      name: 'Test Org',
       createdAt: Date.now()
     })
 
@@ -31,7 +32,7 @@ describe('Copy Note Two-Way Duplicate Verification', () => {
       username: 'user1',
       passwordHash: 'dummy',
       role: 'viewer',
-      teamId: teamId,
+      status: 'approved',
       createdAt: Date.now()
     })
 
@@ -40,12 +41,22 @@ describe('Copy Note Two-Way Duplicate Verification', () => {
       username: 'admin',
       passwordHash: 'dummy',
       role: 'admin',
-      teamId: teamId,
+      status: 'approved',
       createdAt: Date.now()
+    })
+
+    // Assign memberships
+    await db.insert(userOrganizations).values({
+      userId: userId,
+      organizationId: orgId
+    })
+    await db.insert(userOrganizations).values({
+      userId: adminId,
+      organizationId: orgId
     })
   })
 
-  it('should handle copying individual notes to team and prevent duplicates', async () => {
+  it('should handle copying individual notes to organization and prevent duplicates', async () => {
     const noteId = randomUUID()
     // 1. Create individual note A
     await db.insert(notes).values({
@@ -58,14 +69,14 @@ describe('Copy Note Two-Way Duplicate Verification', () => {
       updatedAt: Date.now()
     })
 
-    // Helper to simulate endpoint check for copy-to-team
-    async function canCopyToTeam(id: string, userTeamId: string) {
-      // Duplicate checks in copy-to-team
+    // Helper to simulate endpoint check for copy-to-organization
+    async function canCopyToOrg(id: string, targetOrgId: string) {
+      // Duplicate checks in copy-to-organization
       const [existingChild] = await db.select().from(notes).where(
         and(
           eq(notes.copiedFromId, id),
-          eq(notes.teamId, userTeamId),
-          eq(notes.type, 'team')
+          eq(notes.organizationId, targetOrgId),
+          eq(notes.type, 'organization')
         )
       )
 
@@ -75,8 +86,8 @@ describe('Copy Note Two-Way Duplicate Verification', () => {
         const [parent] = await db.select().from(notes).where(
           and(
             eq(notes.id, note.copiedFromId),
-            eq(notes.teamId, userTeamId),
-            eq(notes.type, 'team')
+            eq(notes.organizationId, targetOrgId),
+            eq(notes.type, 'organization')
           )
         )
         existingParent = parent
@@ -86,37 +97,37 @@ describe('Copy Note Two-Way Duplicate Verification', () => {
     }
 
     // First copy should be allowed
-    let allowed = await canCopyToTeam(noteId, teamId)
+    let allowed = await canCopyToOrg(noteId, orgId)
     expect(allowed).toBe(true)
 
     // Perform copy
-    const teamNoteId = randomUUID()
+    const orgNoteId = randomUUID()
     await db.insert(notes).values({
-      id: teamNoteId,
+      id: orgNoteId,
       userId: userId,
-      teamId: teamId,
+      organizationId: orgId,
       copiedFromId: noteId,
-      type: 'team',
-      title: 'Team Note B',
+      type: 'organization',
+      title: 'Org Note B',
       content: '{}',
       createdAt: Date.now(),
       updatedAt: Date.now()
     })
 
-    // Second copy should be blocked because child copy exists in team
-    allowed = await canCopyToTeam(noteId, teamId)
+    // Second copy should be blocked because child copy exists in organization
+    allowed = await canCopyToOrg(noteId, orgId)
     expect(allowed).toBe(false)
 
-    // Delete the team note copy
-    await db.delete(notes).where(eq(notes.id, teamNoteId))
+    // Delete the organization note copy
+    await db.delete(notes).where(eq(notes.id, orgNoteId))
 
-    // Copy should be allowed again because copy no longer exists in team
-    allowed = await canCopyToTeam(noteId, teamId)
+    // Copy should be allowed again because copy no longer exists in organization
+    allowed = await canCopyToOrg(noteId, orgId)
     expect(allowed).toBe(true)
   })
 
-  it('should handle copying team notes back to personal workspace and prevent duplicates', async () => {
-    const teamNoteId = randomUUID()
+  it('should handle copying organization notes back to personal workspace and prevent duplicates', async () => {
+    const orgNoteId = randomUUID()
     const originalIndividualId = randomUUID()
 
     // 1. Create individual note A
@@ -130,14 +141,14 @@ describe('Copy Note Two-Way Duplicate Verification', () => {
       updatedAt: Date.now()
     })
 
-    // 2. Create team note B copied from A
+    // 2. Create organization note B copied from A
     await db.insert(notes).values({
-      id: teamNoteId,
+      id: orgNoteId,
       userId: userId,
-      teamId: teamId,
+      organizationId: orgId,
       copiedFromId: originalIndividualId,
-      type: 'team',
-      title: 'Team Note B',
+      type: 'organization',
+      title: 'Org Note B',
       content: '{}',
       createdAt: Date.now(),
       updatedAt: Date.now()
@@ -170,16 +181,16 @@ describe('Copy Note Two-Way Duplicate Verification', () => {
       return !(existingChild || existingParent)
     }
 
-    // Try to copy team note B to personal workspace.
+    // Try to copy organization note B to personal workspace.
     // It should be blocked because the original note A (parent) is still in the personal workspace.
-    let allowed = await canCopyToPersonal(teamNoteId, userId)
+    let allowed = await canCopyToPersonal(orgNoteId, userId)
     expect(allowed).toBe(false)
 
     // Delete the original individual note A
     await db.delete(notes).where(eq(notes.id, originalIndividualId))
 
     // Now, copy should be allowed because original individual note A is gone
-    allowed = await canCopyToPersonal(teamNoteId, userId)
+    allowed = await canCopyToPersonal(orgNoteId, userId)
     expect(allowed).toBe(true)
 
     // Perform copy to create individual note C
@@ -187,7 +198,7 @@ describe('Copy Note Two-Way Duplicate Verification', () => {
     await db.insert(notes).values({
       id: newIndividualId,
       userId: userId,
-      copiedFromId: teamNoteId,
+      copiedFromId: orgNoteId,
       type: 'individual',
       title: 'Individual Note C',
       content: '{}',
@@ -196,7 +207,7 @@ describe('Copy Note Two-Way Duplicate Verification', () => {
     })
 
     // Copying again should be blocked because child copy C exists in personal workspace
-    allowed = await canCopyToPersonal(teamNoteId, userId)
+    allowed = await canCopyToPersonal(orgNoteId, userId)
     expect(allowed).toBe(false)
   })
 })

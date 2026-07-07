@@ -3,14 +3,14 @@ import { useNavigate } from '@tanstack/react-router'
 import { ScrollArea } from '../ui/scroll-area'
 import { DayGroup } from './DayGroup'
 import { SearchBar } from './SearchBar'
-import { Plus, LogOut, Users, Shield, Eye, UsersRound, Info, CalendarDays, Menu, X, KeyRound } from 'lucide-react'
+import { Plus, LogOut, Users, Shield, Eye, UsersRound, Info, Menu, X, KeyRound, Brain, ChevronDown, Check } from 'lucide-react'
 import { FontPicker } from './FontPicker'
 import { ThemeToggle } from './ThemeToggle'
 import { useAuth } from '../../lib/auth'
 import { AboutModal } from '../ui/AboutModal'
 import { ChangePasswordModal } from '../ui/ChangePasswordModal'
 
-interface Note { id: string; title: string; createdAt: number; shareToken?: string | null }
+interface Note { id: string; title: string; createdAt: number; shareToken?: string | null; icon?: string | null }
 interface SearchResult { id: string; title: string; createdAt: number; snippet: string }
 interface SidebarProps {
   activeNoteId: string | null
@@ -42,9 +42,10 @@ function groupByDay(notes: Note[]) {
 
 export function Sidebar({ activeNoteId, onShareNote, notesUpdateTrigger }: SidebarProps) {
   const [notes, setNotes] = useState<Note[]>([])
-  const [teamNotes, setTeamNotes] = useState<Note[]>([])
   const [searchResults, setSearchResults] = useState<SearchResult[] | null>(null)
-  const [teamName, setTeamName] = useState<string | null>(null)
+  const [activeScope, setActiveScope] = useState<string>('personal')
+  const [scopeDropdownOpen, setScopeDropdownOpen] = useState(false)
+  const scopeDropdownRef = useRef<HTMLDivElement>(null)
   const [width, setWidth] = useState(308)
   const dragging = useRef(false)
   const startX = useRef(0)
@@ -67,6 +68,17 @@ export function Sidebar({ activeNoteId, onShareNote, notesUpdateTrigger }: Sideb
     return () => window.removeEventListener('resize', checkMobile)
   }, [])
 
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (scopeDropdownRef.current && !scopeDropdownRef.current.contains(e.target as Node)) {
+        setScopeDropdownOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
+
   function navigateAndClose(opts: { to: string; params?: any }) {
     navigate(opts)
     if (window.innerWidth < 768) {
@@ -87,38 +99,38 @@ export function Sidebar({ activeNoteId, onShareNote, notesUpdateTrigger }: Sideb
   }, [isMobile])
 
   async function loadNotes() {
-    const res = await fetch('/api/notes?scope=mine')
+    let url = '/api/notes?scope=mine'
+    if (activeScope !== 'personal') {
+      url = `/api/notes?scope=organization&organizationId=${activeScope}`
+    }
+    const res = await fetch(url)
     if (!res.ok) return
     const data = await res.json()
     setNotes(Array.isArray(data) ? data : [])
   }
 
-  async function loadTeamNotes() {
-    if (!user?.teamId) return
-    const res = await fetch('/api/notes?scope=team')
-    if (!res.ok) return
-    const data = await res.json()
-    setTeamNotes(Array.isArray(data) ? data : [])
-    // fetch team name
-    fetch('/api/teams').then(r => r.json()).then((ts: any[]) => {
-      const t = ts.find(t => t.id === user.teamId)
-      if (t) setTeamName(t.name)
-    })
-  }
-
   useEffect(() => {
     loadNotes()
-    loadTeamNotes()
-  }, [activeNoteId, user?.teamId, notesUpdateTrigger])
+  }, [activeScope, notesUpdateTrigger])
 
-  // auto-switch tab based on active note
+  // Auto-switch sidebar scope based on the active note loaded
   useEffect(() => {
-    if (!activeNoteId || !user?.teamId) return
-    const isTeamNote = teamNotes.some(n => n.id === activeNoteId)
-    const isMineNote = notes.some(n => n.id === activeNoteId)
-    if (isTeamNote && !isMineNote) setActiveTab('team')
-    else if (isMineNote) setActiveTab('mine')
-  }, [activeNoteId, notes, teamNotes])
+    if (!activeNoteId) return
+    fetch(`/api/notes/${activeNoteId}`)
+      .then(r => {
+        if (r.ok) return r.json()
+        return null
+      })
+      .then(note => {
+        if (!note) return
+        if (note.type === 'organization' && note.organizationId) {
+          setActiveScope(note.organizationId)
+        } else {
+          setActiveScope('personal')
+        }
+      })
+      .catch(err => console.error(err))
+  }, [activeNoteId])
 
   async function renameNote(id: string, title: string) {
     await fetch(`/api/notes/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title }) })
@@ -128,54 +140,36 @@ export function Sidebar({ activeNoteId, onShareNote, notesUpdateTrigger }: Sideb
   async function deleteNote(id: string) {
     await fetch(`/api/notes/${id}`, { method: 'DELETE' })
     if (activeNoteId === id) {
-      if (activeTab === 'team') {
-        const remainingTeam = teamNotes.filter(n => n.id !== id)
-        navigateAndClose({ to: remainingTeam.length > 0 ? '/notes/$id' : '/', params: remainingTeam.length > 0 ? { id: remainingTeam[0].id } : {} })
-      } else {
-        const remainingMine = notes.filter(n => n.id !== id)
-        navigateAndClose({ to: remainingMine.length > 0 ? '/notes/$id' : '/', params: remainingMine.length > 0 ? { id: remainingMine[0].id } : {} })
-      }
+      const remaining = notes.filter(n => n.id !== id)
+      navigateAndClose({ to: remaining.length > 0 ? '/notes/$id' : '/', params: remaining.length > 0 ? { id: remaining[0].id } : {} })
     }
     await loadNotes()
-    await loadTeamNotes()
-  }
-
-  const [activeTab, setActiveTab] = useState<'mine' | 'team'>('mine')
-  const newBtnRef = useRef<HTMLButtonElement>(null)
-
-  async function openDailyLog() {
-    const today = new Date().toISOString().slice(0, 10)
-    const res = await fetch(`/api/daily-log?date=${today}`)
-    if (!res.ok) return
-    const note = await res.json()
-    await loadNotes()
-    navigateAndClose({ to: '/notes/$id', params: { id: note.id } })
   }
 
   async function createNote() {
-    const type = activeTab === 'team' ? 'team' : 'individual'
-    const teamId = activeTab === 'team' ? (user?.teamId ?? null) : null
+    const type = activeScope === 'personal' ? 'individual' : 'organization'
+    const organizationId = activeScope === 'personal' ? null : activeScope
     const res = await fetch('/api/notes', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ teamId, type }),
+      body: JSON.stringify({ organizationId, type }),
     })
     if (!res.ok) return
     const note = await res.json()
     if (!note?.id) return
     await loadNotes()
-    if (teamId) await loadTeamNotes()
     navigateAndClose({ to: '/notes/$id', params: { id: note.id } })
   }
 
   const groups = groupByDay(notes)
-  const teamGroups = groupByDay(teamNotes.filter(n => !notes.find(m => m.id === n.id)))
 
   const C = {
     fg: 'var(--fg)', fgMuted: 'var(--fg-muted)', fgSubtle: 'var(--fg-subtle)',
     primary: 'var(--primary)', accent: 'var(--accent)', border: 'var(--border)',
     muted: 'var(--muted)',
   }
+
+  const currentOrgName = activeScope === 'personal' ? '' : (user?.organizations?.find(o => o.id === activeScope)?.name || 'Organisasi')
 
   return (
     <>
@@ -241,8 +235,10 @@ export function Sidebar({ activeNoteId, onShareNote, notesUpdateTrigger }: Sideb
         {/* Header */}
         <div className="px-4 py-4 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <img src="/logo192.png" alt="Homebrew Notes Logo" className="w-6 h-6 object-contain" />
-            <span className="text-sm font-semibold" style={{ color: C.fg, letterSpacing: '-0.01em' }}>Homebrew Notes</span>
+            <div style={{ width: 24, height: 24, borderRadius: 6, background: 'var(--accent)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--primary)' }}>
+              <Brain size={14} />
+            </div>
+            <span className="text-sm font-semibold" style={{ color: C.fg, letterSpacing: '-0.01em', fontFamily: 'var(--font-heading)' }}>Mindspace</span>
           </div>
           <div className="flex items-center gap-1">
             <ThemeToggle />
@@ -275,34 +271,80 @@ export function Sidebar({ activeNoteId, onShareNote, notesUpdateTrigger }: Sideb
 
         <SearchBar onResults={setSearchResults} />
 
-        {/* Tab switcher — only show when user has a team */}
-        {user?.teamId && (
-          <div style={{ display: 'flex', margin: '0 10px 4px', gap: 4, background: C.muted, borderRadius: 8, padding: 3 }}>
-            {([['mine', 'Saya'], ['team', teamName ?? 'Tim']] as const).map(([tab, label]) => (
+        {/* Scope switcher — custom themed dropdown */}
+        {user?.organizations && user.organizations.length > 0 && (() => {
+          const workspaceOptions = [
+            { value: 'personal', label: 'Catatan Pribadi', sublabel: 'Saya' },
+            ...user.organizations.map(org => ({ value: org.id, label: org.name, sublabel: 'Organisasi' }))
+          ]
+          const selected = workspaceOptions.find(o => o.value === activeScope) || workspaceOptions[0]
+          return (
+            <div ref={scopeDropdownRef} style={{ margin: '0 10px 8px', position: 'relative' }}>
+              <label style={{ display: 'block', fontSize: '0.65rem', fontWeight: 700, color: C.fgMuted, textTransform: 'uppercase', letterSpacing: '0.05em', paddingLeft: 2, marginBottom: 4 }}>
+                Ruang Kerja
+              </label>
+              {/* Trigger button */}
               <button
-                key={tab}
-                onClick={() => setActiveTab(tab)}
+                onClick={() => setScopeDropdownOpen(v => !v)}
                 style={{
-                  flex: 1, padding: '5px 0', fontSize: '0.75rem', fontWeight: activeTab === tab ? 600 : 400,
-                  border: 'none', borderRadius: 6, cursor: 'pointer', fontFamily: 'var(--font-body)',
-                  background: activeTab === tab ? 'var(--bg)' : 'transparent',
-                  color: activeTab === tab ? C.fg : C.fgMuted,
-                  boxShadow: activeTab === tab ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
-                  transition: 'all 0.15s',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4,
+                  width: '100%', boxSizing: 'border-box',
+                  display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8,
+                  padding: '7px 10px',
+                  fontSize: '0.8rem', fontWeight: 500, fontFamily: 'var(--font-body)',
+                  border: `1px solid ${scopeDropdownOpen ? 'var(--primary)' : 'var(--border)'}`,
+                  borderRadius: 8, outline: 'none',
+                  color: 'var(--fg)', background: 'var(--sidebar-bg)',
+                  cursor: 'pointer',
+                  transition: 'border-color 0.15s',
                 }}
               >
-                {tab === 'team' && <UsersRound size={11} />}
-                {label}
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', minWidth: 0 }}>
+                  <span style={{ fontSize: '0.75rem', color: 'var(--fg-muted)', fontWeight: 400 }}>{selected.sublabel}</span>
+                  <span style={{ fontWeight: 600, color: 'var(--fg)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '100%' }}>{selected.label}</span>
+                </div>
+                <ChevronDown size={13} style={{ flexShrink: 0, color: 'var(--fg-muted)', transform: scopeDropdownOpen ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }} />
               </button>
-            ))}
-          </div>
-        )}
+              {/* Dropdown panel */}
+              {scopeDropdownOpen && (
+                <div style={{
+                  position: 'absolute', top: 'calc(100% + 4px)', left: 0, right: 0,
+                  background: 'var(--bg)', border: '1px solid var(--border)',
+                  borderRadius: 10, zIndex: 100, overflow: 'hidden',
+                  boxShadow: '0 8px 24px rgba(0,0,0,0.15)',
+                  padding: '4px',
+                }}>
+                  {workspaceOptions.map(opt => (
+                    <button
+                      key={opt.value}
+                      onClick={() => { setActiveScope(opt.value); setSearchResults(null); setScopeDropdownOpen(false) }}
+                      style={{
+                        width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                        padding: '7px 10px', border: 'none', borderRadius: 7,
+                        background: activeScope === opt.value ? 'var(--accent)' : 'transparent',
+                        color: activeScope === opt.value ? 'var(--primary)' : 'var(--fg)',
+                        cursor: 'pointer', textAlign: 'left',
+                        fontFamily: 'var(--font-body)',
+                        transition: 'background 0.1s',
+                      }}
+                      onMouseEnter={e => { if (activeScope !== opt.value) e.currentTarget.style.background = 'var(--muted)' }}
+                      onMouseLeave={e => { if (activeScope !== opt.value) e.currentTarget.style.background = 'transparent' }}
+                    >
+                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
+                        <span style={{ fontSize: '0.7rem', color: activeScope === opt.value ? 'var(--primary)' : 'var(--fg-muted)', fontWeight: 400, opacity: 0.8 }}>{opt.sublabel}</span>
+                        <span style={{ fontSize: '0.8rem', fontWeight: 600 }}>{opt.label}</span>
+                      </div>
+                      {activeScope === opt.value && <Check size={13} style={{ flexShrink: 0 }} />}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )
+        })()}
 
         {/* New Add Button */}
         <div style={{ padding: '0 10px 4px', display: 'flex', flexDirection: 'column', gap: 4 }}>
           <button
-            ref={newBtnRef}
             onClick={createNote}
             style={{
               width: '100%',
@@ -310,7 +352,7 @@ export function Sidebar({ activeNoteId, onShareNote, notesUpdateTrigger }: Sideb
               alignItems: 'center',
               justifyContent: 'center',
               gap: 6,
-              padding: '7px 0',
+              padding: '8px 0',
               fontSize: '0.78rem',
               fontWeight: 600,
               borderRadius: 7,
@@ -326,35 +368,8 @@ export function Sidebar({ activeNoteId, onShareNote, notesUpdateTrigger }: Sideb
             onMouseLeave={e => (e.currentTarget.style.opacity = '1')}
           >
             <Plus size={13} strokeWidth={2.5} />
-            {activeTab === 'team' ? 'Catatan Tim Baru' : 'Catatan Baru'}
+            {activeScope !== 'personal' ? `Catatan Baru di ${currentOrgName}` : 'Catatan Baru'}
           </button>
-          {activeTab === 'mine' && (
-            <button
-              onClick={openDailyLog}
-              style={{
-                width: '100%',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: 6,
-                padding: '7px 0',
-                fontSize: '0.78rem',
-                fontWeight: 600,
-                borderRadius: 7,
-                border: `1px solid ${C.border}`,
-                background: 'transparent',
-                color: C.fg,
-                cursor: 'pointer',
-                fontFamily: 'var(--font-body)',
-                transition: 'all 0.15s',
-              }}
-              onMouseEnter={e => { e.currentTarget.style.background = C.accent; e.currentTarget.style.borderColor = C.primary; e.currentTarget.style.color = C.primary }}
-              onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.borderColor = C.border; e.currentTarget.style.color = C.fg }}
-            >
-              <CalendarDays size={13} strokeWidth={2.5} />
-              Daily Log Hari Ini
-            </button>
-          )}
         </div>
 
         <div style={{ height: '1px', background: C.border, margin: '4px 0' }} />
@@ -380,7 +395,7 @@ export function Sidebar({ activeNoteId, onShareNote, notesUpdateTrigger }: Sideb
                 </button>
               ))}
             </div>
-          ) : activeTab === 'mine' ? (
+          ) : (
             <div className="py-1 px-2">
               {notes.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-12 px-4 text-center">
@@ -416,42 +431,6 @@ export function Sidebar({ activeNoteId, onShareNote, notesUpdateTrigger }: Sideb
                 ))
               )}
             </div>
-          ) : (
-            <div className="py-1 px-2">
-              {teamNotes.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-12 px-4 text-center">
-                  <div className="w-10 h-10 rounded-full flex items-center justify-center mb-3" style={{ background: C.accent, color: C.primary }}>
-                    <Plus className="h-5 w-5" />
-                  </div>
-                  <p className="text-xs font-medium mb-3" style={{ color: C.fg }}>Belum ada catatan tim</p>
-                  <button
-                    onClick={createNote}
-                    className="text-xs font-semibold py-2 px-4 rounded-lg transition-all"
-                    style={{
-                      background: C.primary,
-                      color: 'var(--primary-fg)',
-                      border: 'none',
-                      cursor: 'pointer',
-                      boxShadow: '0 2px 4px rgba(0,0,0,0.05)'
-                    }}
-                    onMouseEnter={e => (e.currentTarget.style.opacity = '0.9')}
-                    onMouseLeave={e => (e.currentTarget.style.opacity = '1')}
-                  >
-                    Buat Catatan Tim Baru
-                  </button>
-                </div>
-              ) : (
-                teamGroups.map(g => (
-                  <DayGroup key={'team-' + g.label} label={g.label} notes={g.notes}
-                    activeNoteId={activeNoteId}
-                    onSelect={id => navigateAndClose({ to: '/notes/$id', params: { id } })}
-                    onRename={renameNote}
-                    onDelete={deleteNote}
-                    onShare={onShareNote}
-                  />
-                ))
-              )}
-            </div>
           )}
         </ScrollArea>
 
@@ -460,7 +439,7 @@ export function Sidebar({ activeNoteId, onShareNote, notesUpdateTrigger }: Sideb
           {user?.role === 'admin' && (
             <>
             <button
-              onClick={() => navigateAndClose({ to: '/teams' })}
+              onClick={() => navigateAndClose({ to: '/organizations' })}
               style={{
                 display: 'flex', alignItems: 'center', gap: 8, width: '100%',
                 padding: '7px 10px', borderRadius: 7, border: 'none',
@@ -470,7 +449,7 @@ export function Sidebar({ activeNoteId, onShareNote, notesUpdateTrigger }: Sideb
               onMouseEnter={e => { e.currentTarget.style.background = C.accent; e.currentTarget.style.color = C.primary }}
               onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = C.fgMuted }}
             >
-              <UsersRound size={14} /> Kelola Tim
+              <UsersRound size={14} /> Kelola Organisasi
             </button>
             <button
               onClick={() => navigateAndClose({ to: '/users' })}
@@ -529,7 +508,7 @@ export function Sidebar({ activeNoteId, onShareNote, notesUpdateTrigger }: Sideb
                   {user?.username}
                 </div>
                 <div style={{ fontSize: '0.7rem', color: C.fgSubtle, textTransform: 'capitalize' }}>
-                  {user?.role}{teamName ? ` · ${teamName}` : ''}
+                  {user?.role}{user?.organizations && user.organizations.length > 0 ? ` · ${user.organizations.length} Org` : ''}
                 </div>
               </div>
             </div>

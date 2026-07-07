@@ -8,8 +8,34 @@ import { ChatBot } from '../components/chat/ChatBot'
 
 
 export const Route = createFileRoute('/notes/$id')({
+  loader: async ({ params }) => {
+    const res = await fetch(`/api/notes/${params.id}`)
+    if (!res.ok) return null
+    return res.json() as Promise<{ id: string; title: string; content: string; createdAt: number; updatedAt: number; isLocked?: boolean; shareToken?: string | null; hasPinProtection?: boolean; createdByUsername?: string | null; updatedByUsername?: string | null }>
+  },
+  pendingComponent: NoteLoadingSkeleton,
   component: NotePageComponent,
 })
+
+function NoteLoadingSkeleton() {
+  return (
+    <div className="flex h-screen overflow-hidden">
+      <div style={{ flexShrink: 0 }}>
+        <Sidebar activeNoteId={null} />
+      </div>
+      <main className="flex-1 overflow-hidden flex flex-col" style={{ background: 'var(--bg)', position: 'relative' }}>
+        <div className="px-10 py-10">
+          <div className="animate-pulse">
+            <div className="h-8 rounded-lg mb-6" style={{ background: 'var(--skeleton)', width: '60%' }} />
+            <div className="h-4 rounded mb-3" style={{ background: 'var(--skeleton)', width: '100%' }} />
+            <div className="h-4 rounded mb-3" style={{ background: 'var(--skeleton)', width: '80%' }} />
+            <div className="h-4 rounded" style={{ background: 'var(--skeleton)', width: '90%' }} />
+          </div>
+        </div>
+      </main>
+    </div>
+  )
+}
 
 type SaveStatus = 'saved' | 'saving' | 'unsaved'
 
@@ -45,11 +71,11 @@ function SaveIndicator({ status, chatOpen, isMobile }: { status: SaveStatus; cha
 
 function NotePageComponent() {
   const { id } = Route.useParams()
+  const initialNote = Route.useLoaderData()
   const navigate = useNavigate()
   const [shareTrigger, setShareTrigger] = useState(0)
   const [notesUpdateTrigger, setNotesUpdateTrigger] = useState(0)
-  const [note, setNote] = useState<{ id: string; title: string; content: string; createdAt: number; updatedAt: number; isLocked?: boolean; shareToken?: string | null; hasPinProtection?: boolean; createdByUsername?: string | null; updatedByUsername?: string | null } | null>(null)
-  const [loading, setLoading] = useState(true)
+  const [note, setNote] = useState(initialNote)
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('saved')
   const [unlocked, setUnlocked] = useState(false)
   const [showUnlockModal, setShowUnlockModal] = useState(false)
@@ -67,18 +93,68 @@ function NotePageComponent() {
   }, [])
 
   useEffect(() => {
-    setLoading(true)
+    setNote(initialNote)
     setSaveStatus('saved')
     setUnlocked(false)
     setShowUnlockModal(false)
-    fetch(`/api/notes/${id}`)
-      .then(r => r.ok ? r.json() : null)
-      .then(data => {
-        setNote(data)
-        setLoading(false)
-        if (data?.isLocked) setShowUnlockModal(true)
-      })
-  }, [id])
+    if (initialNote?.isLocked) setShowUnlockModal(true)
+  }, [initialNote])
+
+  const [activeUsers, setActiveUsers] = useState<{ userId: string; username: string }[]>([])
+  const [typingUsers, setTypingUsers] = useState<{ username: string; pos: number }[]>([])
+  const [remoteUpdate, setRemoteUpdate] = useState<{ updatedBy: string; content: string; title: string } | null>(null)
+
+  useEffect(() => {
+    if (!id || (note?.isLocked && !unlocked)) {
+      setActiveUsers([])
+      setTypingUsers([])
+      setRemoteUpdate(null)
+      return
+    }
+
+    setTypingUsers([])
+    setRemoteUpdate(null)
+    const eventSource = new EventSource(`/api/notes/${id}/events`)
+
+    eventSource.addEventListener('presence', (e: any) => {
+      try {
+        const users = JSON.parse(e.data)
+        setActiveUsers(users)
+      } catch (err) {
+        console.error('Error parsing presence:', err)
+      }
+    })
+
+    eventSource.addEventListener('note-updated', (e: any) => {
+      try {
+        const data = JSON.parse(e.data)
+        setRemoteUpdate({
+          updatedBy: data.updatedBy,
+          content: data.content,
+          title: data.title
+        })
+      } catch (err) {
+        console.error('Error parsing note-updated:', err)
+      }
+    })
+
+    eventSource.addEventListener('typing', (e: any) => {
+      try {
+        const users = JSON.parse(e.data)
+        setTypingUsers(users)
+      } catch (err) {
+        console.error('Error parsing typing:', err)
+      }
+    })
+
+    eventSource.onerror = (err) => {
+      console.error('SSE Error:', err)
+    }
+
+    return () => {
+      eventSource.close()
+    }
+  }, [id, unlocked, note?.isLocked])
 
   async function handleUpdate(fields: { title?: string; content?: string }) {
     await fetch(`/api/notes/${id}`, {
@@ -155,16 +231,7 @@ function NotePageComponent() {
             {sidebarVisible ? <PanelLeftClose size={15} /> : <PanelLeftOpen size={15} />}
           </button>
         )}
-        {loading ? (
-          <div className="px-10 py-10">
-            <div className="animate-pulse">
-              <div className="h-8 rounded-lg mb-6" style={{ background: 'var(--skeleton)', width: '60%' }} />
-              <div className="h-4 rounded mb-3" style={{ background: 'var(--skeleton)', width: '100%' }} />
-              <div className="h-4 rounded mb-3" style={{ background: 'var(--skeleton)', width: '80%' }} />
-              <div className="h-4 rounded" style={{ background: 'var(--skeleton)', width: '90%' }} />
-            </div>
-          </div>
-        ) : !note ? (
+        {!note ? (
           <div className="flex h-full items-center justify-center">
             <p className="text-sm" style={{ color: '#6c757d' }}>Note not found.</p>
           </div>
@@ -181,6 +248,10 @@ function NotePageComponent() {
               shareTrigger={shareTrigger}
               chatOpen={chatOpen}
               onToggleChat={() => setChatOpen(v => !v)}
+              activeUsers={activeUsers}
+              typingUsers={typingUsers}
+              remoteUpdate={remoteUpdate}
+              onClearRemoteUpdate={() => setRemoteUpdate(null)}
             />
             {chatOpen && (
               <ChatBot
@@ -207,7 +278,7 @@ function NotePageComponent() {
             </button>
           </div>
         )}
-        {!loading && note && isContentVisible && <SaveIndicator status={saveStatus} chatOpen={chatOpen} isMobile={isMobile} />}
+        {note && isContentVisible && <SaveIndicator status={saveStatus} chatOpen={chatOpen} isMobile={isMobile} />}
       </main>
 
       {showUnlockModal && (
