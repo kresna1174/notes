@@ -1,15 +1,30 @@
-import { createFileRoute, useNavigate } from '@tanstack/react-router'
+import { createFileRoute, redirect, useRouter } from '@tanstack/react-router'
 import { useAuth } from '../lib/auth'
 import { useState, useEffect } from 'react'
 import { Sidebar } from '../components/sidebar/Sidebar'
 import { Trash2, Plus, UsersRound, UserMinus, UserPlus, Pencil, Check, X } from 'lucide-react'
 
-export const Route = createFileRoute('/teams')({
-  component: TeamsPage,
-})
-
 interface Team { id: string; name: string; description: string | null; createdAt: number }
 interface User { id: string; username: string; role: string; teamId: string | null }
+
+export const Route = createFileRoute('/teams')({
+  beforeLoad: ({ context }) => {
+    if (!context.auth.user || context.auth.user.role !== 'admin') {
+      throw redirect({ to: '/' })
+    }
+  },
+  loader: async () => {
+    const [tr, ur] = await Promise.all([
+      fetch('/api/teams').then(r => r.json()),
+      fetch('/api/auth/users').then(r => r.json()),
+    ])
+    return {
+      teams: (Array.isArray(tr) ? tr : []) as Team[],
+      users: (Array.isArray(ur) ? ur : []) as User[],
+    }
+  },
+  component: TeamsPage,
+})
 
 const inputBase: React.CSSProperties = {
   width: '100%', boxSizing: 'border-box',
@@ -20,10 +35,8 @@ const inputBase: React.CSSProperties = {
 }
 
 function TeamsPage() {
-  const { user } = useAuth()
-  const navigate = useNavigate()
-  const [teams, setTeams] = useState<Team[]>([])
-  const [users, setUsers] = useState<User[]>([])
+  const router = useRouter()
+  const { teams, users } = Route.useLoaderData()
   const [showForm, setShowForm] = useState(false)
   const [form, setForm] = useState({ name: '', description: '' })
   const [saving, setSaving] = useState(false)
@@ -42,20 +55,6 @@ function TeamsPage() {
     return () => window.removeEventListener('resize', checkMobile)
   }, [])
 
-  useEffect(() => {
-    if (!user || user.role !== 'admin') { navigate({ to: '/' }); return }
-    load()
-  }, [user])
-
-  async function load() {
-    const [tr, ur] = await Promise.all([
-      fetch('/api/teams').then(r => r.json()),
-      fetch('/api/auth/users').then(r => r.json()),
-    ])
-    setTeams(Array.isArray(tr) ? tr : [])
-    setUsers(Array.isArray(ur) ? ur : [])
-  }
-
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault()
     setSaving(true)
@@ -67,7 +66,7 @@ function TeamsPage() {
     setSaving(false)
     setForm({ name: '', description: '' })
     setShowForm(false)
-    load()
+    router.invalidate()
   }
 
   async function handleEdit(e: React.FormEvent) {
@@ -81,23 +80,23 @@ function TeamsPage() {
     })
     setSaving(false)
     setEditingTeam(null)
-    load()
+    router.invalidate()
   }
 
   async function handleDeleteTeam(id: string, name: string) {
     if (!window.confirm(`Hapus tim "${name}"? Semua member akan dikeluarkan dari tim.`)) return
     await fetch(`/api/teams/${id}`, { method: 'DELETE' })
-    load()
+    router.invalidate()
   }
 
   async function assignUser(teamId: string, userId: string) {
     await fetch(`/api/teams/${teamId}/members/${userId}`, { method: 'PUT' })
-    load()
+    router.invalidate()
   }
 
   async function removeUser(teamId: string, userId: string) {
     await fetch(`/api/teams/${teamId}/members/${userId}`, { method: 'DELETE' })
-    load()
+    router.invalidate()
   }
 
   return (

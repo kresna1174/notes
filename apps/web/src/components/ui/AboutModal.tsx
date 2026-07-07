@@ -20,7 +20,7 @@ export function AboutModal({ open, onOpenChange }: AboutModalProps) {
           </div>
           <div>
             <DialogTitle className="text-lg font-bold font-heading text-fg">Tentang & Catatan Rilis</DialogTitle>
-            <p className="text-xs text-fg-muted">Homebrew Notes Changelog & Info</p>
+            <p className="text-xs text-fg-muted">Mindspace Changelog & Info</p>
           </div>
         </DialogHeader>
         <div 

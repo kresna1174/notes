@@ -15,39 +15,39 @@ body {
 
 /* ── Font vars (set by inline script + ThemeProvider) ──────── */
 :root {
-  --font-heading: 'Outfit', sans-serif;
-  --font-body: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-heading: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-body: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 }
 
 /* ── Light theme ───────────────────────────────────────────── */
 :root, [data-theme="light"] {
   --bg: #ffffff;
-  --bg-app: #f8f9fa;
-  --fg: #1a1a2e;
-  --fg-muted: #6c757d;
-  --fg-subtle: #adb5bd;
-  --border: #e9ecef;
-  --border-focus: #3b5bdb;
-  --sidebar-bg: #fafafa;
-  --input-bg: #f1f3f5;
+  --bg-app: #f7f7f5;
+  --fg: #37352f;
+  --fg-muted: #6b6a65;
+  --fg-subtle: #9f9e9a;
+  --border: #e9e9e6;
+  --border-focus: #2383e2;
+  --sidebar-bg: #f7f7f5;
+  --input-bg: #f1f1ef;
   --card-bg: #ffffff;
-  --muted: #f1f3f5;
-  --primary: #3b5bdb;
+  --muted: #f1f1ef;
+  --primary: #2383e2;
   --primary-fg: #ffffff;
-  --accent: #e8edff;
-  --accent-fg: #3b5bdb;
-  --active-line-bg: rgba(59,91,219,0.035);
-  --active-line-outline: rgba(59,91,219,0.15);
-  --code-bg: #1e1e2e;
-  --code-fg: #cdd6f4;
-  --inline-code-bg: #f1f3f5;
-  --inline-code-fg: #c2185b;
-  --blockquote-border: #3b5bdb;
-  --table-header-bg: #f1f3f5;
-  --scrollbar: #ced4da;
-  --scrollbar-hover: #adb5bd;
+  --accent: #efeee9;
+  --accent-fg: #37352f;
+  --active-line-bg: rgba(35,131,226,0.025);
+  --active-line-outline: rgba(35,131,226,0.12);
+  --code-bg: #191919;
+  --code-fg: #f8f8f2;
+  --inline-code-bg: rgba(135, 131, 120, 0.15);
+  --inline-code-fg: #eb5757;
+  --blockquote-border: #37352f;
+  --table-header-bg: #f7f7f5;
+  --scrollbar: #e1e1e0;
+  --scrollbar-hover: #ced4da;
   --save-bg: #ffffff;
-  --skeleton: #f1f3f5;
+  --skeleton: #efeee9;
 
   /* shadcn compat */
   --color-background: var(--bg);
@@ -63,92 +63,42 @@ body {
   --color-card-foreground: var(--fg);
   --color-popover: var(--card-bg);
   --color-popover-foreground: var(--fg);
-  --color-destructive: #e03131;
+  --color-destructive: #eb5757;
   --color-destructive-foreground: #ffffff;
   --color-input: var(--border);
   --color-ring: var(--primary);
-  --radius: 8px;
+  --radius: 6px;
 }
 
 /* ── Dark theme ────────────────────────────────────────────── */
 [data-theme="dark"] {
-  --bg: #1a1b1e;
-  --bg-app: #141517;
-  --fg: #e9ecef;
-  --fg-muted: #909296;
-  --fg-subtle: #5c5f66;
-  --border: #2c2e33;
-  --border-focus: #748ffc;
-  --sidebar-bg: #141517;
-  --input-bg: #25262b;
-  --card-bg: #1a1b1e;
-  --muted: #25262b;
-  --primary: #748ffc;
+  --bg: #191919;
+  --bg-app: #202020;
+  --fg: rgba(255, 255, 255, 0.9);
+  --fg-muted: rgba(255, 255, 255, 0.6);
+  --fg-subtle: rgba(255, 255, 255, 0.35);
+  --border: rgba(255, 255, 255, 0.09);
+  --border-focus: #2383e2;
+  --sidebar-bg: #202020;
+  --input-bg: #2c2c2c;
+  --card-bg: #252525;
+  --muted: #2c2c2c;
+  --primary: #2eaadc;
   --primary-fg: #ffffff;
-  --accent: #1f2561;
-  --accent-fg: #748ffc;
-  --active-line-bg: rgba(116,143,252,0.06);
-  --active-line-outline: rgba(116,143,252,0.2);
-  --code-bg: #0d0d14;
-  --code-fg: #cdd6f4;
-  --inline-code-bg: #25262b;
-  --inline-code-fg: #f48fb1;
-  --blockquote-border: #748ffc;
-  --table-header-bg: #25262b;
-  --scrollbar: #373a40;
-  --scrollbar-hover: #4a4d55;
-  --save-bg: #1a1b1e;
-  --skeleton: #25262b;
-
-  --color-background: var(--bg);
-  --color-foreground: var(--fg);
-  --color-muted: var(--muted);
-  --color-muted-foreground: var(--fg-muted);
-  --color-border: var(--border);
-  --color-accent: var(--accent);
-  --color-accent-foreground: var(--accent-fg);
-  --color-primary: var(--primary);
-  --color-primary-foreground: var(--primary-fg);
-  --color-card: var(--card-bg);
-  --color-card-foreground: var(--fg);
-  --color-popover: var(--card-bg);
-  --color-popover-foreground: var(--fg);
-  --color-destructive: #ff6b6b;
-  --color-destructive-foreground: #ffffff;
-  --color-input: var(--border);
-  --color-ring: var(--primary);
-  --radius: 8px;
-}
-
-/* ── Homebrew theme ────────────────────────────────────────── */
-[data-theme="homebrew"] {
-  --bg: #f9f5eb;          /* Faded/pale warm cream-yellow background */
-  --bg-app: #f2ece0;      /* Slightly darker warm tone for the app outer shell */
-  --fg: #2c1e11;          /* Deep dark malt/stout brown for primary text */
-  --fg-muted: #735f4b;    /* Warm medium brown for secondary text */
-  --fg-subtle: #a6927d;   /* Light warm tan for hints and helper text */
-  --border: #ebdcb9;      /* Golden tan border */
-  --border-focus: #c27d0c; /* Rich warm beer amber/gold when active */
-  --sidebar-bg: #f2ece0;  /* Styled matching background for sidebars */
-  --input-bg: #e5dac2;    /* Cozy background for input elements */
-  --card-bg: #fcf9f2;     /* Pure warm cream card background */
-  --muted: #e5dac2;       /* General muted element background */
-  --primary: #c27d0c;     /* True golden/amber brew primary color */
-  --primary-fg: #ffffff;
-  --accent: #f2e1bb;      /* Soft beer-gold highlight */
-  --accent-fg: #945a03;   /* Rich amber text highlight */
-  --active-line-bg: rgba(194, 125, 12, 0.05);
-  --active-line-outline: rgba(194, 125, 12, 0.2);
-  --code-bg: #22170d;     /* Deep dark stout code background */
-  --code-fg: #ebdcb9;     /* Creamy colored code text */
-  --inline-code-bg: #e5dac2;
-  --inline-code-fg: #945a03;
-  --blockquote-border: #c27d0c;
-  --table-header-bg: #e5dac2;
-  --scrollbar: #ebdcb9;
-  --scrollbar-hover: #d6c59d;
-  --save-bg: #fcf9f2;
-  --skeleton: #ebdcb9;
+  --accent: rgba(255, 255, 255, 0.055);
+  --accent-fg: rgba(255, 255, 255, 0.9);
+  --active-line-bg: rgba(46,170,220,0.04);
+  --active-line-outline: rgba(46,170,220,0.15);
+  --code-bg: #0f0f0f;
+  --code-fg: #e3e3e3;
+  --inline-code-bg: rgba(135, 131, 120, 0.15);
+  --inline-code-fg: #ff7369;
+  --blockquote-border: rgba(255, 255, 255, 0.9);
+  --table-header-bg: #252525;
+  --scrollbar: #2d2d2d;
+  --scrollbar-hover: #3f3f3f;
+  --save-bg: #191919;
+  --skeleton: #2c2c2c;
 
   /* shadcn compat */
   --color-background: var(--bg);
@@ -164,62 +114,14 @@ body {
   --color-card-foreground: var(--fg);
   --color-popover: var(--card-bg);
   --color-popover-foreground: var(--fg);
-  --color-destructive: #cc3b3b;
+  --color-destructive: #ff7369;
   --color-destructive-foreground: #ffffff;
   --color-input: var(--border);
   --color-ring: var(--primary);
-  --radius: 8px;
+  --radius: 6px;
 }
 
-/* ── Reactor theme ─────────────────────────────────────────── */
-[data-theme="reactor"] {
-  --bg: #0d1117;
-  --bg-app: #090c10;
-  --fg: #e6edf3;
-  --fg-muted: #7d8590;
-  --fg-subtle: #3d444d;
-  --border: #21262d;
-  --border-focus: #00ff88;
-  --sidebar-bg: #090c10;
-  --input-bg: #161b22;
-  --card-bg: #0d1117;
-  --muted: #161b22;
-  --primary: #00ff88;
-  --primary-fg: #090c10;
-  --accent: #00ff8820;
-  --accent-fg: #00ff88;
-  --active-line-bg: rgba(0, 255, 136, 0.04);
-  --active-line-outline: rgba(0, 255, 136, 0.18);
-  --code-bg: #010409;
-  --code-fg: #00ff88;
-  --inline-code-bg: #161b22;
-  --inline-code-fg: #00e5ff;
-  --blockquote-border: #00ff88;
-  --table-header-bg: #161b22;
-  --scrollbar: #21262d;
-  --scrollbar-hover: #3d444d;
-  --save-bg: #0d1117;
-  --skeleton: #161b22;
 
-  --color-background: var(--bg);
-  --color-foreground: var(--fg);
-  --color-muted: var(--muted);
-  --color-muted-foreground: var(--fg-muted);
-  --color-border: var(--border);
-  --color-accent: var(--accent);
-  --color-accent-foreground: var(--accent-fg);
-  --color-primary: var(--primary);
-  --color-primary-foreground: var(--primary-fg);
-  --color-card: var(--card-bg);
-  --color-card-foreground: var(--fg);
-  --color-popover: var(--card-bg);
-  --color-popover-foreground: var(--fg);
-  --color-destructive: #ff5555;
-  --color-destructive-foreground: #ffffff;
-  --color-input: var(--border);
-  --color-ring: var(--primary);
-  --radius: 8px;
-}
 
 /* ── Dialog / popover inherit font vars ────────────────────── */
 [role="dialog"], [data-radix-popper-content-wrapper] {
@@ -231,13 +133,7 @@ body {
 /* ── Sidebar ───────────────────────────────────────────────── */
 .sidebar { background: var(--sidebar-bg); border-right: 1px solid var(--border); }
 
-/* ── Active block highlight ────────────────────────────────── */
-.ProseMirror .active-block {
-  background: var(--active-line-bg);
-  border-radius: 6px;
-  outline: 1.5px solid var(--active-line-outline);
-  outline-offset: 3px;
-}
+
 
 /* ── ProseMirror placeholder ───────────────────────────────── */
 .ProseMirror p.is-editor-empty:first-child::before {
@@ -257,15 +153,7 @@ body {
   outline: none;
 }
 
-/* ── Content active line indicator ─────────────────────────── */
-.editor-content-wrapper {
-  padding-left: 24px;
-}
-.editor-content-wrapper .ProseMirror {
-  border-left: 2px dotted var(--fg-subtle);
-  padding-left: 16px;
-  margin-left: 4px;
-}
+
 
 .ProseMirror h1 {
   font-size: 1.875rem; font-weight: 700; line-height: 1.2;
@@ -287,7 +175,12 @@ body {
 .ProseMirror strong { color: var(--fg); font-weight: 600; }
 .ProseMirror em { color: var(--fg); }
 
-.ProseMirror ul, .ProseMirror ol {
+.ProseMirror ul:not([data-type="taskList"]) {
+  list-style-type: disc !important;
+  padding-left: 1.5rem; margin: 0.5rem 0; color: var(--fg);
+}
+.ProseMirror ol {
+  list-style-type: decimal !important;
   padding-left: 1.5rem; margin: 0.5rem 0; color: var(--fg);
 }
 .ProseMirror li { margin: 0.25rem 0; }
@@ -322,8 +215,6 @@ body {
 /* ── Search highlight mark ─────────────────────────────────── */
 mark { background-color: #fff3bf; color: #5c4400; border-radius: 2px; padding: 0 2px; }
 [data-theme="dark"] mark { background-color: #4a3800; color: #ffd43b; }
-[data-theme="homebrew"] mark { background-color: #f2d472; color: #593500; }
-[data-theme="reactor"] mark { background-color: #00ff8833; color: #00ff88; }
 
 /* ── Preview pane markdown ─────────────────────────────────── */
 .preview-content { color: var(--fg); font-family: var(--font-body); line-height: 1.75; }
@@ -419,4 +310,52 @@ mark { background-color: #fff3bf; color: #5c4400; border-radius: 2px; padding: 0
   50%  { content: '..'; }
   75%  { content: '...'; }
   100% { content: ''; }
+}
+
+@keyframes collabCaretBlink {
+  0%, 100% { opacity: 0; }
+  50% { opacity: 1; }
+}
+
+/* ── Task List (Checklist) Styling ── */
+ul[data-type="taskList"] {
+  list-style: none !important;
+  padding: 0 !important;
+  margin: 12px 0 !important;
+}
+ul[data-type="taskList"] li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+ul[data-type="taskList"] li > label {
+  display: flex;
+  align-items: center;
+  user-select: none;
+}
+ul[data-type="taskList"] li > div {
+  flex: 1;
+  min-width: 0;
+  outline: none;
+}
+ul[data-type="taskList"] input[type="checkbox"] {
+  cursor: pointer;
+  accent-color: var(--primary);
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  background: var(--bg-app);
+}
+ul[data-type="taskList"] li[data-checked="true"] > div {
+  text-decoration: line-through;
+  color: var(--fg-muted);
+}
+
+/* ── Drag & Drop Cursor Line ── */
+.ProseMirror-dropcursor {
+  border-top: 2px solid var(--primary) !important;
+  transition: all 0.1s ease;
 }

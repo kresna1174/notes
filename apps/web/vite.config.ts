@@ -10,8 +10,8 @@ import { apiPlugin } from './vite-plugin-api'
 const config = defineConfig({
   resolve: { tsconfigPaths: true },
   plugins: [
-    apiPlugin(),
     devtools(),
+    apiPlugin(),
     tailwindcss(),
     tanstackRouter({ target: 'react', autoCodeSplitting: true }),
     viteReact(),

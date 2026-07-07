@@ -1,6 +1,7 @@
 import React, { useState } from 'react'
 import { marked } from 'marked'
 import { FileText, ImageIcon, FileCode, Download, ChevronDown, ChevronUp } from 'lucide-react'
+import { AttachmentPreviewModal, isPreviewable } from './AttachmentPreviewModal'
 
 // ── helpers ──────────────────────────────────────────────────
 
@@ -164,6 +165,7 @@ export function AttachmentPreview({ attachmentId, filename, mimeType, size }: {
   attachmentId: string; filename: string; mimeType: string; size: number
 }) {
   const [expanded, setExpanded] = useState(false)
+  const [previewOpen, setPreviewOpen] = useState(false)
   const url = `/api/attachments/${attachmentId}`
   const isImage = isImageType(mimeType)
   const isViewable = !isImage && isViewableTextType(mimeType, filename)
@@ -187,6 +189,8 @@ export function AttachmentPreview({ attachmentId, filename, mimeType, size }: {
     e.currentTarget.style.color = 'var(--fg-muted, #6c757d)'
   }
 
+  const hasPopupPreview = isPreviewable(mimeType, filename)
+
   return (
     <div style={{
       border: '1px solid var(--border, #e9ecef)', borderRadius: 10,
@@ -198,7 +202,32 @@ export function AttachmentPreview({ attachmentId, filename, mimeType, size }: {
           {isImage ? <ImageIcon size={26} /> : isViewable ? <FileCode size={26} /> : <FileText size={26} />}
         </div>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <p style={{ margin: 0, fontSize: '0.875rem', fontWeight: 500, color: 'var(--fg, #1a1a2e)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          <p
+            onClick={() => hasPopupPreview && setPreviewOpen(true)}
+            style={{
+              margin: 0,
+              fontSize: '0.875rem',
+              fontWeight: 500,
+              color: hasPopupPreview ? 'var(--primary, #3b5bdb)' : 'var(--fg, #1a1a2e)',
+              cursor: hasPopupPreview ? 'pointer' : 'default',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
+              textDecoration: hasPopupPreview ? 'underline decoration-dotted' : 'none'
+            }}
+            onMouseEnter={e => {
+              if (hasPopupPreview) {
+                e.currentTarget.style.color = 'var(--primary-hover, #2b4cc4)'
+                e.currentTarget.style.textDecoration = 'underline'
+              }
+            }}
+            onMouseLeave={e => {
+              if (hasPopupPreview) {
+                e.currentTarget.style.color = 'var(--primary, #3b5bdb)'
+                e.currentTarget.style.textDecoration = 'underline decoration-dotted'
+              }
+            }}
+          >
             {filename}
           </p>
           <p style={{ margin: 0, fontSize: '0.75rem', color: 'var(--fg-muted, #6c757d)' }}>
@@ -238,6 +267,14 @@ export function AttachmentPreview({ attachmentId, filename, mimeType, size }: {
           <TextDocPreview url={url} filename={filename} />
         </div>
       )}
+      <AttachmentPreviewModal
+        isOpen={previewOpen}
+        onClose={() => setPreviewOpen(false)}
+        attachmentId={attachmentId}
+        filename={filename}
+        mimeType={mimeType}
+        size={size}
+      />
     </div>
   )
 }

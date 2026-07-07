@@ -1,6 +1,6 @@
-export const ABOUT_MARKDOWN = `# 📝 Homebrew Notes
+export const ABOUT_MARKDOWN = `# 📝 Mindspace
 
-**Homebrew Notes** adalah aplikasi catatan modern, interaktif, kolaboratif, dan aman yang dikembangkan menggunakan **React, TypeScript, SQLite, Drizzle ORM, TailwindCSS, dan TanStack Router**. Aplikasi ini mengedepankan antarmuka premium, integrasi diagram alir dinamis, penguncian enkripsi berkas mandiri, serta manajemen persetujuan akses pengguna.
+**Mindspace** adalah aplikasi catatan modern, interaktif, kolaboratif, dan aman yang dikembangkan menggunakan **React, TypeScript, SQLite, Drizzle ORM, TailwindCSS, dan TanStack Router**. Aplikasi ini mengedepankan antarmuka premium, integrasi diagram alir dinamis, penguncian enkripsi berkas mandiri, serta manajemen persetujuan akses pengguna.
 
 ---
 

@@ -1,19 +1,30 @@
-import { createFileRoute, useNavigate } from '@tanstack/react-router'
+import { createFileRoute, redirect, useRouter } from '@tanstack/react-router'
 import { useAuth } from '../lib/auth'
 import { useState, useEffect } from 'react'
 import { Sidebar } from '../components/sidebar/Sidebar'
 import { Trash2, UserPlus, Shield, Eye, KeyRound } from 'lucide-react'
 
+interface User { id: string; username: string; role: 'admin' | 'viewer'; status: 'approved' | 'rejected' | 'pending'; createdAt: number }
+
 export const Route = createFileRoute('/users')({
+  beforeLoad: ({ context }) => {
+    if (!context.auth.user || context.auth.user.role !== 'admin') {
+      throw redirect({ to: '/' })
+    }
+  },
+  loader: async () => {
+    const res = await fetch('/api/auth/users')
+    if (!res.ok) return [] as User[]
+    const data = await res.json()
+    return (Array.isArray(data) ? data : []) as User[]
+  },
   component: UsersPage,
 })
 
-interface User { id: string; username: string; role: 'admin' | 'viewer'; status: 'approved' | 'rejected' | 'pending'; createdAt: number }
-
 function UsersPage() {
   const { user } = useAuth()
-  const navigate = useNavigate()
-  const [users, setUsers] = useState<User[]>([])
+  const router = useRouter()
+  const users = Route.useLoaderData()
   const [form, setForm] = useState({ username: '', password: '', role: 'viewer' as 'admin' | 'viewer' })
   const [error, setError] = useState<string | null>(null)
   const [adding, setAdding] = useState(false)
@@ -30,16 +41,6 @@ function UsersPage() {
     return () => window.removeEventListener('resize', checkMobile)
   }, [])
 
-  useEffect(() => {
-    if (!user || user.role !== 'admin') { navigate({ to: '/' }); return }
-    load()
-  }, [user])
-
-  async function load() {
-    const res = await fetch('/api/auth/users')
-    if (res.ok) setUsers(await res.json())
-  }
-
   async function handleAdd(e: React.FormEvent) {
     e.preventDefault()
     setError(null)
@@ -54,23 +55,23 @@ function UsersPage() {
     if (!res.ok) { setError(data.error); return }
     setForm({ username: '', password: '', role: 'viewer' })
     setShowForm(false)
-    load()
+    router.invalidate()
   }
 
   async function handleApprove(id: string) {
     await fetch(`/api/auth/users/${id}/approve`, { method: 'PUT' })
-    load()
+    router.invalidate()
   }
 
   async function handleReject(id: string) {
     await fetch(`/api/auth/users/${id}/reject`, { method: 'PUT' })
-    load()
+    router.invalidate()
   }
 
   async function handleDelete(id: string, username: string) {
     if (!window.confirm(`Hapus user "${username}"?`)) return
     await fetch(`/api/auth/users/${id}`, { method: 'DELETE' })
-    load()
+    router.invalidate()
   }
 
   async function handleResetPassword(id: string, username: string) {

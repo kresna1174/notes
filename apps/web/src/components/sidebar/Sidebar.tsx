@@ -3,14 +3,14 @@ import { useNavigate } from '@tanstack/react-router'
 import { ScrollArea } from '../ui/scroll-area'
 import { DayGroup } from './DayGroup'
 import { SearchBar } from './SearchBar'
-import { Plus, LogOut, Users, Shield, Eye, UsersRound, Info, CalendarDays, Menu, X, KeyRound } from 'lucide-react'
+import { Plus, LogOut, Users, Shield, Eye, UsersRound, Info, CalendarDays, Menu, X, KeyRound, Brain } from 'lucide-react'
 import { FontPicker } from './FontPicker'
 import { ThemeToggle } from './ThemeToggle'
 import { useAuth } from '../../lib/auth'
 import { AboutModal } from '../ui/AboutModal'
 import { ChangePasswordModal } from '../ui/ChangePasswordModal'
 
-interface Note { id: string; title: string; createdAt: number; shareToken?: string | null }
+interface Note { id: string; title: string; createdAt: number; shareToken?: string | null; icon?: string | null }
 interface SearchResult { id: string; title: string; createdAt: number; snippet: string }
 interface SidebarProps {
   activeNoteId: string | null
@@ -241,8 +241,10 @@ export function Sidebar({ activeNoteId, onShareNote, notesUpdateTrigger }: Sideb
         {/* Header */}
         <div className="px-4 py-4 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <img src="/logo192.png" alt="Homebrew Notes Logo" className="w-6 h-6 object-contain" />
-            <span className="text-sm font-semibold" style={{ color: C.fg, letterSpacing: '-0.01em' }}>Homebrew Notes</span>
+            <div style={{ width: 24, height: 24, borderRadius: 6, background: 'var(--accent)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--primary)' }}>
+              <Brain size={14} />
+            </div>
+            <span className="text-sm font-semibold" style={{ color: C.fg, letterSpacing: '-0.01em', fontFamily: 'var(--font-heading)' }}>Mindspace</span>
           </div>
           <div className="flex items-center gap-1">
             <ThemeToggle />

@@ -29,6 +29,8 @@ export const notes = sqliteTable('notes', {
   shareToken: text('share_token'),
   sharePinHash: text('share_pin_hash'),
   updatedByUserId: text('updated_by_user_id'),
+  coverImage: text('cover_image'),
+  icon: text('icon'),
   createdAt: integer('created_at').notNull(),
   updatedAt: integer('updated_at').notNull(),
 })

@@ -108,6 +108,12 @@ if (!notesCols.includes('type')) {
 if (!notesCols.includes('copied_from_id')) {
   sqlite.exec(`ALTER TABLE notes ADD COLUMN copied_from_id TEXT`)
 }
+if (!notesCols.includes('cover_image')) {
+  sqlite.exec(`ALTER TABLE notes ADD COLUMN cover_image TEXT`)
+}
+if (!notesCols.includes('icon')) {
+  sqlite.exec(`ALTER TABLE notes ADD COLUMN icon TEXT`)
+}
 
 const usersCols = (sqlite.pragma('table_info(users)') as { name: string }[]).map(c => c.name)
 if (!usersCols.includes('team_id')) {
