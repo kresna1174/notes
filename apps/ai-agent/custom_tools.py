@@ -8,6 +8,10 @@ import httpx
 from lxml import html
 from ddgs import DDGS
 from agents import function_tool, RunContextWrapper
+import subprocess
+import sys
+import os
+import tempfile
 
 def format_as_tiptap(text: str) -> str:
     """Check if the text is already JSON. If not, wrap it in standard TipTap format."""
@@ -207,3 +211,61 @@ async def crawl_web(url: str, max_pages: int = 5) -> str:
         return f"Crawled {len(visited)} pages from {domain}:\n\n" + "\n---\n".join(results)
     except Exception as e:
         return f"Error crawling website: {str(e)}"
+
+@function_tool
+def execute_python_code(code: str) -> str:
+    """
+    Execute python code in a temporary subprocess sandbox.
+    This is highly useful for data analysis, complex calculations, and visualization (like generating charts using matplotlib).
+    
+    If you generate charts or figures (using matplotlib, seaborn, etc.), you MUST save them as PNG files in the static uploads folder:
+    `../web/uploads/chart_<random_uuid>.png`
+    and return the markdown image link `![Chart](/uploads/chart_<random_uuid>.png)` in your response so the user can see the chart.
+    
+    Args:
+        code: The complete python code string to execute.
+    """
+    # Write the code to a temporary file
+    with tempfile.NamedTemporaryFile(suffix='.py', mode='w', delete=False) as f:
+        # Pre-import common data libraries to make it easier for the agent
+        full_code = (
+            "import os\n"
+            "import sys\n"
+            "import pandas as pd\n"
+            "import numpy as np\n"
+            "import matplotlib.pyplot as plt\n"
+            "\n" + code
+        )
+        f.write(full_code)
+        temp_file_path = f.name
+        
+    try:
+        # Run the temporary script using subprocess
+        # Using sys.executable to run inside the same python virtual environment
+        result = subprocess.run(
+            [sys.executable, temp_file_path],
+            capture_output=True,
+            text=True,
+            timeout=30 # 30 seconds limit
+        )
+        
+        output_parts = []
+        if result.stdout:
+            output_parts.append(f"STDOUT:\n{result.stdout}")
+        if result.stderr:
+            output_parts.append(f"STDERR:\n{result.stderr}")
+            
+        if not output_parts:
+            return "Execution completed successfully with no output (empty stdout/stderr)."
+            
+        return "\n\n".join(output_parts)
+    except subprocess.TimeoutExpired:
+        return "Execution Error: Timeout expired (limit 30 seconds)."
+    except Exception as e:
+        return f"Execution Error: {str(e)}"
+    finally:
+        # Clean up the temp file
+        try:
+            os.unlink(temp_file_path)
+        except Exception:
+            pass

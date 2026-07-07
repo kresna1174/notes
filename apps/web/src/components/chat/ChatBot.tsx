@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef } from 'react'
-import { Loader2, Trash2, ChevronRight, X, ArrowUp } from 'lucide-react'
+import { Loader2, Trash2, ChevronRight, X, ArrowUp, Paperclip } from 'lucide-react'
 import { useChat } from '@ai-sdk/react'
 import { DefaultChatTransport } from 'ai'
+import { marked } from 'marked'
 
 interface ChatBotProps {
   noteId: string
@@ -179,9 +180,10 @@ function ToolCallBlock({ item, noteId, lastUserPrompt }: { item: any; noteId: st
     crawl_web: 'Crawl situs',
     summarize_expert: 'Ringkas (sub-agent)',
     tagger_expert: 'Ekstrak tag (sub-agent)',
+    execute_python_code: 'Eksekusi kode Python',
   }
 
-  const icon = isWriteTool ? '✏️' : item.toolName.includes('web') ? '🌐' : item.toolName.includes('expert') ? '🤖' : '⚙️'
+  const icon = isWriteTool ? '✏️' : item.toolName === 'execute_python_code' ? '💻' : item.toolName.includes('web') ? '🌐' : item.toolName.includes('expert') ? '🤖' : '⚙️'
   const label = toolLabels[item.toolName] || item.toolName
 
   const storageKey = `note_approve_state_${noteId}_${JSON.stringify(item.calls[0]?.args || {})}`
@@ -291,10 +293,10 @@ function ToolCallBlock({ item, noteId, lastUserPrompt }: { item: any; noteId: st
           {call.args && (
             <details style={{ marginBottom: call.result ? 6 : 0 }}>
               <summary style={{ cursor: 'pointer', color: 'var(--fg-subtle)', fontSize: '0.68rem', userSelect: 'none' }}>
-                Parameter {item.calls.length > 1 ? `#${callIdx + 1}` : ''}
+                {item.toolName === 'execute_python_code' ? 'Kode Python' : `Parameter ${item.calls.length > 1 ? `#${callIdx + 1}` : ''}`}
               </summary>
               <pre style={{ margin: '4px 0 0', padding: '5px 6px', background: 'var(--muted)', borderRadius: 4, overflowX: 'auto', fontFamily: 'monospace', fontSize: '0.65rem', whiteSpace: 'pre-wrap' }}>
-                {JSON.stringify(call.args, null, 2)}
+                {item.toolName === 'execute_python_code' && call.args.code ? call.args.code : JSON.stringify(call.args, null, 2)}
               </pre>
             </details>
           )}
@@ -359,6 +361,10 @@ export function ChatBot({ noteId, noteContent, noteTitle, onClose }: ChatBotProp
   const noteStateRef = useRef({ noteId, noteTitle, noteContent })
   noteStateRef.current = { noteId, noteTitle, noteContent }
 
+  const [attachments, setAttachments] = useState<{ filename: string; mimeType: string; filePath: string }[]>([])
+  const [isUploadingFile, setIsUploadingFile] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
   const { messages, setMessages, sendMessage, status } = useChat({
     transport: new DefaultChatTransport({
       api: '/api/ai/chat/stream',
@@ -366,6 +372,7 @@ export function ChatBot({ noteId, noteContent, noteTitle, onClose }: ChatBotProp
         session_id: noteStateRef.current.noteId,
         note_title: noteStateRef.current.noteTitle,
         note_content: noteStateRef.current.noteContent,
+        attachments: attachments,
       }),
     }),
   })
@@ -415,10 +422,46 @@ export function ChatBot({ noteId, noteContent, noteTitle, onClose }: ChatBotProp
   useEffect(() => { adjustHeight() }, [inputValue])
 
   const handleSend = () => {
-    if (!inputValue.trim() || isLoading) return
+    if ((!inputValue.trim() && attachments.length === 0) || isLoading) return
     sendMessage({ text: inputValue })
     setInputValue('')
+    setAttachments([])
     if (textareaRef.current) textareaRef.current.style.height = 'auto'
+  }
+
+  const handleUploadFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files
+    if (!files || files.length === 0) return
+    
+    setIsUploadingFile(true)
+    try {
+      const file = files[0]
+      const form = new FormData()
+      form.append('file', file)
+      form.append('noteId', noteId)
+      
+      const res = await fetch('/api/attachments', {
+        method: 'POST',
+        body: form
+      })
+      if (!res.ok) throw new Error('Gagal mengunggah file')
+      
+      const data = await res.json()
+      setAttachments(prev => [
+        ...prev,
+        {
+          filename: data.filename,
+          mimeType: data.mimeType,
+          filePath: `uploads/${data.storedAs}`
+        }
+      ])
+    } catch (err) {
+      console.error(err)
+      alert(err instanceof Error ? err.message : 'Terjadi kesalahan saat mengunggah file')
+    } finally {
+      setIsUploadingFile(false)
+      if (fileInputRef.current) fileInputRef.current.value = ''
+    }
   }
 
   const handleClearHistory = () => {
@@ -611,18 +654,27 @@ export function ChatBot({ noteId, noteContent, noteTitle, onClose }: ChatBotProp
                 )}
 
                 {/* Assistant prose text — no bubble */}
-                {hasText && (
-                  <div
-                    style={{
-                      fontSize: '0.84rem',
-                      lineHeight: 1.65,
-                      color: 'var(--fg)',
-                      whiteSpace: 'pre-wrap',
-                    }}
-                  >
-                    {textContent}
-                  </div>
-                )}
+                {hasText && (() => {
+                  const parsedHtml = (() => {
+                    try {
+                      return marked.parseSync(textContent, { breaks: true, gfm: true })
+                    } catch (err) {
+                      console.error(err)
+                      return textContent
+                    }
+                  })()
+                  return (
+                    <div
+                      className="markdown-content"
+                      dangerouslySetInnerHTML={{ __html: parsedHtml }}
+                      style={{
+                        fontSize: '0.84rem',
+                        lineHeight: 1.65,
+                        color: 'var(--fg)',
+                      }}
+                    />
+                  )
+                })()}
 
                 {/* Token metrics — live timer while streaming, static after */}
                 {(hasText || isMessageLoading) && (() => {
@@ -688,6 +740,44 @@ export function ChatBot({ noteId, noteContent, noteTitle, onClose }: ChatBotProp
           flexShrink: 0,
         }}
       >
+        {attachments.length > 0 && (
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 8, padding: '0 4px' }}>
+            {attachments.map((file, i) => (
+              <div
+                key={i}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 4,
+                  padding: '4px 8px',
+                  borderRadius: 6,
+                  background: 'var(--muted)',
+                  border: '1px solid var(--border)',
+                  fontSize: '0.72rem',
+                  color: 'var(--fg-muted)',
+                }}
+              >
+                <span>📁 {file.filename}</span>
+                <button
+                  onClick={() => setAttachments(prev => prev.filter((_, idx) => idx !== i))}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    color: 'var(--fg-subtle)',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    padding: 0,
+                  }}
+                  title="Hapus file"
+                >
+                  <X size={12} />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+
         <div
           style={{
             border: '1px solid var(--border)',
@@ -725,24 +815,60 @@ export function ChatBot({ noteId, noteContent, noteTitle, onClose }: ChatBotProp
           <div
             style={{
               display: 'flex',
-              justifyContent: 'flex-end',
+              justifyContent: 'space-between',
+              alignItems: 'center',
               padding: '4px 8px 6px',
             }}
           >
+            <div style={{ display: 'flex', alignItems: 'center' }}>
+              <input
+                type="file"
+                ref={fileInputRef}
+                onChange={handleUploadFile}
+                style={{ display: 'none' }}
+              />
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                disabled={isUploadingFile || isLoading}
+                title="Unggah dokumen (PDF, CSV, Excel, TXT, Gambar)"
+                style={{
+                  width: 28,
+                  height: 28,
+                  borderRadius: 6,
+                  background: 'none',
+                  border: 'none',
+                  color: 'var(--fg-muted)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: isUploadingFile || isLoading ? 'default' : 'pointer',
+                  transition: 'background 0.15s',
+                }}
+                onMouseEnter={e => { if (!isUploadingFile && !isLoading) e.currentTarget.style.background = 'var(--muted)' }}
+                onMouseLeave={e => { e.currentTarget.style.background = 'none' }}
+              >
+                {isUploadingFile ? (
+                  <Loader2 className="animate-spin" size={13} />
+                ) : (
+                  <Paperclip size={13} />
+                )}
+              </button>
+            </div>
+
             <button
               onClick={handleSend}
-              disabled={!inputValue.trim() || isLoading}
+              disabled={(!inputValue.trim() && attachments.length === 0) || isLoading}
               style={{
                 width: 28,
                 height: 28,
                 borderRadius: '50%',
-                background: inputValue.trim() && !isLoading ? 'var(--primary)' : 'var(--border)',
-                color: inputValue.trim() && !isLoading ? 'var(--primary-fg)' : 'var(--fg-subtle)',
+                background: (inputValue.trim() || attachments.length > 0) && !isLoading ? 'var(--primary)' : 'var(--border)',
+                color: (inputValue.trim() || attachments.length > 0) && !isLoading ? 'var(--primary-fg)' : 'var(--fg-subtle)',
                 border: 'none',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                cursor: inputValue.trim() && !isLoading ? 'pointer' : 'default',
+                cursor: (inputValue.trim() || attachments.length > 0) && !isLoading ? 'pointer' : 'default',
                 transition: 'background 0.15s',
               }}
             >

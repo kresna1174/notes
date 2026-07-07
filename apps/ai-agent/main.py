@@ -86,6 +86,11 @@ class ChatRequest(BaseModel):
     session_id: str = "default"
     user_id: str | None = None
 
+class ChatAttachment(BaseModel):
+    filename: str
+    mimeType: str
+    filePath: str
+
 class ChatStreamRequest(BaseModel):
     message: str | None = None
     messages: list[dict] | None = None
@@ -93,6 +98,7 @@ class ChatStreamRequest(BaseModel):
     note_title: str | None = None
     note_content: str | None = None
     user_id: str | None = None
+    attachments: list[ChatAttachment] | None = None
 
 class SummarizeRequest(BaseModel):
     content: str
@@ -109,7 +115,7 @@ class ApproveRejectRequest(BaseModel):
     call_id: str
     status: str
 
-from custom_tools import write_notes, create_new_note, update_note_direct, search_web, extract_web, crawl_web
+from custom_tools import write_notes, create_new_note, update_note_direct, search_web, extract_web, crawl_web, execute_python_code
 from core.llm import default_model_settings
 
 # 1. Definisikan Sub-Agents
@@ -135,7 +141,13 @@ parent_agent = Agent(
     instructions="""You are a helpful notes platform assistant.
     You help the user summarize notes, categorize notes, and answer questions.
     For advanced summarization or tag extraction tasks, delegate to your specialized sub-agents using their tools.
-    You can also search the web, extract content, crawl sites, write/update notes, create brand new notes, and directly update active notes without approval.""",
+    You can also search the web, extract content, crawl sites, write/update notes, create brand new notes, directly update active notes without approval, and execute python code to analyze data or generate charts.
+    
+    If the user asks you to analyze some data or plot a chart (and you have an uploaded file or data), write python code and run it using the `execute_python_code` tool.
+    If you generate charts or figures (using matplotlib, seaborn, etc.), save them as PNG files in the static uploads folder:
+    `../web/uploads/chart_<random_uuid>.png`
+    and return the markdown image link `![Chart](/uploads/chart_<random_uuid>.png)` in your response so the user can see the chart.
+    """,
     model=get_model(),
     model_settings=default_model_settings,
     tools=[
@@ -153,6 +165,7 @@ parent_agent = Agent(
         search_web,
         extract_web,
         crawl_web,
+        execute_python_code,
     ]
 )
 
@@ -491,6 +504,53 @@ async def chat_event_generator(message: str, session_id: str, user_id: str | Non
         yield "data: [DONE]\n\n"
 
 
+def parse_attachment(attachment: ChatAttachment) -> str:
+    # Resolve the physical filepath.
+    # Hono/Node uploads files to 'uploads/' relative to 'apps/web'
+    # The relative path from 'apps/ai-agent' is '../web/uploads/'
+    full_path = os.path.join("..", "web", attachment.filePath)
+    
+    if not os.path.exists(full_path):
+        # Fallback: try filePath as-is
+        full_path = attachment.filePath
+        if not os.path.exists(full_path):
+            return f"[Error: File {attachment.filename} not found on server]"
+            
+    ext = os.path.splitext(attachment.filename)[1].lower()
+    
+    try:
+        if ext == '.pdf':
+            import pypdf
+            reader = pypdf.PdfReader(full_path)
+            text_parts = []
+            for i, page in enumerate(reader.pages):
+                page_text = page.extract_text()
+                if page_text:
+                    text_parts.append(f"--- Page {i+1} ---\n{page_text}")
+            return "\n\n".join(text_parts)
+            
+        elif ext in ['.csv', '.xlsx', '.xls']:
+            import pandas as pd
+            if ext == '.csv':
+                df = pd.read_csv(full_path)
+            else:
+                df = pd.read_excel(full_path)
+            # Render dataframe as markdown table
+            return df.to_markdown(index=False)
+            
+        elif ext in ['.txt', '.md', '.json']:
+            with open(full_path, 'r', encoding='utf-8', errors='ignore') as f:
+                return f.read()
+                
+        elif ext in ['.png', '.jpg', '.jpeg', '.webp']:
+            return f"[Image Attachment: {attachment.filename} uploaded at {attachment.filePath}]"
+            
+        else:
+            return f"[Unsupported file type: {attachment.filename}]"
+            
+    except Exception as e:
+        return f"[Error parsing file {attachment.filename}: {str(e)}]"
+
 @app.post("/api/chat/stream")
 async def chat_stream(request: ChatStreamRequest):
     user_message = ""
@@ -522,6 +582,22 @@ async def chat_stream(request: ChatStreamRequest):
 
         logger.info(f"Extracted user_message: {user_message[:100]!r}")
             
+    # Ekstrak file lampiran dan tambahkan ke context
+    attachments_context = []
+    if request.attachments:
+        for attachment in request.attachments:
+            file_content = parse_attachment(attachment)
+            attachments_context.append(
+                f"[Isi Dokumen Terlampir: \"{attachment.filename}\"]\n"
+                f"```{attachment.filename.split('.')[-1]}\n"
+                f"{file_content}\n"
+                f"```"
+            )
+            
+    if attachments_context:
+        attachments_str = "\n\n".join(attachments_context) + "\n\n"
+        user_message = f"{attachments_str}{user_message}"
+
     # Sisipkan konteks catatan jika ada di body
     if request.note_title or request.note_content:
         context_str = f"[Konteks Catatan: Judul: \"{request.note_title or ''}\", Konten: \"{request.note_content or ''}\"]\n\n"
