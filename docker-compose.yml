@@ -60,8 +60,8 @@ services:
   # Web frontend and proxy Node.js API server
   notes-app:
     build:
-      context: ./apps/web
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: apps/web/Dockerfile
     container_name: notes-web-app
     restart: always
     ports:
