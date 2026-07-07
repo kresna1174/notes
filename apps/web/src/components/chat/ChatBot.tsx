@@ -56,7 +56,7 @@ function ToggleBlock({
   children,
   accentColor,
 }: {
-  icon: string
+  icon: React.ReactNode
   label: string
   badge?: string
   defaultOpen?: boolean
@@ -97,7 +97,7 @@ function ToggleBlock({
           color={headerColor}
           style={{ transform: open ? 'rotate(90deg)' : 'none', transition: 'transform 0.15s', flexShrink: 0 }}
         />
-        <span style={{ fontSize: '0.7rem', flexShrink: 0 }}>{icon}</span>
+        <span style={{ display: 'flex', alignItems: 'center', flexShrink: 0, color: headerColor }}>{icon}</span>
         <span
           style={{
             fontSize: '0.72rem',
@@ -195,20 +195,51 @@ function ToolCallBlock({ item, noteId, lastUserPrompt }: { item: any; noteId: st
   const isAnyCallActive = item.calls.some((c: any) => c.state === 'call')
   const [isAuto, setIsAuto] = useState(false)
 
-  const toolLabels: Record<string, string> = {
-    write_notes: 'Perbarui catatan',
-    create_new_note: 'Buat catatan baru',
-    update_note_direct: 'Edit catatan langsung',
-    search_web: 'Cari di web',
-    extract_web: 'Ekstrak konten web',
-    crawl_web: 'Crawl situs',
-    summarize_expert: 'Ringkas (sub-agent)',
-    tagger_expert: 'Ekstrak tag (sub-agent)',
-    execute_python_code: 'Eksekusi kode Python',
+  const toolMeta: Record<string, { label: string; icon: React.ReactNode }> = {
+    write_notes: {
+      label: 'Updating note',
+      icon: <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>,
+    },
+    create_new_note: {
+      label: 'Creating note',
+      icon: <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg>,
+    },
+    update_note_direct: {
+      label: 'Editing note',
+      icon: <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>,
+    },
+    search_web: {
+      label: 'Searching the web',
+      icon: <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>,
+    },
+    extract_web: {
+      label: 'Extracting web content',
+      icon: <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>,
+    },
+    crawl_web: {
+      label: 'Crawling site',
+      icon: <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>,
+    },
+    summarize_expert: {
+      label: 'Summarizing',
+      icon: <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="21" y1="10" x2="7" y2="10"/><line x1="21" y1="6" x2="3" y2="6"/><line x1="21" y1="14" x2="3" y2="14"/><line x1="21" y1="18" x2="7" y2="18"/></svg>,
+    },
+    tagger_expert: {
+      label: 'Extracting tags',
+      icon: <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>,
+    },
+    execute_python_code: {
+      label: 'Running code',
+      icon: <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>,
+    },
   }
 
-  const icon = isWriteTool ? '✏️' : item.toolName === 'execute_python_code' ? '💻' : item.toolName.includes('web') ? '🌐' : item.toolName.includes('expert') ? '🤖' : '⚙️'
-  const label = toolLabels[item.toolName] || item.toolName
+  const fallbackMeta = {
+    label: item.toolName.replace(/_/g, ' '),
+    icon: <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M4.93 4.93a10 10 0 0 0 0 14.14"/></svg>,
+  }
+
+  const { label, icon } = toolMeta[item.toolName] ?? fallbackMeta
 
   const storageKey = `note_approve_state_${noteId}_${JSON.stringify(item.calls[0]?.args || {})}`
   const [approvalState, setApprovalState] = useState<'pending' | 'approved' | 'rejected'>(() => {
@@ -295,8 +326,8 @@ function ToolCallBlock({ item, noteId, lastUserPrompt }: { item: any; noteId: st
   }, [approvalState, item, lastUserPrompt])
 
   const statusBadge =
-    approvalState === 'approved' ? '✓ diterapkan' :
-    approvalState === 'rejected' ? '✗ ditolak' :
+    approvalState === 'approved' ? 'applied' :
+    approvalState === 'rejected' ? 'rejected' :
     undefined
 
   return (
