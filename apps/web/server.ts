@@ -2,6 +2,8 @@ import { createServer } from 'http'
 import { existsSync, createReadStream, statSync } from 'fs'
 import { join, extname } from 'path'
 import { handleApiRequest } from './src/server/api'
+import { WebSocketServer } from 'ws'
+import { verifySession, handleYjsConnection } from './src/server/yjs'
 
 const PORT = process.env.PORT || 3000
 const DIST_DIR = join(process.cwd(), 'dist')
@@ -80,6 +82,33 @@ const server = createServer(async (req, res) => {
     res.writeHead(404, { 'Content-Type': 'text/plain' })
     res.end('404 Not Found')
   }
+})
+
+const wss = new WebSocketServer({ noServer: true })
+
+server.on('upgrade', (request, socket, head) => {
+  const url = new URL(request.url || '', `http://${request.headers.host || 'localhost'}`)
+  const pathname = url.pathname
+  const match = pathname.match(/^\/api\/notes\/([^\/]+)\/collaboration\/([^\/]+)$/)
+  
+  if (match) {
+    const noteId = match[1]
+    const cookieHeader = request.headers.cookie
+    if (!verifySession(cookieHeader)) {
+      socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n')
+      socket.destroy()
+      return
+    }
+    wss.handleUpgrade(request, socket, head, (ws) => {
+      wss.emit('connection', ws, request, noteId)
+    })
+  } else {
+    socket.destroy()
+  }
+})
+
+wss.on('connection', (ws: any, _request: any, noteId: any) => {
+  handleYjsConnection(ws, noteId as string)
 })
 
 server.listen(PORT, () => {

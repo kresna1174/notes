@@ -2,6 +2,11 @@ import { useEditor, EditorContent } from '@tiptap/react'
 import Link from '@tiptap/extension-link'
 import StarterKit from '@tiptap/starter-kit'
 import Heading from '@tiptap/extension-heading'
+import { Collaboration } from '@tiptap/extension-collaboration'
+import { CollaborationCaret } from '@tiptap/extension-collaboration-caret'
+import * as Y from 'yjs'
+import { WebsocketProvider } from 'y-websocket'
+import { useAuth } from '../../lib/auth'
 import { Table } from '@tiptap/extension-table'
 import { TableRow } from '@tiptap/extension-table-row'
 import { TableCell } from '@tiptap/extension-table-cell'
@@ -15,7 +20,7 @@ import Underline from '@tiptap/extension-underline'
 import Highlight from '@tiptap/extension-highlight'
 import { SlashCommandExtension } from './SlashCommand'
 import { DiagramBlock, EditDiagramDialog } from './DiagramBlock'
-import { AttachmentBlockExtension } from './AttachmentBlock'
+import { AttachmentBlockExtension, pendingFiles } from './AttachmentBlock'
 import { BubbleToolbar } from './BubbleToolbar'
 import { PreviewPanel } from './PreviewPanel'
 import { PinLockModal } from './PinLockModal'
@@ -27,15 +32,15 @@ import { TableOfContentsBlock } from './TableOfContentsBlock'
 import { WebBookmarkBlock } from './WebBookmarkBlock'
 import { ToggleBlock } from './ToggleBlock'
 import { DragHandle } from './DragHandle'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, useMemo } from 'react'
 import { Eye, EyeOff, Lock, LockOpen, Share2, FileUp, Paperclip, Sparkles } from 'lucide-react'
 import { marked } from 'marked'
 import mammoth from 'mammoth'
 import * as XLSX from 'xlsx'
 
 import { Extension } from '@tiptap/core'
-import { Plugin, PluginKey } from '@tiptap/pm/state'
-import { Decoration, DecorationSet } from '@tiptap/pm/view'
+import { Plugin } from '@tiptap/pm/state'
+
 
 interface Note {
   id: string
@@ -53,120 +58,7 @@ interface Note {
   icon?: string | null
 }
 
-const CollabCursorKey = new PluginKey('collabCursor')
 
-export const CollabCursor = Extension.create({
-  name: 'collabCursor',
-
-  addProseMirrorPlugins() {
-    return [
-      new Plugin({
-        key: CollabCursorKey,
-        state: {
-          init() {
-            return DecorationSet.empty
-          },
-          apply(tr, set) {
-            // Check if we received a metadata update with new typing users
-            const nextTypingUsers = tr.getMeta(CollabCursorKey) as { username: string; pos: number }[] | undefined
-            
-            if (nextTypingUsers !== undefined) {
-              const decos: Decoration[] = []
-              const docSize = tr.doc.content.size
-
-              for (const user of nextTypingUsers) {
-                const username = user.username
-                let pos = user.pos
-
-                if (pos === undefined || pos < 0) continue
-                if (pos > docSize) pos = docSize
-
-                const initial = username.slice(0, 2).toUpperCase()
-
-                const widget = Decoration.widget(pos, () => {
-                  const span = document.createElement('span')
-                  span.className = 'collab-cursor-widget'
-                  span.style.position = 'relative'
-                  span.style.display = 'inline-flex'
-                  span.style.alignItems = 'center'
-                  span.style.verticalAlign = 'middle'
-                  span.style.margin = '0 2px'
-                  span.style.pointerEvents = 'none'
-                  span.style.userSelect = 'none'
-
-                  // Blinking caret
-                  const caret = document.createElement('span')
-                  caret.style.display = 'inline-block'
-                  caret.style.width = '2px'
-                  caret.style.height = '1.2em'
-                  caret.style.background = '#2f9e44'
-                  caret.style.animation = 'collabCaretBlink 1s infinite'
-                  span.appendChild(caret)
-
-                  // Rounded Avatar (just initial name) floating above the caret
-                  const avatar = document.createElement('span')
-                  avatar.style.position = 'absolute'
-                  avatar.style.bottom = '100%'
-                  avatar.style.left = '50%'
-                  avatar.style.transform = 'translate(-50%, -2px)'
-                  avatar.style.width = '20px'
-                  avatar.style.height = '20px'
-                  avatar.style.borderRadius = '50%'
-                  avatar.style.background = '#2f9e44'
-                  avatar.style.color = '#fff'
-                  avatar.style.fontSize = '0.65rem'
-                  avatar.style.fontWeight = '700'
-                  avatar.style.display = 'flex'
-                  avatar.style.alignItems = 'center'
-                  avatar.style.justifyContent = 'center'
-                  avatar.style.boxShadow = '0 1px 4px rgba(0,0,0,0.15)'
-                  avatar.style.whiteSpace = 'nowrap'
-                  avatar.style.zIndex = '50'
-                  avatar.innerText = initial
-                  span.appendChild(avatar)
-
-                  // Blinking typing dots inline next to caret - ONLY IF TYPING
-                  if (user.isTyping) {
-                    const dots = document.createElement('span')
-                    dots.style.display = 'inline-flex'
-                    dots.style.alignItems = 'center'
-                    dots.style.gap = '2px'
-                    dots.style.marginLeft = '4px'
-                    dots.style.background = 'rgba(47, 158, 68, 0.1)'
-                    dots.style.border = '1px solid rgba(47, 158, 68, 0.2)'
-                    dots.style.padding = '2px 4px'
-                    dots.style.borderRadius = '4px'
-                    dots.style.height = '14px'
-
-                    dots.innerHTML = `
-                      <span style="width: 3px; height: 3px; border-radius: 50%; background: #2f9e44; display: inline-block; animation: dot-blink 1.4s infinite both;"></span>
-                      <span style="width: 3px; height: 3px; border-radius: 50%; background: #2f9e44; display: inline-block; animation: dot-blink 1.4s infinite both; animation-delay: 0.2s;"></span>
-                      <span style="width: 3px; height: 3px; border-radius: 50%; background: #2f9e44; display: inline-block; animation: dot-blink 1.4s infinite both; animation-delay: 0.4s;"></span>
-                    `
-                    span.appendChild(dots)
-                  }
-
-                  return span
-                }, { side: 1, key: username })
-
-                decos.push(widget)
-              }
-
-              return DecorationSet.create(tr.doc, decos)
-            }
-
-            return set.map(tr.mapping, tr.doc)
-          },
-        },
-        props: {
-          decorations(state) {
-            return CollabCursorKey.getState(state)
-          }
-        }
-      })
-    ]
-  }
-})
 
 export const DragDropPlugin = Extension.create({
   name: 'dragDropPlugin',
@@ -175,6 +67,32 @@ export const DragDropPlugin = Extension.create({
       new Plugin({
         props: {
           handleDrop(view, event) {
+            // First check if it is an external file drop
+            const files = event.dataTransfer ? Array.from(event.dataTransfer.files) : []
+            if (files.length > 0) {
+              event.preventDefault()
+              
+              // Calculate drop position
+              const coordinates = view.posAtCoords({ left: event.clientX, top: event.clientY })
+              const dropPos = coordinates ? coordinates.pos : view.state.selection.to
+
+              for (const file of files) {
+                const uploadId = 'upload_' + Math.random().toString(36).substring(2, 9)
+                pendingFiles.set(uploadId, file)
+
+                const node = view.state.schema.nodes.attachment.create({
+                  attachmentId: null,
+                  uploadId,
+                  filename: file.name,
+                  mimeType: file.type,
+                  size: file.size
+                })
+                const tr = view.state.tr.insert(dropPos, node)
+                view.dispatch(tr)
+              }
+              return true
+            }
+
             const dragStartPos = (window as any).__dragStartPos
             const draggedNode = (window as any).__draggedNode
             if (dragStartPos === undefined || !draggedNode) {
@@ -192,19 +110,88 @@ export const DragDropPlugin = Extension.create({
             const dropPos = coordinates.pos
             const tr = view.state.tr
 
-            if (dragStartPos === dropPos) {
+            // Resolve target block depth
+            const $pos = view.state.doc.resolve(dropPos)
+            if ($pos.depth === 0) return false
+
+            let targetDepth = $pos.depth
+            while (targetDepth > 0) {
+              const nodeType = $pos.node(targetDepth).type.name
+              if (
+                nodeType === 'listItem' ||
+                nodeType === 'taskItem' ||
+                nodeType === 'callout' ||
+                nodeType === 'diagram' ||
+                nodeType === 'toggleBlock' ||
+                nodeType === 'bookmark'
+              ) {
+                break
+              }
+              if (targetDepth === 1) {
+                break
+              }
+              targetDepth--
+            }
+
+            const targetBlockStart = $pos.before(targetDepth)
+            const targetBlockNode = $pos.node(targetDepth)
+            const targetBlockEnd = targetBlockStart + targetBlockNode.nodeSize
+
+            // Determine drop position (before or after target block)
+            // By default, drop before target block
+            let dropAt = targetBlockStart
+
+            // Use target element's DOM bounding rect to check if mouse is on upper or lower half
+            const targetElement = event.target as HTMLElement
+            let current: HTMLElement | null = targetElement
+            let targetBlockDom: HTMLElement | null = null
+            const editorDom = view.dom
+            while (current && current.parentElement) {
+              if (current.parentElement === editorDom) {
+                targetBlockDom = current
+                break
+              }
+              if (
+                current.tagName === 'LI' ||
+                current.getAttribute('data-type') === 'callout' ||
+                current.getAttribute('data-type') === 'diagram' ||
+                current.getAttribute('data-type') === 'toggle-block' ||
+                current.getAttribute('data-type') === 'bookmark'
+              ) {
+                targetBlockDom = current
+                break
+              }
+              current = current.parentElement
+            }
+
+            if (targetBlockDom) {
+              const rect = targetBlockDom.getBoundingClientRect()
+              const relativeY = event.clientY - rect.top
+              if (relativeY > rect.height / 2) {
+                dropAt = targetBlockEnd
+              }
+            } else {
+              // Fallback: if mouse is in the bottom half of the block, drop after
+              const blockLength = targetBlockNode.textContent.length
+              const offsetInsideBlock = $pos.parentOffset
+              if (offsetInsideBlock > blockLength / 2) {
+                dropAt = targetBlockEnd
+              }
+            }
+
+            if (dragStartPos === dropAt) {
               return true
             }
 
-            if (dragStartPos < dropPos) {
+            if (dragStartPos < dropAt) {
               // Dragging down: delete original node first
               tr.delete(dragStartPos, dragStartPos + draggedNode.nodeSize)
               // Calculate target position in modified document
-              const targetPos = Math.min(tr.doc.content.size, Math.max(0, dropPos - draggedNode.nodeSize))
+              const targetPos = Math.min(tr.doc.content.size, Math.max(0, dropAt - draggedNode.nodeSize))
               tr.insert(targetPos, draggedNode)
             } else {
               // Dragging up: insert first
-              tr.insert(dropPos, draggedNode)
+              tr.insert(dropAt, draggedNode)
               // Calculate target position in modified document (shifted by nodeSize)
               const targetStart = dragStartPos + draggedNode.nodeSize
               tr.delete(targetStart, targetStart + draggedNode.nodeSize)
@@ -212,6 +199,32 @@ export const DragDropPlugin = Extension.create({
 
             view.dispatch(tr)
             return true
+          },
+          handlePaste(view, event) {
+            const files = event.clipboardData ? Array.from(event.clipboardData.files) : []
+            if (files.length > 0) {
+              event.preventDefault()
+
+              // Determine insert position (current cursor position)
+              const dropPos = view.state.selection.to
+
+              for (const file of files) {
+                const uploadId = 'upload_' + Math.random().toString(36).substring(2, 9)
+                pendingFiles.set(uploadId, file)
+
+                const node = view.state.schema.nodes.attachment.create({
+                  attachmentId: null,
+                  uploadId,
+                  filename: file.name,
+                  mimeType: file.type,
+                  size: file.size
+                })
+                const tr = view.state.tr.insert(dropPos, node)
+                view.dispatch(tr)
+              }
+              return true
+            }
+            return false
           }
         }
       })
@@ -221,16 +234,12 @@ export const DragDropPlugin = Extension.create({
 
 interface EditorProps {
   note: Note
-  onUpdate: (fields: { title?: string; content?: string }) => Promise<void>
+  onUpdate: (fields: { title?: string; content?: string; coverImage?: string | null; icon?: string | null }) => Promise<void>
   onSaveStatusChange?: (status: 'saved' | 'saving' | 'unsaved') => void
   onLockChange?: (isLocked: boolean) => void
   shareTrigger?: number
   chatOpen?: boolean
   onToggleChat?: () => void
-  activeUsers?: { userId: string; username: string }[]
-  typingUsers?: { username: string; pos: number }[]
-  remoteUpdate?: { updatedBy: string; content: string; title: string } | null
-  onClearRemoteUpdate?: () => void
 }
 
 function fmt(ts: number) {
@@ -469,7 +478,7 @@ function CoverSelector({ onSelect }: { onSelect: (gradient: string) => void }) {
   )
 }
 
-export function Editor({ note, onUpdate, onSaveStatusChange, onLockChange, shareTrigger, chatOpen, onToggleChat, activeUsers = [], typingUsers = [], remoteUpdate = null, onClearRemoteUpdate }: EditorProps) {
+export function Editor({ note, onUpdate, onSaveStatusChange, onLockChange, shareTrigger, chatOpen, onToggleChat }: EditorProps) {
   const [title, setTitle] = useState(note.title)
   const titleValRef = useRef(title)
   titleValRef.current = title
@@ -513,24 +522,71 @@ export function Editor({ note, onUpdate, onSaveStatusChange, onLockChange, share
   function setStatus(s: SaveStatus) { onSaveStatusChange?.(s) }
   const titleRef = useRef<HTMLInputElement>(null)
   const saveTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
+  const typingTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const attachInputRef = useRef<HTMLInputElement>(null)
 
-  const lastTypingSent = useRef<number>(0)
-  const lastPosSent = useRef<number>(-1)
-  function triggerTyping(pos?: number) {
-    const currentPos = pos ?? editor?.state.selection.head ?? 0
-    const now = Date.now()
-    if (now - lastTypingSent.current > 2000 || currentPos !== lastPosSent.current) {
-      lastTypingSent.current = now
-      lastPosSent.current = currentPos
-      fetch(`/api/notes/${note.id}/typing`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ pos: currentPos })
-      }).catch(() => {})
+  const { user: currentUser } = useAuth()
+  const [activeUsers, setActiveUsers] = useState<{ userId: string; username: string; isTyping: boolean; color: string }[]>([])
+
+  const { ydoc, provider } = useMemo(() => {
+    const ydoc = new Y.Doc()
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
+    const provider = new WebsocketProvider(
+      `${protocol}//${window.location.host}/api/notes/${note.id}/collaboration`,
+      note.id,
+      ydoc,
+      { connect: false }
+    )
+    return { ydoc, provider }
+  }, [note.id])
+
+  useEffect(() => {
+    provider.connect()
+    return () => {
+      provider.disconnect()
+      ydoc.destroy()
     }
-  }
+  }, [provider, ydoc])
+
+  useEffect(() => {
+    if (currentUser) {
+      const colors = ['#f783ac', '#da77f2', '#94d82d', '#ffd43b', '#ff922b', '#20c997', '#22b8cf', '#4d638d']
+      const color = colors[(currentUser.userId || '').charCodeAt(0) % colors.length]
+      provider.awareness.setLocalStateField('user', {
+        name: currentUser.username,
+        color: color,
+      })
+    }
+  }, [currentUser, provider])
+
+  useEffect(() => {
+    const handleAwarenessUpdate = () => {
+      const states = Array.from(provider.awareness.getStates().entries())
+      const usersList = states.map(([clientId, state]: [number, any]) => {
+        const user = state.user
+        if (!user) return null
+        return {
+          userId: String(clientId),
+          username: user.name || 'Anonymous',
+          isTyping: !!state.isTyping,
+          color: user.color || '#2f9e44',
+        }
+      }).filter(Boolean) as { userId: string; username: string; isTyping: boolean; color: string }[]
+
+      const uniqueUsers = usersList.filter((val, index, self) =>
+        self.findIndex(t => t.username === val.username) === index
+      )
+      setActiveUsers(uniqueUsers)
+    }
+
+    provider.awareness.on('update', handleAwarenessUpdate)
+    handleAwarenessUpdate()
+
+    return () => {
+      provider.awareness.off('update', handleAwarenessUpdate)
+    }
+  }, [provider])
 
   const editor = useEditor({
     extensions: [
@@ -551,7 +607,16 @@ export function Editor({ note, onUpdate, onSaveStatusChange, onLockChange, share
       DiagramBlock,
       AttachmentBlockExtension,
       Link.configure({ autolink: true, openOnClick: true, HTMLAttributes: { target: '_blank', rel: 'noopener noreferrer' } }),
-      CollabCursor,
+      Collaboration.configure({
+        document: ydoc,
+      }),
+      CollaborationCaret.configure({
+        provider: provider,
+        user: {
+          name: currentUser?.username || 'Anonymous',
+          color: '#2f9e44',
+        }
+      }),
       TaskList,
       TaskItem.configure({ nested: true }),
       CalloutBlock,
@@ -560,11 +625,17 @@ export function Editor({ note, onUpdate, onSaveStatusChange, onLockChange, share
       ToggleBlock,
       DragDropPlugin,
     ],
-    content: (() => {
-      try { return JSON.parse(note.content) } catch { return {} }
-    })(),
-    onUpdate: ({ editor }) => {
-      triggerTyping(editor.state.selection.head)
+    onUpdate: ({ editor, transaction }) => {
+      const isRemote = transaction.getMeta('y-sync$') !== undefined
+      if (!isRemote && currentUser && provider) {
+        provider.awareness.setLocalStateField('isTyping', true)
+        clearTimeout(typingTimer.current)
+        typingTimer.current = setTimeout(() => {
+          provider.awareness.setLocalStateField('isTyping', false)
+        }, 3000)
+      }
+      if (isRemote) return
+
       Promise.resolve().then(() => setStatus('unsaved'))
       clearTimeout(saveTimer.current)
       saveTimer.current = setTimeout(() => {
@@ -586,23 +657,44 @@ export function Editor({ note, onUpdate, onSaveStatusChange, onLockChange, share
         onUpdate({ content: JSON.stringify(editor.getJSON()), title: newTitle })
           .then(() => { setUpdatedAt(Date.now()); setStatus('saved') })
       }, 1000)
-    },
-    onSelectionUpdate: ({ editor }) => {
-      triggerTyping(editor.state.selection.head)
     }
-  })
+  }, [ydoc, provider, currentUser])
+
+  useEffect(() => {
+    if (!editor) return
+    const handleSync = (isSynced: boolean) => {
+      if (isSynced) {
+        const isDocEmpty = ydoc.getXmlFragment('default').length === 0
+        if (isDocEmpty && note.content) {
+          try {
+            const json = JSON.parse(note.content)
+            editor.commands.setContent(json, { emitUpdate: false })
+          } catch (e) {
+            console.error('Failed to parse initial content', e)
+          }
+        }
+      }
+    }
+    provider.on('sync', handleSync)
+    if (provider.synced) {
+      handleSync(true)
+    }
+    return () => {
+      provider.off('sync', handleSync)
+    }
+  }, [editor, provider, ydoc, note.content])
 
   const [editDiagramData, setEditDiagramData] = useState<{ id: string; initialData: string } | null>(null)
 
   useEffect(() => {
-    if (editor && editor.storage.diagram) {
-      editor.storage.diagram.openEditor = (id: string, initialData: string) => {
+    if (editor && (editor.storage as any).diagram) {
+      (editor.storage as any).diagram.openEditor = (id: string, initialData: string) => {
         setEditDiagramData({ id, initialData })
       }
     }
     return () => {
-      if (editor && editor.storage.diagram) {
-        editor.storage.diagram.openEditor = null
+      if (editor && (editor.storage as any).diagram) {
+        (editor.storage as any).diagram.openEditor = null
       }
     }
   }, [editor])
@@ -676,7 +768,12 @@ export function Editor({ note, onUpdate, onSaveStatusChange, onLockChange, share
     }
   }
 
-  useEffect(() => { return () => clearTimeout(saveTimer.current) }, [])
+  useEffect(() => {
+    return () => {
+      clearTimeout(saveTimer.current)
+      clearTimeout(typingTimer.current)
+    }
+  }, [])
 
   useEffect(() => {
     if (editor) {
@@ -687,11 +784,7 @@ export function Editor({ note, onUpdate, onSaveStatusChange, onLockChange, share
     }
   }, [editor])
 
-  useEffect(() => {
-    if (editor && !editor.isDestroyed) {
-      editor.view.dispatch(editor.state.tr.setMeta(CollabCursorKey, typingUsers))
-    }
-  }, [typingUsers, editor])
+
 
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
@@ -731,23 +824,7 @@ export function Editor({ note, onUpdate, onSaveStatusChange, onLockChange, share
     if (editor) (editor.storage as any).noteId = note.id
   }, [editor, note.id])
 
-  useEffect(() => {
-    if (remoteUpdate && editor) {
-      const isUserEditing = editor.isFocused || document.activeElement === titleRef.current
-      if (!isUserEditing) {
-        try {
-          editor.commands.setContent(JSON.parse(remoteUpdate.content))
-          setTitle(remoteUpdate.title)
-          if ((remoteUpdate as any).coverImage !== undefined) setCoverImage((remoteUpdate as any).coverImage)
-          if ((remoteUpdate as any).icon !== undefined) setIcon((remoteUpdate as any).icon)
-          setUpdatedAt(Date.now())
-          onClearRemoteUpdate?.()
-        } catch (e) {
-          console.error('Failed to parse remote update:', e)
-        }
-      }
-    }
-  }, [remoteUpdate, editor, onClearRemoteUpdate])
+
 
   useEffect(() => {
     function handleAiUpdate(e: Event) {
@@ -793,9 +870,6 @@ export function Editor({ note, onUpdate, onSaveStatusChange, onLockChange, share
     setIsLocked(note.isLocked ?? false)
     setShareToken(note.shareToken ?? null)
     setHasPinProtection(note.hasPinProtection ?? false)
-    if (editor && note.content) {
-      try { editor.commands.setContent(JSON.parse(note.content)) } catch {}
-    }
   }, [note.id])
 
   useEffect(() => {
@@ -843,10 +917,16 @@ export function Editor({ note, onUpdate, onSaveStatusChange, onLockChange, share
   }
 
   function handleTitleChange(e: React.ChangeEvent<HTMLInputElement>) {
-    triggerTyping()
     setTitle(e.target.value)
     setStatus('unsaved')
     clearTimeout(saveTimer.current)
+    if (currentUser && provider) {
+      provider.awareness.setLocalStateField('isTyping', true)
+      clearTimeout(typingTimer.current)
+      typingTimer.current = setTimeout(() => {
+        provider.awareness.setLocalStateField('isTyping', false)
+      }, 3000)
+    }
     saveTimer.current = setTimeout(() => {
       setStatus('saving')
       onUpdate({ title: e.target.value })
@@ -1011,7 +1091,8 @@ export function Editor({ note, onUpdate, onSaveStatusChange, onLockChange, share
                 <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginRight: 8 }}>
                   {activeUsers.map(user => {
                     const initial = user.username.slice(0, 2).toUpperCase()
-                    const isTyping = typingUsers.some(u => u.username === user.username)
+                    const isTyping = user.isTyping
+                    const userColor = user.color || 'var(--primary)'
                     return (
                       <div
                         key={user.userId}
@@ -1020,9 +1101,9 @@ export function Editor({ note, onUpdate, onSaveStatusChange, onLockChange, share
                           width: 28,
                           height: 28,
                           borderRadius: '50%',
-                          background: isTyping ? 'var(--primary)' : 'var(--accent)',
-                          border: isTyping ? '2px solid #2f9e44' : '2px solid var(--primary)',
-                          color: isTyping ? 'var(--save-bg)' : 'var(--primary)',
+                          background: isTyping ? userColor : 'var(--accent)',
+                          border: `2px solid ${userColor}`,
+                          color: isTyping ? '#ffffff' : userColor,
                           fontSize: '0.75rem',
                           fontWeight: 600,
                           display: 'flex',
@@ -1250,55 +1331,7 @@ export function Editor({ note, onUpdate, onSaveStatusChange, onLockChange, share
             </div>
 
             {/* Remote Update Notification Banner */}
-            {remoteUpdate && (
-              <div style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                padding: '10px 16px',
-                marginBottom: 16,
-                background: 'var(--accent)',
-                border: '1px solid var(--primary)',
-                borderRadius: 8,
-                fontFamily: 'var(--font-body)',
-                fontSize: '0.85rem',
-                color: 'var(--primary)',
-                boxShadow: '0 2px 8px rgba(0,0,0,0.05)',
-              }}>
-                <span style={{ fontWeight: 500 }}>
-                  Catatan diperbarui oleh <span style={{ textDecoration: 'underline' }}>{remoteUpdate.updatedBy}</span>.
-                </span>
-                <button
-                  onClick={() => {
-                    if (editor) {
-                      try {
-                        editor.commands.setContent(JSON.parse(remoteUpdate.content))
-                        setTitle(remoteUpdate.title)
-                        setUpdatedAt(Date.now())
-                        onClearRemoteUpdate?.()
-                      } catch (e) {
-                        console.error(e)
-                      }
-                    }
-                  }}
-                  style={{
-                    padding: '4px 12px',
-                    background: 'var(--primary)',
-                    color: 'var(--save-bg)',
-                    border: 'none',
-                    borderRadius: 20,
-                    fontWeight: 600,
-                    cursor: 'pointer',
-                    fontSize: '0.75rem',
-                    transition: 'opacity 0.15s'
-                  }}
-                  onMouseEnter={e => e.currentTarget.style.opacity = '0.9'}
-                  onMouseLeave={e => e.currentTarget.style.opacity = '1'}
-                >
-                  Sinkronkan
-                </button>
-              </div>
-            )}
+
 
             <input
               ref={titleRef}

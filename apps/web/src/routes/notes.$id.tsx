@@ -100,61 +100,7 @@ function NotePageComponent() {
     if (initialNote?.isLocked) setShowUnlockModal(true)
   }, [initialNote])
 
-  const [activeUsers, setActiveUsers] = useState<{ userId: string; username: string }[]>([])
-  const [typingUsers, setTypingUsers] = useState<{ username: string; pos: number }[]>([])
-  const [remoteUpdate, setRemoteUpdate] = useState<{ updatedBy: string; content: string; title: string } | null>(null)
 
-  useEffect(() => {
-    if (!id || (note?.isLocked && !unlocked)) {
-      setActiveUsers([])
-      setTypingUsers([])
-      setRemoteUpdate(null)
-      return
-    }
-
-    setTypingUsers([])
-    setRemoteUpdate(null)
-    const eventSource = new EventSource(`/api/notes/${id}/events`)
-
-    eventSource.addEventListener('presence', (e: any) => {
-      try {
-        const users = JSON.parse(e.data)
-        setActiveUsers(users)
-      } catch (err) {
-        console.error('Error parsing presence:', err)
-      }
-    })
-
-    eventSource.addEventListener('note-updated', (e: any) => {
-      try {
-        const data = JSON.parse(e.data)
-        setRemoteUpdate({
-          updatedBy: data.updatedBy,
-          content: data.content,
-          title: data.title
-        })
-      } catch (err) {
-        console.error('Error parsing note-updated:', err)
-      }
-    })
-
-    eventSource.addEventListener('typing', (e: any) => {
-      try {
-        const users = JSON.parse(e.data)
-        setTypingUsers(users)
-      } catch (err) {
-        console.error('Error parsing typing:', err)
-      }
-    })
-
-    eventSource.onerror = (err) => {
-      console.error('SSE Error:', err)
-    }
-
-    return () => {
-      eventSource.close()
-    }
-  }, [id, unlocked, note?.isLocked])
 
   async function handleUpdate(fields: { title?: string; content?: string }) {
     await fetch(`/api/notes/${id}`, {
@@ -238,6 +184,7 @@ function NotePageComponent() {
         ) : isContentVisible ? (
           <div style={{ flex: 1, overflow: 'hidden', display: 'flex' }}>
             <Editor
+              key={note.id}
               note={note}
               onUpdate={handleUpdate}
               onSaveStatusChange={setSaveStatus}
@@ -248,10 +195,6 @@ function NotePageComponent() {
               shareTrigger={shareTrigger}
               chatOpen={chatOpen}
               onToggleChat={() => setChatOpen(v => !v)}
-              activeUsers={activeUsers}
-              typingUsers={typingUsers}
-              remoteUpdate={remoteUpdate}
-              onClearRemoteUpdate={() => setRemoteUpdate(null)}
             />
             {chatOpen && (
               <ChatBot
