@@ -1,0 +1,10 @@
+node_modules
+dist
+.git
+.vscode
+.tanstack
+*.log
+data
+uploads
+.env
+.env.*
