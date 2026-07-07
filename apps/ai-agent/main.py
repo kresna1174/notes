@@ -1,5 +1,6 @@
 import asyncio
 import os
+import random
 import re
 import uuid
 import logging
@@ -145,7 +146,7 @@ parent_agent = Agent(
     
     If the user asks you to analyze some data or plot a chart (and you have an uploaded file or data), write python code and run it using the `execute_python_code` tool.
     If you generate charts or figures (using matplotlib, seaborn, etc.), save them as PNG files in the static uploads folder:
-    `../web/uploads/chart_<random_uuid>.png`
+    `../../web/uploads/chart_<random_uuid>.png`
     and return the markdown image link `![Chart](/uploads/chart_<random_uuid>.png)` in your response so the user can see the chart.
     """,
     model=get_model(),
@@ -551,6 +552,63 @@ def parse_attachment(attachment: ChatAttachment) -> str:
     except Exception as e:
         return f"[Error parsing file {attachment.filename}: {str(e)}]"
 
+# ── Input Guardrail ─────────────────────────────────────────────────────────
+# List of suspicious patterns that indicate a user is trying to extract
+# sensitive files, credentials, env vars, or server internals.
+_SENSITIVE_PATTERNS = [
+    # .env / environment variables
+    r"\.env", r"env\s+file", r"environment\s+variable", r"environtment",
+    r"api[_\s]?key", r"secret[_\s]?key", r"private[_\s]?key", r"access[_\s]?token",
+    r"bearer[_\s]?token", r"auth[_\s]?token", r"jwt[_\s]?secret",
+    # Credentials / passwords
+    r"password", r"passwd", r"credentials", r"database[_\s]?url",
+    r"db[_\s]?pass", r"db[_\s]?password", r"connection[_\s]?string",
+    # System / config files
+    r"sessions?\.db", r"config\.json", r"/etc/passwd", r"/etc/shadow",
+    r"id_rsa", r"\.ssh", r"authorized_keys", r"known_hosts",
+    r"docker-compose", r"dockerfile",
+    # Source code fishing
+    r"source\s+code", r"show\s+me\s+your\s+code", r"baca\s+file",
+    r"tampilkan\s+file", r"isi\s+file", r"lihat\s+file",
+    r"buka\s+file", r"akses\s+file", r"read\s+file",
+    r"cat\s+\.", r"ls\s+-", r"dir\s+/",
+    # Prompt injection attempts
+    r"ignore\s+(previous|all|prior)\s+instructions?",
+    r"forget\s+(everything|your|all)",
+    r"you\s+are\s+now", r"pretend\s+(you|to|that)",
+    r"jailbreak", r"bypass", r"override\s+(your\s+)?instructions?",
+    r"act\s+as\s+(if\s+you\s+are|a|an)\s+(?!notes|assistant|ai)",
+    r"new\s+persona", r"roleplay\s+as",
+    # RCE / shell command injection
+    r"exec(ute)?\s+command", r"run\s+shell", r"terminal", r"bash",
+    r"curl\s+", r"wget\s+", r"chmod\s+", r"rm\s+-",
+]
+
+# Random redirect topics shown inside the deflection message
+_REDIRECT_TOPICS = [
+    "cara membuat ringkasan catatan yang efektif",
+    "perbedaan arsitektur monolith dan microservices",
+    "tips produktivitas saat mencatat ide",
+    "cara mengorganisasi catatan proyek",
+    "teknik Zettelkasten untuk manajemen pengetahuan",
+    "cara menulis dokumentasi teknis yang baik",
+    "strategi belajar dengan spaced repetition",
+    "cara membuat outline artikel yang menarik",
+    "perbedaan antara SQL dan NoSQL database",
+    "tips debugging kode Python yang efisien",
+]
+
+def _check_input_guardrail(message: str) -> str | None:
+    """Return a deflection message string if message contains sensitive patterns, else None."""
+    msg_lower = message.lower()
+    for pattern in _SENSITIVE_PATTERNS:
+        if re.search(pattern, msg_lower):
+            topic = random.choice(_REDIRECT_TOPICS)
+            return f"Saya tidak mengerti yang anda maksud. Tanyakan soal **{topic}** saja 😊"
+    return None
+
+# ────────────────────────────────────────────────────────────────────────────
+
 @app.post("/api/chat/stream")
 async def chat_stream(request: ChatStreamRequest):
     user_message = ""
@@ -581,11 +639,64 @@ async def chat_stream(request: ChatStreamRequest):
             user_message = "".join(parts_text)
 
         logger.info(f"Extracted user_message: {user_message[:100]!r}")
+
+    # ── Input Guardrail check ──────────────────────────────────────────────
+    # Strip metadata tags before checking so legitimate filenames don't trigger
+    _clean_for_check = re.sub(
+        r'\[Isi Dokumen Terlampir:[^\]]+\]', '', user_message
+    ).strip()
+    _deflection = _check_input_guardrail(_clean_for_check)
+    if _deflection:
+        logger.warning(f"Input guardrail triggered for message: {user_message[:80]!r}")
+        async def _blocked_stream():
+            msg_id  = f"message_{uuid.uuid4().hex}"
+            text_id = f"text_{uuid.uuid4().hex}"
+            yield sse({"type": "start", "messageId": msg_id})
+            yield sse({"type": "start-step"})
+            yield sse({"type": "text-start", "id": text_id})
+            yield sse({"type": "text-delta", "id": text_id, "delta": _deflection})
+            yield sse({"type": "text-end", "id": text_id})
+            yield sse({"type": "finish-step"})
+            yield sse({"type": "finish"})
+            yield "data: [DONE]\n\n"
+        return StreamingResponse(
+            _blocked_stream(),
+            media_type="text/event-stream",
+            headers={
+                "Content-Type": "text/event-stream",
+                "Cache-Control": "no-cache",
+                "Connection": "keep-alive",
+                "X-Accel-Buffering": "no",
+            }
+        )
+    # ──────────────────────────────────────────────────────────────────────
             
     # Ekstrak file lampiran dan tambahkan ke context
     attachments_context = []
+    
+    # 1. Parse dari metadata tags di user_message string jika ada
+    pattern = r'\[Isi Dokumen Terlampir:\s*\"([^\"]+)\"\s+filePath=\"([^\"]+)\"\s+mimeType=\"([^\"]+)\"\]'
+    tag_matches = re.findall(pattern, user_message)
+    for filename, filePath, mimeType in tag_matches:
+        attachment = ChatAttachment(filename=filename, filePath=filePath, mimeType=mimeType)
+        file_content = parse_attachment(attachment)
+        attachments_context.append(
+            f"[Isi Dokumen Terlampir: \"{filename}\"]\n"
+            f"```{filename.split('.')[-1]}\n"
+            f"{file_content}\n"
+            f"```"
+        )
+        
+    # Bersihkan metadata tags dari user_message agar tidak mengacaukan model
+    if tag_matches:
+        user_message = re.sub(pattern, '', user_message).strip()
+        
+    # 2. Parse dari request.attachments jika dilewatkan di request body
     if request.attachments:
         for attachment in request.attachments:
+            # Cegah duplikasi jika file ini sudah di-parse dari tags
+            if any(attachment.filename in ctx for ctx in attachments_context):
+                continue
             file_content = parse_attachment(attachment)
             attachments_context.append(
                 f"[Isi Dokumen Terlampir: \"{attachment.filename}\"]\n"

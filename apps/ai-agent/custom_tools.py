@@ -12,6 +12,7 @@ import subprocess
 import sys
 import os
 import tempfile
+import ast
 
 def format_as_tiptap(text: str) -> str:
     """Check if the text is already JSON. If not, wrap it in standard TipTap format."""
@@ -212,38 +213,119 @@ async def crawl_web(url: str, max_pages: int = 5) -> str:
     except Exception as e:
         return f"Error crawling website: {str(e)}"
 
+def is_code_safe(code: str) -> tuple[bool, str]:
+    # 1. Quick regex/string check for high-risk system commands or files
+    blocked_keywords = [
+        "docker", "docker-compose", "rm -rf", "rmdir", "chmod", "chown", 
+        ".env", "sessions.db", "config.json", "/etc/", ".ssh", "id_rsa", 
+        "authorized_keys", "eval(", "exec(", "shutil.rmtree", "os.system",
+        "os.remove", "os.unlink", "os.rmdir", "os.popen", "subprocess.run"
+    ]
+    code_lower = code.lower()
+    for kw in blocked_keywords:
+        if kw in code_lower:
+            return False, f"Security Block: Blocked keyword or command pattern detected: '{kw}'"
+            
+    # 2. Parse code using Python's AST (Abstract Syntax Tree) to inspect imports, calls, and attributes
+    try:
+        tree = ast.parse(code)
+    except SyntaxError as se:
+        return False, f"Syntax Error: {str(se)}"
+        
+    blocked_modules = {
+        "subprocess", "os", "sys", "shutil", "socket", "urllib", "requests", 
+        "httpx", "http", "webbrowser", "pty", "platform", "ctypes", "builtins",
+        "importlib", "runpy", "code", "pdb", "ipdb"
+    }
+    
+    for node in ast.walk(tree):
+        # Check imports: `import module`
+        if isinstance(node, ast.Import):
+            for alias in node.names:
+                root_module = alias.name.split('.')[0]
+                if root_module in blocked_modules:
+                    return False, f"Security Block: Import of module '{root_module}' is strictly prohibited."
+        # Check imports: `from module import ...`
+        elif isinstance(node, ast.ImportFrom):
+            if node.module:
+                root_module = node.module.split('.')[0]
+                if root_module in blocked_modules:
+                    return False, f"Security Block: Import from module '{root_module}' is strictly prohibited."
+                    
+        # Check function calls: prevent eval, exec, open, compile, etc.
+        elif isinstance(node, ast.Call):
+            if isinstance(node.func, ast.Name):
+                func_name = node.func.id
+                if func_name in ["eval", "exec", "compile", "globals", "locals", "getattr", "setattr", "__import__"]:
+                    return False, f"Security Block: Calling standard function '{func_name}' is strictly prohibited."
+            
+            # Check attribute access on modules (e.g. `system`, `popen`, `run`)
+            elif isinstance(node.func, ast.Attribute):
+                if node.func.attr in ["eval", "exec", "system", "popen", "run", "spawn", "fork", "remove", "unlink", "rmdir", "rmtree"]:
+                    return False, f"Security Block: Invoking attribute/method '{node.func.attr}' is strictly prohibited."
+                    
+        # Check all string constants in the code to block path traversal or accessing sensitive files
+        elif isinstance(node, ast.Constant) and isinstance(node.value, str):
+            val = node.value.lower()
+            # Block any traversal using .. or absolute paths or sensitive filenames
+            if ".." in val or ".env" in val or "sessions.db" in val or ".ssh" in val or "/etc/" in val:
+                return False, f"Security Block: File path/value '{node.value}' contains restricted keywords or directory traversal."
+                    
+    return True, "Code is safe."
+
 @function_tool
 def execute_python_code(code: str) -> str:
     """
-    Execute python code in a temporary subprocess sandbox.
+    Execute python code in a temporary subprocess sandbox inside the `.sandbox` directory.
     This is highly useful for data analysis, complex calculations, and visualization (like generating charts using matplotlib).
     
     If you generate charts or figures (using matplotlib, seaborn, etc.), you MUST save them as PNG files in the static uploads folder:
-    `../web/uploads/chart_<random_uuid>.png`
+    `../../web/uploads/chart_<random_uuid>.png`
     and return the markdown image link `![Chart](/uploads/chart_<random_uuid>.png)` in your response so the user can see the chart.
     
     Args:
         code: The complete python code string to execute.
     """
-    # Write the code to a temporary file
-    with tempfile.NamedTemporaryFile(suffix='.py', mode='w', delete=False) as f:
-        # Pre-import common data libraries to make it easier for the agent
-        full_code = (
-            "import os\n"
-            "import sys\n"
-            "import pandas as pd\n"
-            "import numpy as np\n"
-            "import matplotlib.pyplot as plt\n"
-            "\n" + code
-        )
-        f.write(full_code)
-        temp_file_path = f.name
-        
+    # Run code safety check through static analysis guardrail
+    is_safe, reason = is_code_safe(code)
+    if not is_safe:
+        return f"Execution Blocked by Guardrails:\n{reason}"
+
+    # Define sandbox directory inside apps/ai-agent/.sandbox
+    sandbox_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".sandbox"))
+    os.makedirs(sandbox_dir, exist_ok=True)
+    
+    # Ensure a .gitignore file exists inside .sandbox so git ignores everything inside it
+    gitignore_path = os.path.join(sandbox_dir, ".gitignore")
+    if not os.path.exists(gitignore_path):
+        try:
+            with open(gitignore_path, 'w') as f_git:
+                f_git.write("# Ignore all files in this sandbox directory\n*\n!.gitignore\n")
+        except Exception:
+            pass
+
+    # Create temporary script file inside the sandbox directory
+    temp_filename = f"sandbox_run_{uuid.uuid4().hex[:8]}.py"
+    temp_file_path = os.path.join(sandbox_dir, temp_filename)
+    
     try:
-        # Run the temporary script using subprocess
-        # Using sys.executable to run inside the same python virtual environment
+        # Write the code to the sandbox script file
+        with open(temp_file_path, 'w', encoding='utf-8') as f:
+            # Pre-import common data libraries to make it easier for the agent
+            # Note: We do NOT pre-import sys or os anymore to minimize the execution scope!
+            full_code = (
+                "import pandas as pd\n"
+                "import numpy as np\n"
+                "import matplotlib.pyplot as plt\n"
+                "\n" + code
+            )
+            f.write(full_code)
+            
+        # Run the script using subprocess inside the sandbox directory
+        # Set cwd to sandbox_dir so all relative paths inside user code are sandbox-scoped
         result = subprocess.run(
             [sys.executable, temp_file_path],
+            cwd=sandbox_dir,
             capture_output=True,
             text=True,
             timeout=30 # 30 seconds limit
@@ -264,8 +346,9 @@ def execute_python_code(code: str) -> str:
     except Exception as e:
         return f"Execution Error: {str(e)}"
     finally:
-        # Clean up the temp file
+        # Clean up the script file inside the sandbox
         try:
-            os.unlink(temp_file_path)
+            if os.path.exists(temp_file_path):
+                os.unlink(temp_file_path)
         except Exception:
             pass

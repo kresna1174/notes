@@ -22,6 +22,30 @@ function LiveMetrics() {
   )
 }
 
+// ── Markdown renderer component ──────────────────────────────
+function Markdown({ text, style }: { text: string; style?: React.CSSProperties }) {
+  const [html, setHtml] = useState('')
+
+  useEffect(() => {
+    let active = true
+    Promise.resolve(marked.parse(text, { breaks: true, gfm: true })).then(parsed => {
+      if (active) setHtml(parsed)
+    }).catch(err => {
+      console.error(err)
+      if (active) setHtml(text)
+    })
+    return () => { active = false }
+  }, [text])
+
+  return (
+    <div
+      className="markdown-content"
+      dangerouslySetInnerHTML={{ __html: html || text }}
+      style={style}
+    />
+  )
+}
+
 // ── Notion-style toggle block ────────────────────────────────
 function ToggleBlock({
   icon,
@@ -365,6 +389,9 @@ export function ChatBot({ noteId, noteContent, noteTitle, onClose }: ChatBotProp
   const [isUploadingFile, setIsUploadingFile] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
+  const attachmentsRef = useRef(attachments)
+  attachmentsRef.current = attachments
+
   const { messages, setMessages, sendMessage, status } = useChat({
     transport: new DefaultChatTransport({
       api: '/api/ai/chat/stream',
@@ -372,7 +399,7 @@ export function ChatBot({ noteId, noteContent, noteTitle, onClose }: ChatBotProp
         session_id: noteStateRef.current.noteId,
         note_title: noteStateRef.current.noteTitle,
         note_content: noteStateRef.current.noteContent,
-        attachments: attachments,
+        attachments: attachmentsRef.current,
       }),
     }),
   })
@@ -423,7 +450,16 @@ export function ChatBot({ noteId, noteContent, noteTitle, onClose }: ChatBotProp
 
   const handleSend = () => {
     if ((!inputValue.trim() && attachments.length === 0) || isLoading) return
-    sendMessage({ text: inputValue })
+    
+    let textToSend = inputValue
+    if (attachments.length > 0) {
+      const attachmentsPrefix = attachments.map(att => 
+        `[Isi Dokumen Terlampir: "${att.filename}" filePath="${att.filePath}" mimeType="${att.mimeType}"]`
+      ).join('\n')
+      textToSend = `${attachmentsPrefix}\n\n${inputValue}`
+    }
+    
+    sendMessage({ text: textToSend })
     setInputValue('')
     setAttachments([])
     if (textareaRef.current) textareaRef.current.style.height = 'auto'
@@ -538,6 +574,7 @@ export function ChatBot({ noteId, noteContent, noteTitle, onClose }: ChatBotProp
         style={{
           flex: 1,
           overflowY: 'auto',
+          overflowX: 'hidden',
           minHeight: 0,
           padding: '16px 16px 8px',
           display: 'flex',
@@ -556,23 +593,85 @@ export function ChatBot({ noteId, noteContent, noteTitle, onClose }: ChatBotProp
 
             if (msg.role === 'user') {
               const text = msg.parts?.filter((p: any) => p.type === 'text').map((p: any) => p.text).join('') || ''
+              
+              // Extract attachments metadata from tags
+              const extractedFiles: { filename: string; filePath: string }[] = []
+              const tagRegex = /\[Isi Dokumen Terlampir:\s*\"([^\"]+)\"\s+filePath=\"([^\"]+)\"\s+mimeType=\"([^\"]+)\"\]/g
+              let match
+              while ((match = tagRegex.exec(text)) !== null) {
+                extractedFiles.push({ filename: match[1], filePath: match[2] })
+              }
+              
+              // Clean up the text: remove all tag blocks
+              let cleanText = text.replace(tagRegex, '').trim()
+              
+              // Also support legacy/fallback context parsing just in case
+              cleanText = cleanText.replace(/\[Konteks Catatan:[\s\S]*?\]/g, '').trim()
+              if (cleanText.startsWith('Pertanyaan/Instruksi User:')) {
+                cleanText = cleanText.substring('Pertanyaan/Instruksi User:'.length).trim()
+              }
+
               return (
-                <div key={index} style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 16 }}>
-                  <div
-                    style={{
-                      maxWidth: '80%',
-                      padding: '7px 12px',
-                      borderRadius: '14px',
-                      borderBottomRightRadius: 4,
-                      background: 'var(--muted)',
-                      color: 'var(--fg)',
-                      fontSize: '0.82rem',
-                      lineHeight: 1.5,
-                      whiteSpace: 'pre-wrap',
-                    }}
-                  >
-                    {text}
-                  </div>
+                <div key={index} style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', marginBottom: 16 }}>
+                  {/* Extracted file attachments */}
+                  {extractedFiles.length > 0 && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 6, maxWidth: '80%' }}>
+                      {extractedFiles.map((file, i) => (
+                        <a
+                          key={i}
+                          href={`/${file.filePath}`}
+                          download={file.filename}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 8,
+                            padding: '8px 12px',
+                            borderRadius: 8,
+                            background: 'var(--muted)',
+                            border: '1px solid var(--border)',
+                            fontSize: '0.74rem',
+                            color: 'var(--fg)',
+                            textDecoration: 'none',
+                            cursor: 'pointer',
+                            transition: 'all 0.15s ease',
+                            alignSelf: 'flex-end',
+                            boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
+                          }}
+                          onMouseEnter={e => {
+                            e.currentTarget.style.background = 'var(--accent)'
+                            e.currentTarget.style.borderColor = 'var(--primary)'
+                          }}
+                          onMouseLeave={e => {
+                            e.currentTarget.style.background = 'var(--muted)'
+                            e.currentTarget.style.borderColor = 'var(--border)'
+                          }}
+                        >
+                          <span style={{ fontSize: '1rem' }}>📄</span>
+                          <span style={{ fontWeight: 500, maxWidth: '180px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {file.filename}
+                          </span>
+                          <span style={{ fontSize: '0.62rem', color: 'var(--fg-subtle)' }}>↓ Download</span>
+                        </a>
+                      ))}
+                    </div>
+                  )}
+                  {cleanText && (
+                    <div
+                      style={{
+                        maxWidth: '80%',
+                        padding: '7px 12px',
+                        borderRadius: '14px',
+                        borderBottomRightRadius: 4,
+                        background: 'var(--muted)',
+                        color: 'var(--fg)',
+                        fontSize: '0.82rem',
+                        lineHeight: 1.5,
+                        whiteSpace: 'pre-wrap',
+                      }}
+                    >
+                      {cleanText}
+                    </div>
+                  )}
                 </div>
               )
             }
@@ -654,27 +753,16 @@ export function ChatBot({ noteId, noteContent, noteTitle, onClose }: ChatBotProp
                 )}
 
                 {/* Assistant prose text — no bubble */}
-                {hasText && (() => {
-                  const parsedHtml = (() => {
-                    try {
-                      return marked.parseSync(textContent, { breaks: true, gfm: true })
-                    } catch (err) {
-                      console.error(err)
-                      return textContent
-                    }
-                  })()
-                  return (
-                    <div
-                      className="markdown-content"
-                      dangerouslySetInnerHTML={{ __html: parsedHtml }}
-                      style={{
-                        fontSize: '0.84rem',
-                        lineHeight: 1.65,
-                        color: 'var(--fg)',
-                      }}
-                    />
-                  )
-                })()}
+                {hasText && (
+                  <Markdown
+                    text={textContent}
+                    style={{
+                      fontSize: '0.84rem',
+                      lineHeight: 1.65,
+                      color: 'var(--fg)',
+                    }}
+                  />
+                )}
 
                 {/* Token metrics — live timer while streaming, static after */}
                 {(hasText || isMessageLoading) && (() => {
