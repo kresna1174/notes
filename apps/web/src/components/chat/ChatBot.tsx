@@ -227,7 +227,7 @@ function ToolCallBlock({ item, noteId, lastUserPrompt }: { item: any; noteId: st
         const createRes = await fetch('/api/notes', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ type: 'individual', teamId: null }),
+          body: JSON.stringify({ type: 'individual', organizationId: null }),
         })
         const newNote = await createRes.json()
         await fetch(`/api/notes/${newNote.id}`, {

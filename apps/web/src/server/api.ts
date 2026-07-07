@@ -1,8 +1,8 @@
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { createReadStream } from 'node:fs'
 import { db, sqlite } from '../lib/db'
-import { notes, attachments, users, teams } from '../../drizzle/schema'
-import { desc, eq, and, sql } from 'drizzle-orm'
+import { notes, attachments, users, organizations, userOrganizations } from '../../drizzle/schema'
+import { desc, eq, and, sql, or, inArray } from 'drizzle-orm'
 import { randomUUID } from 'crypto'
 import { saveFile, getFilePath, deleteFile } from '../lib/storage'
 import bcrypt from 'bcryptjs'
@@ -18,7 +18,7 @@ const AI_AGENT_URL = process.env.AI_AGENT_URL || 'http://localhost:8000'
 
 type Env = {
   Variables: {
-    session: { userId: string; username: string; role: string; teamId?: string }
+    session: { userId: string; username: string; role: string }
   }
 }
 
@@ -121,14 +121,36 @@ function stripAndEnrich(note: Record<string, any>) {
   }
 }
 
+async function getUserOrganizations(userId: string) {
+  const orgs = await db.select({
+    id: organizations.id,
+    name: organizations.name,
+    description: organizations.description,
+  })
+  .from(userOrganizations)
+  .innerJoin(organizations, eq(userOrganizations.organizationId, organizations.id))
+  .where(eq(userOrganizations.userId, userId))
+  return orgs
+}
+
 async function getOwnerFilter(id: string, userId: string, role: string) {
-  const [sessionUser] = await db.select({ teamId: users.teamId }).from(users).where(eq(users.id, userId))
-  const userTeamId = sessionUser?.teamId ?? null
-  return role === 'admin'
-    ? eq(notes.id, id)
-    : userTeamId
-      ? and(eq(notes.id, id), sql`(${notes.userId} = ${userId} OR (${notes.type} = 'team' AND ${notes.teamId} = ${userTeamId}))`)
-      : and(eq(notes.id, id), eq(notes.userId, userId))
+  if (role === 'admin') {
+    return eq(notes.id, id)
+  }
+  const myOrgs = await db.select({ orgId: userOrganizations.organizationId })
+    .from(userOrganizations)
+    .where(eq(userOrganizations.userId, userId))
+  const myOrgIds = myOrgs.map(o => o.orgId)
+  if (myOrgIds.length > 0) {
+    return and(
+      eq(notes.id, id),
+      or(
+        eq(notes.userId, userId),
+        and(eq(notes.type, 'organization'), inArray(notes.organizationId, myOrgIds))
+      )
+    )
+  }
+  return and(eq(notes.id, id), eq(notes.userId, userId))
 }
 
 // Hono Middlewares
@@ -179,7 +201,8 @@ app.post('/api/auth/login', async (c) => {
   const token = randomUUID()
   sqlite.prepare('INSERT INTO sessions (token, user_id, username, role, created_at) VALUES (?, ?, ?, ?, ?)').run(token, user.id, user.username, user.role, Date.now())
   setCookie(c, 'session', token, { path: '/', httpOnly: true, sameSite: 'Strict' })
-  return c.json({ userId: user.id, username: user.username, role: user.role, teamId: user.teamId })
+  const orgs = await getUserOrganizations(user.id)
+  return c.json({ userId: user.id, username: user.username, role: user.role, organizations: orgs })
 })
 
 app.post('/api/auth/logout', async (c) => {
@@ -196,8 +219,8 @@ app.get('/api/auth/me', async (c) => {
   if (!session) {
     return c.json({ error: 'unauthenticated' }, 401)
   }
-  const [me] = await db.select({ teamId: users.teamId }).from(users).where(eq(users.id, session.userId))
-  return c.json({ ...session, teamId: me?.teamId ?? null })
+  const orgs = await getUserOrganizations(session.userId)
+  return c.json({ ...session, organizations: orgs })
 })
 
 app.post('/api/auth/register', adminMiddleware, async (c) => {
@@ -274,11 +297,21 @@ app.get('/api/auth/users', adminMiddleware, async (c) => {
     id: users.id, 
     username: users.username, 
     role: users.role, 
-    teamId: users.teamId, 
     status: users.status, 
     createdAt: users.createdAt 
   }).from(users)
-  return c.json(all)
+
+  const enrichedUsers = await Promise.all(
+    all.map(async (u) => {
+      const orgs = await getUserOrganizations(u.id)
+      return {
+        ...u,
+        organizations: orgs,
+        organizationIds: orgs.map(o => o.id),
+      }
+    })
+  )
+  return c.json(enrichedUsers)
 })
 
 app.put('/api/auth/users/:id/approve', adminMiddleware, async (c) => {
@@ -303,52 +336,57 @@ app.delete('/api/auth/users/:id', adminMiddleware, async (c) => {
   return c.json({ ok: true })
 })
 
-// --- TEAM ENDPOINTS ---
+// --- ORGANIZATION ENDPOINTS ---
 
-app.get('/api/teams', authMiddleware, async (c) => {
-  const all = await db.select().from(teams).orderBy(teams.name)
+app.get('/api/organizations', authMiddleware, async (c) => {
+  const all = await db.select().from(organizations).orderBy(organizations.name)
   return c.json(all)
 })
 
-app.post('/api/teams', adminMiddleware, async (c) => {
+app.post('/api/organizations', adminMiddleware, async (c) => {
   const body = await c.req.json().catch(() => ({})) as { name?: string; description?: string }
   const { name, description } = body
   if (!name?.trim()) {
     return c.json({ error: 'name required' }, 400)
   }
   const id = randomUUID()
-  await db.insert(teams).values({ id, name: name.trim(), description: description?.trim() ?? null, createdAt: Date.now() })
+  await db.insert(organizations).values({ id, name: name.trim(), description: description?.trim() ?? null, createdAt: Date.now() })
   return c.json({ id, name, description }, 201)
 })
 
-app.put('/api/teams/:id', adminMiddleware, async (c) => {
-  const teamId = c.req.param('id')
+app.put('/api/organizations/:id', adminMiddleware, async (c) => {
+  const orgId = c.req.param('id')
   const body = await c.req.json().catch(() => ({})) as { name?: string; description?: string }
   const { name, description } = body
   if (!name?.trim()) {
     return c.json({ error: 'name required' }, 400)
   }
-  await db.update(teams).set({ name: name.trim(), description: description?.trim() ?? null }).where(eq(teams.id, teamId))
+  await db.update(organizations).set({ name: name.trim(), description: description?.trim() ?? null }).where(eq(organizations.id, orgId))
   return c.json({ ok: true })
 })
 
-app.delete('/api/teams/:id', adminMiddleware, async (c) => {
-  const teamId = c.req.param('id')
-  await db.update(users).set({ teamId: null }).where(eq(users.teamId, teamId))
-  await db.delete(teams).where(eq(teams.id, teamId))
+app.delete('/api/organizations/:id', adminMiddleware, async (c) => {
+  const orgId = c.req.param('id')
+  await db.delete(userOrganizations).where(eq(userOrganizations.organizationId, orgId))
+  await db.update(notes).set({ organizationId: null, type: 'individual' }).where(eq(notes.organizationId, orgId))
+  await db.delete(organizations).where(eq(organizations.id, orgId))
   return c.json({ ok: true })
 })
 
-app.put('/api/teams/:id/members/:userId', adminMiddleware, async (c) => {
-  const teamId = c.req.param('id')
+app.put('/api/organizations/:id/members/:userId', adminMiddleware, async (c) => {
+  const orgId = c.req.param('id')
   const userId = c.req.param('userId')
-  await db.update(users).set({ teamId }).where(eq(users.id, userId))
+  const [exists] = await db.select().from(userOrganizations).where(and(eq(userOrganizations.organizationId, orgId), eq(userOrganizations.userId, userId)))
+  if (!exists) {
+    await db.insert(userOrganizations).values({ userId, organizationId: orgId })
+  }
   return c.json({ ok: true })
 })
 
-app.delete('/api/teams/:id/members/:userId', adminMiddleware, async (c) => {
+app.delete('/api/organizations/:id/members/:userId', adminMiddleware, async (c) => {
+  const orgId = c.req.param('id')
   const userId = c.req.param('userId')
-  await db.update(users).set({ teamId: null }).where(eq(users.id, userId))
+  await db.delete(userOrganizations).where(and(eq(userOrganizations.organizationId, orgId), eq(userOrganizations.userId, userId)))
   return c.json({ ok: true })
 })
 
@@ -379,26 +417,33 @@ app.get('/api/search', authMiddleware, async (c) => {
 app.get('/api/notes', authMiddleware, async (c) => {
   const session = c.get('session')
   const scope = c.req.query('scope')
+  const orgId = c.req.query('organizationId')
 
-  const [me] = await db.select({ teamId: users.teamId }).from(users).where(eq(users.id, session.userId))
-  const myTeamId = me?.teamId ?? null
+  const myOrgs = await db.select({ orgId: userOrganizations.organizationId }).from(userOrganizations).where(eq(userOrganizations.userId, session.userId))
+  const myOrgIds = myOrgs.map(o => o.orgId)
 
   let allNotes: any[] = []
   if (session.role === 'admin') {
     if (scope === 'mine') {
       allNotes = await db.select().from(notes).where(eq(notes.type, 'individual')).orderBy(desc(notes.createdAt))
-    } else if (scope === 'team') {
-      allNotes = await db.select().from(notes).where(eq(notes.type, 'team')).orderBy(desc(notes.createdAt))
+    } else if (scope === 'organization' && orgId) {
+      allNotes = await db.select().from(notes).where(and(eq(notes.type, 'organization'), eq(notes.organizationId, orgId))).orderBy(desc(notes.createdAt))
+    } else if (scope === 'organization') {
+      allNotes = await db.select().from(notes).where(eq(notes.type, 'organization')).orderBy(desc(notes.createdAt))
     } else {
       allNotes = await db.select().from(notes).orderBy(desc(notes.createdAt))
     }
   } else {
     if (scope === 'mine') {
       allNotes = await db.select().from(notes).where(and(eq(notes.userId, session.userId), eq(notes.type, 'individual'))).orderBy(desc(notes.createdAt))
-    } else if (scope === 'team' && myTeamId) {
-      allNotes = await db.select().from(notes).where(and(eq(notes.teamId, myTeamId), eq(notes.type, 'team'))).orderBy(desc(notes.createdAt))
-    } else if (scope === 'team') {
-      allNotes = []
+    } else if (scope === 'organization' && orgId && myOrgIds.includes(orgId)) {
+      allNotes = await db.select().from(notes).where(and(eq(notes.organizationId, orgId), eq(notes.type, 'organization'))).orderBy(desc(notes.createdAt))
+    } else if (scope === 'organization') {
+      if (myOrgIds.length > 0) {
+        allNotes = await db.select().from(notes).where(and(inArray(notes.organizationId, myOrgIds), eq(notes.type, 'organization'))).orderBy(desc(notes.createdAt))
+      } else {
+        allNotes = []
+      }
     } else {
       allNotes = await db.select().from(notes).where(and(eq(notes.userId, session.userId), eq(notes.type, 'individual'))).orderBy(desc(notes.createdAt))
     }
@@ -407,40 +452,14 @@ app.get('/api/notes', authMiddleware, async (c) => {
   return c.json(allNotes.map(n => stripAndEnrich(n)))
 })
 
-app.get('/api/daily-log', authMiddleware, async (c) => {
-  const session = c.get('session')
-  const dateStr = c.req.query('date')
-  if (!dateStr) return c.json({ error: 'date required' }, 400)
-  const title = `[Daily] ${dateStr}`
-  const [existing] = await db.select().from(notes).where(and(eq(notes.userId, session.userId), eq(notes.title, title)))
-  if (existing) return c.json(stripAndEnrich(existing))
-  const d = new Date(`${dateStr}T00:00:00`)
-  const formatted = d.toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
-  const content = JSON.stringify({
-    type: 'doc',
-    content: [
-      { type: 'heading', attrs: { level: 1 }, content: [{ type: 'text', text: `Daily Log - ${formatted}` }] },
-      { type: 'heading', attrs: { level: 2 }, content: [{ type: 'text', text: 'Timeline' }] },
-      { type: 'bulletList', content: [{ type: 'listItem', content: [{ type: 'paragraph', content: [] }] }] },
-      { type: 'heading', attrs: { level: 2 }, content: [{ type: 'text', text: 'Catatan' }] },
-      { type: 'paragraph', content: [] },
-    ],
-  })
-  const id = randomUUID()
-  const now = Date.now()
-  const note = { id, userId: session.userId, teamId: null, type: 'individual' as const, title, content, createdAt: now, updatedAt: now }
-  await db.insert(notes).values(note)
-  return c.json(stripAndEnrich(note), 201)
-})
-
 app.post('/api/notes', authMiddleware, async (c) => {
   const session = c.get('session')
-  const body = await c.req.json().catch(() => ({})) as { teamId?: string | null; type?: 'individual' | 'team' | null } | null
-  const teamId = body?.teamId ?? null
-  const type = body?.type || (teamId ? 'team' : 'individual')
+  const body = await c.req.json().catch(() => ({})) as { organizationId?: string | null; type?: 'individual' | 'organization' | null } | null
+  const organizationId = body?.organizationId ?? null
+  const type = body?.type || (organizationId ? 'organization' : 'individual')
   const now = Date.now()
   const id = randomUUID()
-  const note = { id, userId: session.userId, teamId, type, title: '', content: '{"type":"doc","content":[]}', createdAt: now, updatedAt: now }
+  const note = { id, userId: session.userId, organizationId, type, title: '', content: '{"type":"doc","content":[]}', createdAt: now, updatedAt: now }
   await db.insert(notes).values(note)
   return c.json(stripAndEnrich(note), 201)
 })
@@ -543,13 +562,70 @@ app.post('/api/notes/:id/pin/verify', authMiddleware, async (c) => {
   return c.json({ ok: true })
 })
 
-app.post('/api/notes/:id/copy-to-team', authMiddleware, async (c) => {
+// ── Admin-only: list all PIN-locked notes ─────────────────────────────────
+app.get('/api/admin/locked-notes', authMiddleware, async (c) => {
+  const session = c.get('session')
+  if (session.role !== 'admin') return c.json({ error: 'forbidden' }, 403)
+
+  const rows = sqlite.prepare(`
+    SELECT n.id, n.title, n.created_at as createdAt, n.updated_at as updatedAt,
+           u.username as ownerUsername, u.id as ownerId,
+           n.type, n.organization_id as organizationId
+    FROM notes n
+    LEFT JOIN users u ON n.user_id = u.id
+    WHERE n.pin_hash IS NOT NULL AND n.pin_hash != ''
+    ORDER BY n.updated_at DESC
+  `).all() as { id: string; title: string; createdAt: number; updatedAt: number; ownerUsername: string; ownerId: string; type: string; organizationId: string | null }[]
+
+  return c.json(rows)
+})
+
+// ── Admin-only: force-reset (remove) PIN of any note ─────────────────────
+app.delete('/api/admin/notes/:id/pin', authMiddleware, async (c) => {
+  const session = c.get('session')
+  if (session.role !== 'admin') return c.json({ error: 'forbidden' }, 403)
+
+  const id = c.req.param('id')
+  const [note] = await db.select().from(notes).where(eq(notes.id, id))
+  if (!note) return c.json({ error: 'not found' }, 404)
+  if (!note.pinHash) return c.json({ error: 'note is not PIN-locked' }, 400)
+
+  await db.update(notes).set({ pinHash: null }).where(eq(notes.id, id))
+  return c.json({ ok: true })
+})
+
+// ── Admin-only: force-set a new PIN on any note ───────────────────────────
+app.put('/api/admin/notes/:id/pin', authMiddleware, async (c) => {
+  const session = c.get('session')
+  if (session.role !== 'admin') return c.json({ error: 'forbidden' }, 403)
+
+  const id = c.req.param('id')
+  const [note] = await db.select().from(notes).where(eq(notes.id, id))
+  if (!note) return c.json({ error: 'not found' }, 404)
+
+  const body = await c.req.json().catch(() => ({})) as { pin?: string }
+  if (!body.pin || !/^\d{4,6}$/.test(body.pin)) {
+    return c.json({ error: 'PIN harus 4–6 digit angka' }, 400)
+  }
+
+  const hash = bcrypt.hashSync(body.pin, 10)
+  await db.update(notes).set({ pinHash: hash }).where(eq(notes.id, id))
+  return c.json({ ok: true })
+})
+
+
+app.post('/api/notes/:id/copy-to-organization', authMiddleware, async (c) => {
   const id = c.req.param('id')
   const session = c.get('session')
-  
-  const [sessionUser] = await db.select({ teamId: users.teamId }).from(users).where(eq(users.id, session.userId))
-  const userTeamId = sessionUser?.teamId ?? null
-  if (!userTeamId) return c.json({ error: 'Anda belum tergabung dalam tim' }, 400)
+  const body = await c.req.json().catch(() => ({})) as { organizationId: string; pin?: string | null }
+  const { organizationId, pin } = body
+  if (!organizationId) return c.json({ error: 'organizationId required' }, 400)
+
+  // Verify user membership
+  const [membership] = await db.select().from(userOrganizations).where(and(eq(userOrganizations.userId, session.userId), eq(userOrganizations.organizationId, organizationId)))
+  if (!membership && session.role !== 'admin') {
+    return c.json({ error: 'Anda bukan anggota organisasi ini' }, 403)
+  }
 
   const ownerFilter = await getOwnerFilter(id, session.userId, session.role)
   const [note] = await db.select().from(notes).where(ownerFilter)
@@ -558,8 +634,8 @@ app.post('/api/notes/:id/copy-to-team', authMiddleware, async (c) => {
   const [existingChild] = await db.select().from(notes).where(
     and(
       eq(notes.copiedFromId, id),
-      eq(notes.teamId, userTeamId),
-      eq(notes.type, 'team')
+      eq(notes.organizationId, organizationId),
+      eq(notes.type, 'organization')
     )
   )
 
@@ -568,19 +644,17 @@ app.post('/api/notes/:id/copy-to-team', authMiddleware, async (c) => {
     const [parent] = await db.select().from(notes).where(
       and(
         eq(notes.id, note.copiedFromId),
-        eq(notes.teamId, userTeamId),
-        eq(notes.type, 'team')
+        eq(notes.organizationId, organizationId),
+        eq(notes.type, 'organization')
       )
     )
     existingParent = parent
   }
 
   if (existingChild || existingParent) {
-    return c.json({ error: 'Catatan ini sudah ada di ruang kerja Tim (sudah pernah disalin dan masih ada di target)' }, 400)
+    return c.json({ error: 'Catatan ini sudah ada di ruang kerja Organisasi (sudah pernah disalin dan masih ada di target)' }, 400)
   }
 
-  const body = await c.req.json().catch(() => ({})) as { pin?: string | null }
-  const pin = body?.pin
   let customPinHash = note.pinHash
   if (pin !== undefined) {
     customPinHash = pin ? bcrypt.hashSync(pin, 10) : null
@@ -591,9 +665,9 @@ app.post('/api/notes/:id/copy-to-team', authMiddleware, async (c) => {
   await db.insert(notes).values({
     id: newId,
     userId: session.userId,
-    teamId: userTeamId,
+    organizationId,
     copiedFromId: id,
-    type: 'team',
+    type: 'organization',
     title: `${session.username}: ${note.title || 'Catatan Tanpa Judul'}`,
     content: note.content,
     pinHash: customPinHash,
@@ -604,20 +678,23 @@ app.post('/api/notes/:id/copy-to-team', authMiddleware, async (c) => {
   return c.json({ ok: true, id: newId }, 201)
 })
 
-app.post('/api/notes/:id/move-to-team', authMiddleware, async (c) => {
+app.post('/api/notes/:id/move-to-organization', authMiddleware, async (c) => {
   const id = c.req.param('id')
   const session = c.get('session')
+  const body = await c.req.json().catch(() => ({})) as { organizationId: string; pin?: string | null }
+  const { organizationId, pin } = body
+  if (!organizationId) return c.json({ error: 'organizationId required' }, 400)
 
-  const [sessionUser] = await db.select({ teamId: users.teamId }).from(users).where(eq(users.id, session.userId))
-  const userTeamId = sessionUser?.teamId ?? null
-  if (!userTeamId) return c.json({ error: 'Anda belum tergabung dalam tim' }, 400)
+  // Verify user membership
+  const [membership] = await db.select().from(userOrganizations).where(and(eq(userOrganizations.userId, session.userId), eq(userOrganizations.organizationId, organizationId)))
+  if (!membership && session.role !== 'admin') {
+    return c.json({ error: 'Anda bukan anggota organisasi ini' }, 403)
+  }
 
   const ownerFilter = await getOwnerFilter(id, session.userId, session.role)
   const [note] = await db.select().from(notes).where(ownerFilter)
   if (!note) return c.json({ error: 'Catatan tidak ditemukan atau Anda tidak memiliki akses' }, 404)
 
-  const body = await c.req.json().catch(() => ({})) as { pin?: string | null }
-  const pin = body?.pin
   let customPinHash = note.pinHash
   if (pin !== undefined) {
     customPinHash = pin ? bcrypt.hashSync(pin, 10) : null
@@ -625,8 +702,8 @@ app.post('/api/notes/:id/move-to-team', authMiddleware, async (c) => {
 
   await db.update(notes)
     .set({ 
-      type: 'team', 
-      teamId: userTeamId, 
+      type: 'organization', 
+      organizationId, 
       title: `${session.username}: ${note.title || 'Catatan Tanpa Judul'}`,
       pinHash: customPinHash,
       updatedAt: Date.now() 
@@ -668,10 +745,10 @@ app.post('/api/notes/:id/copy-to-personal', authMiddleware, async (c) => {
     return c.json({ error: 'Catatan ini sudah ada di ruang kerja Saya (sudah pernah disalin dan masih ada di target)' }, 400)
   }
 
-  let teamName = 'Tim'
-  if (note.teamId) {
-    const [team] = await db.select({ name: teams.name }).from(teams).where(eq(teams.id, note.teamId))
-    if (team?.name) teamName = team.name
+  let orgName = 'Organisasi'
+  if (note.organizationId) {
+    const [org] = await db.select({ name: organizations.name }).from(organizations).where(eq(organizations.id, note.organizationId))
+    if (org?.name) orgName = org.name
   }
 
   const now = Date.now()
@@ -679,10 +756,10 @@ app.post('/api/notes/:id/copy-to-personal', authMiddleware, async (c) => {
   await db.insert(notes).values({
     id: newId,
     userId: session.userId,
-    teamId: null,
+    organizationId: null,
     copiedFromId: id,
     type: 'individual',
-    title: `${teamName}: ${note.title || 'Catatan Tanpa Judul'}`,
+    title: `${orgName}: ${note.title || 'Catatan Tanpa Judul'}`,
     content: note.content,
     pinHash: note.pinHash,
     createdAt: now,
@@ -700,18 +777,18 @@ app.post('/api/notes/:id/move-to-personal', authMiddleware, async (c) => {
   const [note] = await db.select().from(notes).where(ownerFilter)
   if (!note) return c.json({ error: 'Catatan tidak ditemukan atau Anda tidak memiliki akses' }, 404)
 
-  let teamName = 'Tim'
-  if (note.teamId) {
-    const [team] = await db.select({ name: teams.name }).from(teams).where(eq(teams.id, note.teamId))
-    if (team?.name) teamName = team.name
+  let orgName = 'Organisasi'
+  if (note.organizationId) {
+    const [org] = await db.select({ name: organizations.name }).from(organizations).where(eq(organizations.id, note.organizationId))
+    if (org?.name) orgName = org.name
   }
 
   await db.update(notes)
     .set({ 
       type: 'individual', 
-      teamId: null, 
+      organizationId: null, 
       userId: session.userId, 
-      title: `${teamName}: ${note.title || 'Catatan Tanpa Judul'}`,
+      title: `${orgName}: ${note.title || 'Catatan Tanpa Judul'}`,
       updatedAt: Date.now() 
     })
     .where(eq(notes.id, id))

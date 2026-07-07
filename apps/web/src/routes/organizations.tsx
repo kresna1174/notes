@@ -4,26 +4,26 @@ import { useState, useEffect } from 'react'
 import { Sidebar } from '../components/sidebar/Sidebar'
 import { Trash2, Plus, UsersRound, UserMinus, UserPlus, Pencil, Check, X } from 'lucide-react'
 
-interface Team { id: string; name: string; description: string | null; createdAt: number }
-interface User { id: string; username: string; role: string; teamId: string | null }
+interface Organization { id: string; name: string; description: string | null; createdAt: number }
+interface User { id: string; username: string; role: string; organizationIds: string[] }
 
-export const Route = createFileRoute('/teams')({
+export const Route = createFileRoute('/organizations')({
   beforeLoad: ({ context }) => {
     if (!context.auth.user || context.auth.user.role !== 'admin') {
       throw redirect({ to: '/' })
     }
   },
   loader: async () => {
-    const [tr, ur] = await Promise.all([
-      fetch('/api/teams').then(r => r.json()),
+    const [or, ur] = await Promise.all([
+      fetch('/api/organizations').then(r => r.json()),
       fetch('/api/auth/users').then(r => r.json()),
     ])
     return {
-      teams: (Array.isArray(tr) ? tr : []) as Team[],
+      organizations: (Array.isArray(or) ? or : []) as Organization[],
       users: (Array.isArray(ur) ? ur : []) as User[],
     }
   },
-  component: TeamsPage,
+  component: OrganizationsPage,
 })
 
 const inputBase: React.CSSProperties = {
@@ -34,15 +34,15 @@ const inputBase: React.CSSProperties = {
   outline: 'none', color: 'var(--fg)', background: 'var(--input-bg)',
 }
 
-function TeamsPage() {
+function OrganizationsPage() {
   const router = useRouter()
-  const { teams, users } = Route.useLoaderData()
+  const { organizations, users } = Route.useLoaderData()
   const [showForm, setShowForm] = useState(false)
   const [form, setForm] = useState({ name: '', description: '' })
   const [saving, setSaving] = useState(false)
-  const [editingTeam, setEditingTeam] = useState<Team | null>(null)
+  const [editingOrg, setEditingOrg] = useState<Organization | null>(null)
   const [editForm, setEditForm] = useState({ name: '', description: '' })
-  const [expandedTeam, setExpandedTeam] = useState<string | null>(null)
+  const [expandedOrg, setExpandedOrg] = useState<string | null>(null)
 
   const [isMobile, setIsMobile] = useState(false)
 
@@ -58,7 +58,7 @@ function TeamsPage() {
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault()
     setSaving(true)
-    await fetch('/api/teams', {
+    await fetch('/api/organizations', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(form),
@@ -71,31 +71,31 @@ function TeamsPage() {
 
   async function handleEdit(e: React.FormEvent) {
     e.preventDefault()
-    if (!editingTeam) return
+    if (!editingOrg) return
     setSaving(true)
-    await fetch(`/api/teams/${editingTeam.id}`, {
+    await fetch(`/api/organizations/${editingOrg.id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(editForm),
     })
     setSaving(false)
-    setEditingTeam(null)
+    setEditingOrg(null)
     router.invalidate()
   }
 
-  async function handleDeleteTeam(id: string, name: string) {
-    if (!window.confirm(`Hapus tim "${name}"? Semua member akan dikeluarkan dari tim.`)) return
-    await fetch(`/api/teams/${id}`, { method: 'DELETE' })
+  async function handleDeleteOrg(id: string, name: string) {
+    if (!window.confirm(`Hapus organisasi "${name}"? Semua member akan dikeluarkan dari organisasi.`)) return
+    await fetch(`/api/organizations/${id}`, { method: 'DELETE' })
     router.invalidate()
   }
 
-  async function assignUser(teamId: string, userId: string) {
-    await fetch(`/api/teams/${teamId}/members/${userId}`, { method: 'PUT' })
+  async function assignUser(orgId: string, userId: string) {
+    await fetch(`/api/organizations/${orgId}/members/${userId}`, { method: 'PUT' })
     router.invalidate()
   }
 
-  async function removeUser(teamId: string, userId: string) {
-    await fetch(`/api/teams/${teamId}/members/${userId}`, { method: 'DELETE' })
+  async function removeUser(orgId: string, userId: string) {
+    await fetch(`/api/organizations/${orgId}/members/${userId}`, { method: 'DELETE' })
     router.invalidate()
   }
 
@@ -109,10 +109,10 @@ function TeamsPage() {
           <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', alignItems: isMobile ? 'flex-start' : 'center', justifyContent: 'space-between', gap: isMobile ? 12 : 8, marginBottom: 28 }}>
             <div>
               <h1 style={{ fontFamily: 'var(--font-heading)', fontWeight: 700, fontSize: '1.5rem', color: 'var(--fg)', margin: 0 }}>
-                Kelola Tim
+                Kelola Organisasi
               </h1>
               <p style={{ fontSize: '0.875rem', color: 'var(--fg-muted)', margin: '4px 0 0' }}>
-                Buat tim dan assign anggota
+                Buat organisasi dan assign anggota
               </p>
             </div>
             <button
@@ -127,7 +127,7 @@ function TeamsPage() {
               onMouseEnter={e => (e.currentTarget.style.opacity = '0.9')}
               onMouseLeave={e => (e.currentTarget.style.opacity = '1')}
             >
-              <Plus size={15} /> Buat Tim
+              <Plus size={15} /> Buat Organisasi
             </button>
           </div>
 
@@ -138,9 +138,9 @@ function TeamsPage() {
               borderRadius: 10, padding: '20px', marginBottom: 24,
               display: 'flex', flexDirection: 'column', gap: 12,
             }}>
-              <p style={{ margin: 0, fontWeight: 600, fontSize: '0.875rem', color: 'var(--fg)' }}>Tim Baru</p>
+              <p style={{ margin: 0, fontWeight: 600, fontSize: '0.875rem', color: 'var(--fg)' }}>Organisasi Baru</p>
               <input
-                style={inputBase} placeholder="Nama tim" required
+                style={inputBase} placeholder="Nama organisasi" required
                 value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
                 onFocus={e => (e.currentTarget.style.borderColor = 'var(--primary)')}
                 onBlur={e => (e.currentTarget.style.borderColor = 'var(--border)')}
@@ -171,22 +171,22 @@ function TeamsPage() {
             </form>
           )}
 
-          {/* Teams list */}
+          {/* Organizations list */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-            {teams.length === 0 && (
+            {organizations.length === 0 && (
               <div style={{ textAlign: 'center', padding: '40px 0', color: 'var(--fg-muted)', fontSize: '0.875rem', fontFamily: 'var(--font-body)' }}>
-                Belum ada tim. Buat tim pertama.
+                Belum ada organisasi. Buat organisasi pertama.
               </div>
             )}
-            {teams.map(team => {
-              const members = users.filter(u => u.teamId === team.id)
-              const nonMembers = users.filter(u => u.teamId !== team.id)
-              const isExpanded = expandedTeam === team.id
-              const isEditing = editingTeam?.id === team.id
+            {organizations.map(org => {
+              const members = users.filter(u => u.organizationIds?.includes(org.id))
+              const nonMembers = users.filter(u => !u.organizationIds?.includes(org.id))
+              const isExpanded = expandedOrg === org.id
+              const isEditing = editingOrg?.id === org.id
 
               return (
-                <div key={team.id} style={{ border: '1px solid var(--border)', borderRadius: 12, background: 'var(--card-bg)', overflow: 'hidden' }}>
-                  {/* Team header */}
+                <div key={org.id} style={{ border: '1px solid var(--border)', borderRadius: 12, background: 'var(--card-bg)', overflow: 'hidden' }}>
+                  {/* Org header */}
                   <div style={{ padding: '14px 16px', display: 'flex', flexDirection: isMobile ? 'column' : 'row', alignItems: isMobile ? 'stretch' : 'center', gap: 12 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 12, flex: 1 }}>
                       <div style={{ width: 38, height: 38, borderRadius: 9, background: 'var(--accent)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
@@ -196,7 +196,7 @@ function TeamsPage() {
                       {isEditing ? (
                         <form onSubmit={handleEdit} style={{ flex: 1, display: 'flex', gap: 8, alignItems: 'center' }}>
                           <input
-                            style={{ ...inputBase, flex: 1 }} placeholder="Nama tim" required
+                            style={{ ...inputBase, flex: 1 }} placeholder="Nama organisasi" required
                             value={editForm.name} onChange={e => setEditForm(f => ({ ...f, name: e.target.value }))}
                             onFocus={e => (e.currentTarget.style.borderColor = 'var(--primary)')}
                             onBlur={e => (e.currentTarget.style.borderColor = 'var(--border)')}
@@ -211,14 +211,14 @@ function TeamsPage() {
                           <button type="submit" style={{ padding: '6px', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--primary)' }}>
                             <Check size={16} />
                           </button>
-                          <button type="button" onClick={() => setEditingTeam(null)} style={{ padding: '6px', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--fg-muted)' }}>
+                          <button type="button" onClick={() => setEditingOrg(null)} style={{ padding: '6px', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--fg-muted)' }}>
                             <X size={16} />
                           </button>
                         </form>
                       ) : (
                         <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ fontWeight: 600, fontSize: '0.9rem', color: 'var(--fg)', fontFamily: 'var(--font-body)' }}>{team.name}</div>
-                          {team.description && <div style={{ fontSize: '0.75rem', color: 'var(--fg-muted)', marginTop: 2 }}>{team.description}</div>}
+                          <div style={{ fontWeight: 600, fontSize: '0.9rem', color: 'var(--fg)', fontFamily: 'var(--font-body)' }}>{org.name}</div>
+                          {org.description && <div style={{ fontSize: '0.75rem', color: 'var(--fg-muted)', marginTop: 2 }}>{org.description}</div>}
                           <div style={{ fontSize: '0.72rem', color: 'var(--fg-subtle)', marginTop: 2 }}>{members.length} anggota</div>
                         </div>
                       )}
@@ -227,13 +227,13 @@ function TeamsPage() {
                     {!isEditing && (
                       <div style={{ display: 'flex', gap: 4, flexShrink: 0, justifyContent: isMobile ? 'flex-end' : 'flex-start', marginTop: isMobile ? 8 : 0 }}>
                         <button
-                          onClick={() => { setExpandedTeam(isExpanded ? null : team.id) }}
+                          onClick={() => { setExpandedOrg(isExpanded ? null : org.id) }}
                           style={{ padding: '6px 10px', fontSize: '0.75rem', fontWeight: 500, display: 'flex', alignItems: 'center', gap: 4, background: isExpanded ? 'var(--accent)' : 'var(--muted)', border: '1px solid var(--border)', borderRadius: 7, cursor: 'pointer', color: isExpanded ? 'var(--primary)' : 'var(--fg-muted)', fontFamily: 'var(--font-body)' }}
                         >
                           <UserPlus size={12} /> Kelola Anggota
                         </button>
                         <button
-                          onClick={() => { setEditingTeam(team); setEditForm({ name: team.name, description: team.description ?? '' }) }}
+                          onClick={() => { setEditingOrg(org); setEditForm({ name: org.name, description: org.description ?? '' }) }}
                           style={{ width: 30, height: 30, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'transparent', border: 'none', borderRadius: 6, cursor: 'pointer', color: 'var(--fg-muted)' }}
                           onMouseEnter={e => { e.currentTarget.style.background = 'var(--muted)' }}
                           onMouseLeave={e => { e.currentTarget.style.background = 'transparent' }}
@@ -241,7 +241,7 @@ function TeamsPage() {
                           <Pencil size={13} />
                         </button>
                         <button
-                          onClick={() => handleDeleteTeam(team.id, team.name)}
+                          onClick={() => handleDeleteOrg(org.id, org.name)}
                           style={{ width: 30, height: 30, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'transparent', border: 'none', borderRadius: 6, cursor: 'pointer', color: 'var(--fg-muted)' }}
                           onMouseEnter={e => { e.currentTarget.style.background = 'rgba(224,49,49,0.1)'; e.currentTarget.style.color = '#e03131' }}
                           onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--fg-muted)' }}
@@ -266,8 +266,8 @@ function TeamsPage() {
                             <div key={u.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '7px 10px', background: 'var(--muted)', borderRadius: 7 }}>
                               <span style={{ fontSize: '0.85rem', fontWeight: 500, color: 'var(--fg)', fontFamily: 'var(--font-body)' }}>{u.username}</span>
                               <button
-                                onClick={() => removeUser(team.id, u.id)}
-                                title="Keluarkan dari tim"
+                                onClick={() => removeUser(org.id, u.id)}
+                                title="Keluarkan dari organisasi"
                                 style={{ width: 26, height: 26, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'transparent', border: 'none', borderRadius: 5, cursor: 'pointer', color: 'var(--fg-subtle)' }}
                                 onMouseEnter={e => { e.currentTarget.style.background = 'rgba(224,49,49,0.1)'; e.currentTarget.style.color = '#e03131' }}
                                 onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--fg-subtle)' }}
@@ -290,8 +290,8 @@ function TeamsPage() {
                               <div key={u.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '7px 10px', background: 'var(--muted)', borderRadius: 7 }}>
                                 <span style={{ fontSize: '0.85rem', color: 'var(--fg-muted)', fontFamily: 'var(--font-body)' }}>{u.username}</span>
                                 <button
-                                  onClick={() => assignUser(team.id, u.id)}
-                                  title="Tambahkan ke tim"
+                                  onClick={() => assignUser(org.id, u.id)}
+                                  title="Tambahkan ke organisasi"
                                   style={{ width: 26, height: 26, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'transparent', border: 'none', borderRadius: 5, cursor: 'pointer', color: 'var(--fg-subtle)' }}
                                   onMouseEnter={e => { e.currentTarget.style.background = 'var(--accent)'; e.currentTarget.style.color = 'var(--primary)' }}
                                   onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--fg-subtle)' }}

@@ -20,7 +20,6 @@ import { BubbleToolbar } from './BubbleToolbar'
 import { PreviewPanel } from './PreviewPanel'
 import { PinLockModal } from './PinLockModal'
 import { ShareModal } from './ShareModal'
-import { DailyLogBar } from './DailyLogBar'
 import TaskList from '@tiptap/extension-task-list'
 import TaskItem from '@tiptap/extension-task-item'
 import { CalloutBlock } from './CalloutBlock'
@@ -49,7 +48,7 @@ interface Note {
   hasPinProtection?: boolean
   createdByUsername?: string | null
   updatedByUsername?: string | null
-  teamId?: string | null
+  organizationId?: string | null
   coverImage?: string | null
   icon?: string | null
 }
@@ -929,11 +928,8 @@ export function Editor({ note, onUpdate, onSaveStatusChange, onLockChange, share
     e.target.value = ''
   }
 
-  const isDailyLog = note.title.startsWith('[Daily]')
-
   return (
     <div style={{ display: 'flex', flex: 1, minWidth: 0, minHeight: 0, flexDirection: 'column' }}>
-      {isDailyLog && <DailyLogBar editor={editor} />}
       <div style={{ display: 'flex', flex: 1, minWidth: 0, minHeight: 0 }}>
       {/* Editor pane */}
       {(!isMobile || !preview) && (
@@ -1349,7 +1345,7 @@ export function Editor({ note, onUpdate, onSaveStatusChange, onLockChange, share
           onClose={() => setShowShare(false)}
           onShareChange={(t, p) => { setShareToken(t); setHasPinProtection(p) }}
           onActionSuccess={() => window.location.reload()}
-          isTeamNote={note.teamId !== null && note.teamId !== ''}
+          isTeamNote={note.organizationId !== null && note.organizationId !== ''}
         />
       )}
 
