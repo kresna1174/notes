@@ -7,11 +7,12 @@ WORKDIR /app
 # Install build dependencies for better-sqlite3 native compilation
 RUN apk add --no-cache python3 make g++
 
-# Copy dependency manifests
+# Copy dependency manifests (monorepo: root + workspace)
 COPY package*.json ./
+COPY apps/web/package*.json ./apps/web/
 
 # Install dependencies (development dependencies are required for build stage)
-RUN npm ci
+RUN npm ci --legacy-peer-deps
 
 # Copy application source code
 COPY . .
