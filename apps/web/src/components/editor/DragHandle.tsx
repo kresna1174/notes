@@ -20,6 +20,7 @@ export function DragHandle({ editor }: DragHandleProps) {
 
   // Helper to dynamically calculate fixed coordinates based on active element
   function updatePosition(block: HTMLElement, wrapper: HTMLElement) {
+    if (!editor || !editor.view || !block || typeof block.getBoundingClientRect !== 'function') return
     const rect = block.getBoundingClientRect()
     const wrapperRect = wrapper.getBoundingClientRect()
     const blockStyle = window.getComputedStyle(block)
@@ -31,44 +32,102 @@ export function DragHandle({ editor }: DragHandleProps) {
     const gap = baseFontSize * 1.2 // Constant gap of 18px (~1.2em of baseline)
     const containerWidth = 50 // Plus (24) + Gap (2) + Grip (24)
     
+    const editorDom = editor.view.dom
+    const editorDomRect = editorDom.getBoundingClientRect()
+    
     // Position vertically centered relative to viewport
     const y = rect.top + paddingTop + (lineHeight - 24) / 2
-    const x = rect.left - (gap + containerWidth)
-
-    setTop(y)
     
-    // Prevent overlapping the text block (ensure at least a 4px gap)
-    const maxLeftToAvoidOverlap = rect.left - (containerWidth + 4)
+    // Horizontal position: always align with the left of the editor DOM (no indentation)
+    const x = editorDomRect.left - (gap + containerWidth)
+    
+    // Prevent overlapping the editor content (ensure at least a 4px gap)
+    const maxLeftToAvoidOverlap = editorDomRect.left - (containerWidth + 4)
     const clampedX = Math.min(maxLeftToAvoidOverlap, Math.max(wrapperRect.left + 8, x))
     
+    setTop(y)
     setLeft(clampedX)
+  }
+
+  // Find draggable block starting from an element
+  function findDraggableBlock(el: HTMLElement) {
+    if (!editor || !editor.view || !el || el.nodeType !== 1) return null
+    const editorDom = editor.view.dom
+    let current: HTMLElement | null = el
+    while (current && current.parentElement) {
+      if (current.parentElement === editorDom) {
+        return current // top-level block
+      }
+      if (
+        current.tagName === 'LI' ||
+        (typeof current.getAttribute === 'function' && (
+          current.getAttribute('data-type') === 'callout' ||
+          current.getAttribute('data-type') === 'diagram' ||
+          current.getAttribute('data-type') === 'toggle-block' ||
+          current.getAttribute('data-type') === 'bookmark'
+        ))
+      ) {
+        return current
+      }
+      current = current.parentElement
+    }
+    return null
+  }
+
+  // Get active block element based on window selection or editor state
+  function getActiveBlockElement() {
+    if (!editor || editor.isDestroyed || !editor.view) return null
+    
+    // Try to find block via window selection
+    const selection = window.getSelection()
+    if (selection && selection.anchorNode) {
+      let el = selection.anchorNode as HTMLElement
+      if (el.nodeType === 3) { // Text node
+        el = el.parentElement as HTMLElement
+      }
+      if (el && el.nodeType === 1) {
+        const block = findDraggableBlock(el)
+        if (block) return block
+      }
+    }
+    
+    // Fallback: use ProseMirror state selection
+    const { $from } = editor.state.selection
+    let depth = $from.depth
+    while (depth >= 0) {
+      const node = $from.node(depth)
+      if (node.isBlock) {
+        try {
+          const activePos = $from.start(depth)
+          let domNode = editor.view.nodeDOM(activePos) as HTMLElement | null
+          if (domNode) {
+            if (domNode.nodeType === 3) { // Text node
+              domNode = domNode.parentElement as HTMLElement | null
+            }
+            if (domNode && domNode.nodeType === 1) {
+              const block = findDraggableBlock(domNode)
+              if (block) return block
+            }
+          }
+        } catch (e) {}
+      }
+      depth--
+    }
+    
+    return null
   }
 
   useEffect(() => {
     if (!editor || !editor.view) return
 
     const editorDom = editor.view.dom
-    const scrollContainer = editorDom.parentElement
     const wrapper = editorDom.closest('.editor-content-wrapper') || editorDom.parentElement || document.body
 
-    function findDraggableBlock(el: HTMLElement) {
-      let current = el
-      while (current && current.parentElement) {
-        if (current.parentElement === editorDom) {
-          return current // top-level block
-        }
-        if (
-          current.tagName === 'LI' ||
-          current.getAttribute('data-type') === 'callout' ||
-          current.getAttribute('data-type') === 'diagram' ||
-          current.getAttribute('data-type') === 'toggle-block' ||
-          current.getAttribute('data-type') === 'bookmark'
-        ) {
-          return current
-        }
-        current = current.parentElement
-      }
-      return null
+    function updatePositionTo(block: HTMLElement | null) {
+      if (!block) return
+      setHoveredElement(block)
+      updatePosition(block, wrapper as HTMLElement)
+      setVisible(true)
     }
 
     function handleMouseMove(e: MouseEvent) {
@@ -87,12 +146,10 @@ export function DragHandle({ editor }: DragHandleProps) {
       const block = findDraggableBlock(target)
 
       if (block) {
-        setHoveredElement(block)
-        updatePosition(block, wrapper as HTMLElement)
-        setVisible(true)
+        updatePositionTo(block)
       } else {
         // Safe zone check: if mouse is vertically close to the active block
-        // and horizontally close to the handle, don't hide it yet.
+        // and horizontally close to the handle, don't hide or jump yet.
         if (hoveredElement && visible) {
           const rect = hoveredElement.getBoundingClientRect()
           const isVerticallyClose = e.clientY >= rect.top - 12 && e.clientY <= rect.bottom + 12
@@ -104,9 +161,14 @@ export function DragHandle({ editor }: DragHandleProps) {
           }
         }
 
-        // Hide only if mouse is outside the editor wrapper AND not hovering the handle
+        // Snap back to active block if mouse is outside the editor wrapper
         if (wrapper && !wrapper.contains(target) && !isHoveringHandleRef.current) {
-          setVisible(false)
+          const activeBlock = getActiveBlockElement()
+          if (activeBlock) {
+            updatePositionTo(activeBlock)
+          } else {
+            setVisible(false)
+          }
         }
       }
     }
@@ -117,12 +179,46 @@ export function DragHandle({ editor }: DragHandleProps) {
       }
     }
 
+    // Snaps handle to current active block on selection/editor update
+    const handleSelectionOrUpdate = () => {
+      if (editor.isDestroyed) return
+      if (isHoveringHandleRef.current) return
+      
+      const activeBlock = getActiveBlockElement()
+      if (activeBlock) {
+        updatePositionTo(activeBlock)
+      }
+    }
+
+    const handleBlur = () => {
+      setTimeout(() => {
+        if (!isHoveringHandleRef.current && !editor.isFocused) {
+          setVisible(false)
+        }
+      }, 150)
+    }
+
+    // Set initial position if editor is focused
+    if (editor.isFocused) {
+      handleSelectionOrUpdate()
+    }
+
     document.addEventListener('mousemove', handleMouseMove)
     window.addEventListener('scroll', handleScroll, { capture: true, passive: true })
+
+    editor.on('selectionUpdate', handleSelectionOrUpdate)
+    editor.on('update', handleSelectionOrUpdate)
+    editor.on('focus', handleSelectionOrUpdate)
+    editor.on('blur', handleBlur)
 
     return () => {
       document.removeEventListener('mousemove', handleMouseMove)
       window.removeEventListener('scroll', handleScroll, { capture: true })
+
+      editor.off('selectionUpdate', handleSelectionOrUpdate)
+      editor.off('update', handleSelectionOrUpdate)
+      editor.off('focus', handleSelectionOrUpdate)
+      editor.off('blur', handleBlur)
     }
   }, [editor, hoveredElement, visible, left])
 

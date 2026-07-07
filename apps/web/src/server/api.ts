@@ -24,67 +24,7 @@ type Env = {
 
 export const app = new Hono<Env>()
 
-// SSE types and state for Real-Time Note Collaboration
-type SSEClient = {
-  id: string
-  userId: string
-  username: string
-  write: (data: string, event: string) => Promise<void>
-}
 
-// Maps noteId -> Array of active SSEClient connections
-export const noteSubscribers = new Map<string, SSEClient[]>()
-
-// Maps noteId -> Map of userId -> { username: string, timestamp: number }
-export const noteTypingState = new Map<string, Map<string, { username: string; timestamp: number }>>()
-
-export function broadcastPresence(noteId: string) {
-  const list = noteSubscribers.get(noteId) || []
-  const activeUsers = list.map(cli => ({ userId: cli.userId, username: cli.username }))
-  // Filter out duplicates
-  const uniqueUsers = activeUsers.filter((val, index, self) =>
-    self.findIndex(t => t.userId === val.userId) === index
-  )
-
-  for (const client of list) {
-    client.write(JSON.stringify(uniqueUsers), 'presence').catch(() => {})
-  }
-}
-
-export function broadcastTyping(noteId: string) {
-  const map = noteTypingState.get(noteId)
-  const list = noteSubscribers.get(noteId) || []
-  
-  const now = Date.now()
-  const activeTyping: { username: string; pos: number; isTyping: boolean }[] = []
-  
-  if (map) {
-    for (const [userId, val] of map.entries()) {
-      const isSubscribed = list.some(cli => cli.userId === userId)
-      if (isSubscribed) {
-        activeTyping.push({
-          username: val.username,
-          pos: (val as any).pos ?? 0,
-          isTyping: now - val.timestamp < 4000
-        })
-      } else {
-        map.delete(userId)
-      }
-    }
-  }
-
-  for (const client of list) {
-    const typingFiltered = activeTyping.filter(item => item.username !== client.username)
-    client.write(JSON.stringify(typingFiltered), 'typing').catch(() => {})
-  }
-}
-
-// Global interval to automatically update typing status after inactivity
-setInterval(() => {
-  for (const noteId of noteTypingState.keys()) {
-    broadcastTyping(noteId)
-  }
-}, 2000)
 
 app.use('*', async (c, next) => {
   console.log(`[Hono Request] ${c.req.method} ${c.req.url}`)
@@ -859,80 +799,7 @@ app.get('/api/notes/:id', authMiddleware, async (c) => {
   return c.json(stripAndEnrich(note))
 })
 
-app.get('/api/notes/:id/events', authMiddleware, async (c) => {
-  const noteId = c.req.param('id')
-  const session = c.get('session')
-  const clientUuid = randomUUID()
 
-  // Verify the user has access to this note
-  const ownerFilter = await getOwnerFilter(noteId, session.userId, session.role)
-  const [note] = await db.select().from(notes).where(ownerFilter)
-  if (!note) {
-    return c.json({ error: 'not found' }, 404)
-  }
-
-  return streamSSE(c, async (stream) => {
-    const write = async (data: string, event: string) => {
-      await stream.writeSSE({
-        data,
-        event,
-        id: randomUUID()
-      })
-    }
-
-    const client: SSEClient = {
-      id: clientUuid,
-      userId: session.userId,
-      username: session.username,
-      write
-    }
-
-    // Add to subscribers
-    const list = noteSubscribers.get(noteId) || []
-    list.push(client)
-    noteSubscribers.set(noteId, list)
-
-    console.log(`[SSE] User ${session.username} joined note ${noteId}`)
-
-    // Broadcast presence update immediately
-    broadcastPresence(noteId)
-
-    // Keep connection alive and clean up on abort
-    stream.onAbort(() => {
-      const activeList = noteSubscribers.get(noteId) || []
-      const filtered = activeList.filter(cli => cli.id !== clientUuid)
-      if (filtered.length > 0) {
-        noteSubscribers.set(noteId, filtered)
-      } else {
-        noteSubscribers.delete(noteId)
-      }
-
-      // If no more connections for this userId, clean up their typing status
-      const hasOtherConnections = filtered.some(cli => cli.userId === session.userId)
-      if (!hasOtherConnections) {
-        const typingMap = noteTypingState.get(noteId)
-        if (typingMap) {
-          typingMap.delete(session.userId)
-        }
-      }
-
-      console.log(`[SSE] User ${session.username} left note ${noteId}`)
-      // Broadcast updates
-      broadcastPresence(noteId)
-      broadcastTyping(noteId)
-    })
-
-    // Sleep in a loop to keep stream open (Hono requires this to not close the request handler)
-    while (true) {
-      await stream.sleep(30000) // 30s heartbeat
-      try {
-        await write('ping', 'heartbeat')
-      } catch (e) {
-        break // connection closed
-      }
-    }
-  })
-})
 
 app.put('/api/notes/:id', authMiddleware, async (c) => {
   const id = c.req.param('id')
@@ -953,45 +820,12 @@ app.put('/api/notes/:id', authMiddleware, async (c) => {
   const [updated] = await db.select().from(notes).where(ownerFilter)
   if (!updated) return c.json({ error: 'not found' }, 404)
 
-  // Broadcast update to other active subscribers of this note
-  const list = noteSubscribers.get(id) || []
-  for (const client of list) {
-    if (client.userId !== session.userId) {
-      client.write(JSON.stringify({
-        updatedBy: session.username,
-        updatedByUserId: session.userId,
-        title: updated.title,
-        content: updated.content,
-        coverImage: updated.coverImage,
-        icon: updated.icon,
-        updatedAt: updated.updatedAt
-      }), 'note-updated').catch(() => {})
-    }
-  }
+
 
   return c.json(stripAndEnrich(updated))
 })
 
-app.post('/api/notes/:id/typing', authMiddleware, async (c) => {
-  const noteId = c.req.param('id')
-  const session = c.get('session')
-  const body = await c.req.json().catch(() => ({})) as { pos?: number }
 
-  let map = noteTypingState.get(noteId)
-  if (!map) {
-    map = new Map()
-    noteTypingState.set(noteId, map)
-  }
-
-  map.set(session.userId, {
-    username: session.username,
-    timestamp: Date.now(),
-    pos: body.pos ?? 0
-  })
-
-  broadcastTyping(noteId)
-  return c.json({ ok: true })
-})
 
 app.delete('/api/notes/:id', authMiddleware, async (c) => {
   const id = c.req.param('id')

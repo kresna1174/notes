@@ -1,8 +1,10 @@
 import { Node, mergeAttributes } from '@tiptap/core'
 import { ReactNodeViewRenderer, NodeViewWrapper } from '@tiptap/react'
-import { useRef, useState } from 'react'
-import { Paperclip, Download, Trash2, FileText, Image as ImageIcon } from 'lucide-react'
+import { useRef, useState, useEffect } from 'react'
+import { Paperclip, Download, Trash2, FileText, Image as ImageIcon, Loader2 } from 'lucide-react'
 import { AttachmentPreviewModal, isPreviewable } from './AttachmentPreviewModal'
+
+export const pendingFiles = new Map<string, File>()
 
 function formatBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`
@@ -19,7 +21,49 @@ function AttachmentNodeView({ node, updateAttributes, deleteNode, editor }: any)
   const [uploading, setUploading] = useState(false)
   const [dragging, setDragging] = useState(false)
   const [previewOpen, setPreviewOpen] = useState(false)
-  const { attachmentId, filename, mimeType, size } = node.attrs
+  const { attachmentId, filename, mimeType, size, uploadId } = node.attrs
+
+  useEffect(() => {
+    if (uploadId && !attachmentId) {
+      const file = pendingFiles.get(uploadId)
+      if (file) {
+        setUploading(true)
+        const noteId = (editor.storage as any).noteId
+        if (!noteId) {
+          console.error('noteId is not set in editor storage')
+          deleteNode()
+          pendingFiles.delete(uploadId)
+          return
+        }
+        const form = new FormData()
+        form.append('file', file)
+        form.append('noteId', noteId)
+        fetch('/api/attachments', { method: 'POST', body: form })
+          .then(async res => {
+            if (!res.ok) throw new Error(`Upload failed: ${res.status}`)
+            const data = await res.json()
+            updateAttributes({
+              attachmentId: data.id,
+              filename: data.filename,
+              mimeType: data.mimeType,
+              size: data.size,
+              uploadId: null
+            })
+            pendingFiles.delete(uploadId)
+          })
+          .catch(err => {
+            alert(`Upload failed: ${err instanceof Error ? err.message : 'Unknown error'}`)
+            deleteNode()
+            pendingFiles.delete(uploadId)
+          })
+          .finally(() => {
+            setUploading(false)
+          })
+      } else {
+        updateAttributes({ uploadId: null })
+      }
+    }
+  }, [uploadId, attachmentId])
 
   async function upload(file: File) {
     if (uploading) return
@@ -91,6 +135,44 @@ function AttachmentNodeView({ node, updateAttributes, deleteNode, editor }: any)
   async function remove() {
     if (attachmentId) await fetch(`/api/attachments/${attachmentId}`, { method: 'DELETE' })
     deleteNode()
+  }
+
+  if (uploadId && !attachmentId) {
+    return (
+      <NodeViewWrapper>
+        <div style={{
+          border: '1px solid var(--border)', borderRadius: 8, padding: '10px 14px',
+          display: 'flex', alignItems: 'center', gap: 12,
+          background: 'var(--muted)',
+          fontFamily: 'var(--font-body)',
+        }}>
+          <Loader2 size={24} className="animate-spin text-primary" style={{ flexShrink: 0, color: 'var(--primary)' }} />
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <p style={{
+              margin: 0,
+              fontSize: '0.875rem',
+              fontWeight: 500,
+              color: 'var(--fg)',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
+            }}>
+              {filename || 'Mengunggah file...'}
+            </p>
+            <p style={{ margin: 0, fontSize: '0.75rem', color: 'var(--fg-muted)' }}>
+              {size ? `${formatBytes(size)} · ` : ''}Uploading…
+            </p>
+          </div>
+          <button onClick={deleteNode}
+            style={{ width: 30, height: 30, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 6, border: 'none', cursor: 'pointer', background: 'transparent', color: 'var(--fg-muted)' }}
+            onMouseEnter={e => { e.currentTarget.style.background = 'rgba(224,49,49,0.1)'; e.currentTarget.style.color = '#e03131' }}
+            onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--fg-muted)' }}
+          >
+            <Trash2 size={15} />
+          </button>
+        </div>
+      </NodeViewWrapper>
+    )
   }
 
   if (!attachmentId) {
@@ -293,6 +375,7 @@ export const AttachmentBlockExtension = Node.create({
       filename: { default: '' },
       mimeType: { default: '' },
       size: { default: 0 },
+      uploadId: { default: null },
     }
   },
   parseHTML() { return [{ tag: 'div[data-type="attachment"]' }] },
