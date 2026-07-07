@@ -1,0 +1,6 @@
+# https://moonrepo.dev/docs/config/toolchains
+$schema: 'https://moonrepo.dev/schemas/toolchains.json'
+
+node:
+  version: '24.15.0'
+  packageManager: 'npm'
