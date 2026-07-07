@@ -67,8 +67,8 @@ services:
     ports:
       - "127.0.0.1:3000:3000"
     volumes:
-      - ./apps/web/data:/app/data
-      - ./apps/web/uploads:/app/uploads
+      - notes_data:/app/data
+      - notes_uploads:/app/uploads
     environment:
       - PORT=3000
       - NODE_ENV=production
@@ -80,6 +80,8 @@ services:
 
 volumes:
   redis_data:
+  notes_data:
+  notes_uploads:
 
 networks:
   notes-network:
