@@ -14,7 +14,7 @@ import { Color } from '@tiptap/extension-color'
 import Underline from '@tiptap/extension-underline'
 import Highlight from '@tiptap/extension-highlight'
 import { SlashCommandExtension } from './SlashCommand'
-import { DiagramBlock } from './DiagramBlock'
+import { DiagramBlock, EditDiagramDialog } from './DiagramBlock'
 import { AttachmentBlockExtension } from './AttachmentBlock'
 import { BubbleToolbar } from './BubbleToolbar'
 import { PreviewPanel } from './PreviewPanel'
@@ -591,6 +591,21 @@ export function Editor({ note, onUpdate, onSaveStatusChange, onLockChange, share
       triggerTyping(editor.state.selection.head)
     }
   })
+
+  const [editDiagramData, setEditDiagramData] = useState<{ id: string; initialData: string } | null>(null)
+
+  useEffect(() => {
+    if (editor && editor.storage.diagram) {
+      editor.storage.diagram.openEditor = (id: string, initialData: string) => {
+        setEditDiagramData({ id, initialData })
+      }
+    }
+    return () => {
+      if (editor && editor.storage.diagram) {
+        editor.storage.diagram.openEditor = null
+      }
+    }
+  }, [editor])
 
   const [aiPromptActive, setAiPromptActive] = useState(false)
   const [aiPromptText, setAiPromptText] = useState('')
@@ -1346,6 +1361,14 @@ export function Editor({ note, onUpdate, onSaveStatusChange, onLockChange, share
           onShareChange={(t, p) => { setShareToken(t); setHasPinProtection(p) }}
           onActionSuccess={() => window.location.reload()}
           isTeamNote={note.organizationId !== null && note.organizationId !== ''}
+        />
+      )}
+
+      {editDiagramData && (
+        <EditDiagramDialog
+          editor={editor}
+          data={editDiagramData}
+          onClose={() => setEditDiagramData(null)}
         />
       )}
 
