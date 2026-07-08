@@ -147,12 +147,15 @@ export function ExportModal({ note, onClose }: ExportModalProps) {
     
     // Set custom styles for A4 dimensions
     clone.style.width = '794px' // Standard A4 width in pixels (~210mm at 96 dpi)
+    clone.style.maxWidth = 'none'
+    clone.style.minWidth = 'none'
     clone.style.height = 'auto'
     clone.style.maxHeight = 'none'
     clone.style.overflow = 'visible'
     clone.style.boxShadow = 'none'
     clone.style.border = 'none'
     clone.style.borderRadius = '0'
+    clone.style.margin = '0'
 
     // Create wrapper that is inside positive viewport bounds but hidden under the layout
     const wrapper = document.createElement('div')
