@@ -116,7 +116,7 @@ class ApproveRejectRequest(BaseModel):
     call_id: str
     status: str
 
-from custom_tools import write_notes, create_new_note, update_note_direct, search_web, extract_web, crawl_web, execute_python_code
+from custom_tools import write_notes, create_new_note, update_note_direct, search_web, extract_web, crawl_web, execute_python_code, find_web_photos, find_youtube_videos
 from core.llm import default_model_settings
 
 # 1. Definisikan Sub-Agents
@@ -148,6 +148,16 @@ parent_agent = Agent(
     If you generate charts or figures (using matplotlib, seaborn, etc.), save them as PNG files in the static uploads folder:
     `../../web/uploads/chart_<random_uuid>.png`
     and return the markdown image link `![Chart](/uploads/chart_<random_uuid>.png)` in your response so the user can see the chart.
+
+    If the user asks you to fetch or search for a photo or image on the web and embed/insert it in the note:
+    1. Search for relevant photos using the `find_web_photos` tool.
+    2. Choose the best matching image URL.
+    3. Construct a standard HTML image tag: <img src="IMAGE_URL" alt="Description" /> or markdown image: ![Description](IMAGE_URL). Include it in the proposed note content and write/update the note using `write_notes` or `update_note_direct`.
+
+    If the user asks you to fetch or search for a video from YouTube and embed/insert it in the note:
+    1. Search for relevant YouTube videos using the `find_youtube_videos` tool.
+    2. Choose the best matching video/embed URL.
+    3. Construct a YouTube embed iframe wrapped in a div: <div data-youtube-video><iframe src="EMBED_URL_OR_VIDEO_URL"></iframe></div> or simply write the video URL inside the note. The editor is configured with @tiptap/extension-youtube to parse and render it as a video component. Include it in the proposed note content and write/update the note using `write_notes` or `update_note_direct`.
     """,
     model=get_model(),
     model_settings=default_model_settings,
@@ -167,6 +177,8 @@ parent_agent = Agent(
         extract_web,
         crawl_web,
         execute_python_code,
+        find_web_photos,
+        find_youtube_videos,
     ]
 )
 
