@@ -797,6 +797,7 @@ export function Editor({ note, onUpdate, onSaveStatusChange, onLockChange, share
 
     let fullText = ''
     let promptBarClosed = false
+    let streamError: string | null = null
 
     const cursorChar = ' ▋'
     let hasCursor = false
@@ -862,7 +863,9 @@ export function Editor({ note, onUpdate, onSaveStatusChange, onLockChange, share
           
           try {
             const data = JSON.parse(jsonStr)
-            if (data.type === 'text-delta' && data.delta) {
+            if (data.type === 'error' && data.errorText) {
+              streamError = data.errorText
+            } else if (data.type === 'text-delta' && data.delta) {
               const delta = data.delta
               fullText += delta
               insertDeltaWithCursor(delta)
@@ -879,7 +882,9 @@ export function Editor({ note, onUpdate, onSaveStatusChange, onLockChange, share
           const jsonStr = buffer.trim().substring(6)
           if (jsonStr !== '[DONE]') {
             const data = JSON.parse(jsonStr)
-            if (data.type === 'text-delta' && data.delta) {
+            if (data.type === 'error' && data.errorText) {
+              streamError = data.errorText
+            } else if (data.type === 'text-delta' && data.delta) {
               const delta = data.delta
               fullText += delta
               insertDeltaWithCursor(delta)
@@ -890,6 +895,11 @@ export function Editor({ note, onUpdate, onSaveStatusChange, onLockChange, share
 
       // Remove the inline cursor before final compilation
       removeCursor()
+
+      // If stream error occurred and no text was generated, show error
+      if (streamError && !fullText) {
+        throw new Error(streamError)
+      }
 
       // Replace the entire streamed raw text with compiled markdown HTML
       if (fullText) {

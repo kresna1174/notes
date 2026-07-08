@@ -3,7 +3,7 @@ import { useNavigate } from '@tanstack/react-router'
 import { ScrollArea } from '../ui/scroll-area'
 import { DayGroup } from './DayGroup'
 import { SearchBar } from './SearchBar'
-import { Plus, LogOut, Users, Shield, Eye, UsersRound, Info, Menu, X, KeyRound, Brain, ChevronDown, Check } from 'lucide-react'
+import { Plus, LogOut, Users, Shield, Eye, Info, Menu, X, KeyRound, Brain, ChevronDown, Check } from 'lucide-react'
 import { FontPicker } from './FontPicker'
 import { ThemeToggle } from './ThemeToggle'
 import { useAuth } from '../../lib/auth'
@@ -437,20 +437,6 @@ export function Sidebar({ activeNoteId, onShareNote, notesUpdateTrigger }: Sideb
         {/* Footer */}
         <div style={{ borderTop: `1px solid ${C.border}`, padding: '10px 12px', flexShrink: 0 }}>
           {user?.role === 'admin' && (
-            <>
-            <button
-              onClick={() => navigateAndClose({ to: '/organizations' })}
-              style={{
-                display: 'flex', alignItems: 'center', gap: 8, width: '100%',
-                padding: '7px 10px', borderRadius: 7, border: 'none',
-                background: 'transparent', cursor: 'pointer', marginBottom: 2,
-                fontSize: '0.8125rem', color: C.fgMuted, fontFamily: 'var(--font-body)',
-              }}
-              onMouseEnter={e => { e.currentTarget.style.background = C.accent; e.currentTarget.style.color = C.primary }}
-              onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = C.fgMuted }}
-            >
-              <UsersRound size={14} /> Kelola Organisasi
-            </button>
             <button
               onClick={() => navigateAndClose({ to: '/users' })}
               style={{
@@ -462,9 +448,8 @@ export function Sidebar({ activeNoteId, onShareNote, notesUpdateTrigger }: Sideb
               onMouseEnter={e => { e.currentTarget.style.background = C.accent; e.currentTarget.style.color = C.primary }}
               onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = C.fgMuted }}
             >
-              <Users size={14} /> Kelola User
+              <Users size={14} /> Settings
             </button>
-            </>
           )}
 
           <button

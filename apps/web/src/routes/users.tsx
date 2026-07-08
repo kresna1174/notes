@@ -1,11 +1,14 @@
 import { createFileRoute, redirect, useRouter } from '@tanstack/react-router'
 import { useAuth } from '../lib/auth'
-import { useState, useEffect, useRef } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { Sidebar } from '../components/sidebar/Sidebar'
-import { Trash2, UserPlus, Shield, Eye, KeyRound, Lock, LockOpen, X, AlertTriangle, Check, Users as UsersIcon, RefreshCw } from 'lucide-react'
+import { Trash2, UserPlus, Shield, Eye, KeyRound, Lock, LockOpen, X, AlertTriangle, Check, Users as UsersIcon, RefreshCw, Sparkles, Pencil, Plus, UsersRound, UserMinus } from 'lucide-react'
 
 interface User { id: string; username: string; role: 'admin' | 'viewer'; status: 'approved' | 'rejected' | 'pending'; createdAt: number }
 interface LockedNote { id: string; title: string; createdAt: number; updatedAt: number; ownerUsername: string; ownerId: string; type: string; organizationId: string | null }
+interface AiSession { session_id: string; user_id: string | null; username: string | null; note_title: string | null; created_at: string; updated_at: string; message_count: number; user_message_count: number; tool_call_count: number; prompt_preview: string; has_error: boolean; error_message: string | null; prompt_tokens: number; completion_tokens: number; messages: { role: string; type: string; content: string; name: string | null; tool_call_id: string | null }[] }
+interface AiStats { total_sessions: number; total_messages: number; total_user_messages: number; total_tool_calls: number; total_prompt_tokens: number; total_completion_tokens: number }
+interface Organization { id: string; name: string; description: string | null; createdAt: number }
 
 export const Route = createFileRoute('/users')({
   beforeLoad: ({ context }) => {
@@ -403,6 +406,132 @@ function ResetPinModal({ note, onClose, onSuccess }: ResetPinModalProps) {
   )
 }
 
+// ── User Action Modal ──────────────────────────────────────────────────────────
+interface UserActionModalProps {
+  user: User
+  action: 'edit' | 'password' | 'delete'
+  onClose: () => void
+  onDone: () => void
+}
+
+function UserActionModal({ user: target, action, onClose, onDone }: UserActionModalProps) {
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
+  const [username, setUsername] = useState(target.username)
+  const [role, setRole] = useState(target.role)
+  const [password, setPassword] = useState('')
+
+  async function handleEdit() {
+    setLoading(true); setError('')
+    const res = await fetch(`/api/auth/users/${target.id}`, {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, role }),
+    })
+    setLoading(false)
+    if (res.ok) { onDone() } else { const d = await res.json(); setError(d.error || 'Gagal') }
+  }
+
+  async function handlePassword() {
+    if (password.trim().length < 4) { setError('Minimal 4 karakter'); return }
+    setLoading(true); setError('')
+    const res = await fetch(`/api/auth/users/${target.id}/reset-password`, {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ newPassword: password.trim() }),
+    })
+    setLoading(false)
+    if (res.ok) { onDone() } else { const d = await res.json(); setError(d.error || 'Gagal') }
+  }
+
+  async function handleDelete() {
+    setLoading(true); setError('')
+    const res = await fetch(`/api/auth/users/${target.id}`, { method: 'DELETE' })
+    setLoading(false)
+    if (res.ok) { onDone() } else { const d = await res.json(); setError(d.error || 'Gagal') }
+  }
+
+  const overlayStyle: React.CSSProperties = { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999 }
+  const boxStyle: React.CSSProperties = { background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 14, padding: 24, width: '100%', maxWidth: 400, boxShadow: '0 16px 48px rgba(0,0,0,0.18)' }
+  const inputStyle: React.CSSProperties = { width: '100%', boxSizing: 'border-box', padding: '8px 12px', fontSize: '0.875rem', fontFamily: 'var(--font-body)', border: '1px solid var(--border)', borderRadius: 7, outline: 'none', color: 'var(--fg)', background: 'var(--input-bg)' }
+  const btnPrimary: React.CSSProperties = { padding: '8px 18px', fontSize: '0.875rem', fontWeight: 600, fontFamily: 'var(--font-body)', background: 'var(--primary)', color: 'var(--primary-fg)', border: 'none', borderRadius: 7, cursor: 'pointer' }
+  const btnDanger: React.CSSProperties = { ...btnPrimary, background: '#e03131' }
+  const btnGhost: React.CSSProperties = { padding: '8px 18px', fontSize: '0.875rem', fontFamily: 'var(--font-body)', background: 'var(--muted)', color: 'var(--fg-muted)', border: '1px solid var(--border)', borderRadius: 7, cursor: 'pointer' }
+
+  return (
+    <div style={overlayStyle} onClick={onClose}>
+      <div style={boxStyle} onClick={e => e.stopPropagation()}>
+        {/* Header */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <div style={{ width: 36, height: 36, borderRadius: 8, background: 'var(--muted)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--fg-subtle)' }}>
+              {action === 'edit' ? <Pencil size={16} /> : action === 'password' ? <KeyRound size={16} /> : <Trash2 size={16} />}
+            </div>
+            <div>
+              <p style={{ margin: 0, fontWeight: 600, fontSize: '0.95rem', color: 'var(--fg)' }}>
+                {action === 'edit' ? 'Edit User' : action === 'password' ? 'Ganti Password' : 'Hapus User'}
+              </p>
+              <p style={{ margin: 0, fontSize: '0.78rem', color: 'var(--fg-muted)' }}>@{target.username}</p>
+            </div>
+          </div>
+          <button onClick={onClose} style={{ width: 30, height: 30, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'transparent', border: 'none', borderRadius: 6, cursor: 'pointer', color: 'var(--fg-muted)' }}><X size={16} /></button>
+        </div>
+
+        {/* Body */}
+        {action === 'edit' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <div>
+              <label style={{ fontSize: '0.8rem', fontWeight: 500, color: 'var(--fg-muted)', marginBottom: 4, display: 'block' }}>Username</label>
+              <input style={inputStyle} value={username} onChange={e => setUsername(e.target.value)} />
+            </div>
+            <div>
+              <label style={{ fontSize: '0.8rem', fontWeight: 500, color: 'var(--fg-muted)', marginBottom: 4, display: 'block' }}>Role</label>
+              <div style={{ display: 'flex', gap: 8 }}>
+                {(['viewer', 'admin'] as const).map(r => (
+                  <button key={r} type="button" onClick={() => setRole(r)} style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5, padding: '8px 0', fontSize: '0.8125rem', borderRadius: 7, border: '1px solid', cursor: 'pointer', fontFamily: 'var(--font-body)', background: role === r ? 'var(--accent)' : 'var(--bg)', borderColor: role === r ? 'var(--primary)' : 'var(--border)', color: role === r ? 'var(--primary)' : 'var(--fg-muted)', fontWeight: role === r ? 600 : 400 }}>
+                    {r === 'admin' ? <Shield size={13} /> : <Eye size={13} />} {r === 'admin' ? 'Admin' : 'Viewer'}
+                  </button>
+                ))}
+              </div>
+            </div>
+            {error && <p style={{ margin: 0, fontSize: '0.8rem', color: '#e03131' }}>{error}</p>}
+            <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
+              <button onClick={handleEdit} disabled={loading} style={{ ...btnPrimary, opacity: loading ? 0.6 : 1 }}>{loading ? 'Menyimpan…' : 'Simpan'}</button>
+              <button onClick={onClose} style={btnGhost}>Batal</button>
+            </div>
+          </div>
+        )}
+
+        {action === 'password' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <div>
+              <label style={{ fontSize: '0.8rem', fontWeight: 500, color: 'var(--fg-muted)', marginBottom: 4, display: 'block' }}>Password Baru (min 4 karakter)</label>
+              <input style={inputStyle} type="password" value={password} onChange={e => { setPassword(e.target.value); setError('') }} autoFocus onKeyDown={e => e.key === 'Enter' && handlePassword()} />
+            </div>
+            {error && <p style={{ margin: 0, fontSize: '0.8rem', color: '#e03131' }}>{error}</p>}
+            <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
+              <button onClick={handlePassword} disabled={loading} style={{ ...btnPrimary, opacity: loading ? 0.6 : 1 }}>{loading ? 'Menyimpan…' : 'Simpan'}</button>
+              <button onClick={onClose} style={btnGhost}>Batal</button>
+            </div>
+          </div>
+        )}
+
+        {action === 'delete' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 14px', background: 'rgba(224,49,49,0.06)', borderRadius: 8, border: '1px solid rgba(224,49,49,0.15)' }}>
+              <AlertTriangle size={18} color="#e03131" />
+              <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--fg)' }}>Yakin ingin menghapus user <strong>@{target.username}</strong>? Tindakan ini tidak dapat dibatalkan.</p>
+            </div>
+            {error && <p style={{ margin: 0, fontSize: '0.8rem', color: '#e03131' }}>{error}</p>}
+            <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
+              <button onClick={handleDelete} disabled={loading} style={{ ...btnDanger, opacity: loading ? 0.6 : 1 }}>{loading ? 'Menghapus…' : 'Hapus'}</button>
+              <button onClick={onClose} style={btnGhost}>Batal</button>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
 // ── Main page ────────────────────────────────────────────────────────────────
 function UsersPage() {
   const { user } = useAuth()
@@ -412,11 +541,27 @@ function UsersPage() {
   const [error, setError] = useState<string | null>(null)
   const [adding, setAdding] = useState(false)
   const [showForm, setShowForm] = useState(false)
-  const [activeTab, setActiveTab] = useState<'users' | 'pins'>('users')
+  const [activeTab, setActiveTab] = useState<'users' | 'pins' | 'ai-history' | 'organizations'>('users')
   const [lockedNotes, setLockedNotes] = useState<LockedNote[]>([])
   const [loadingLocked, setLoadingLocked] = useState(false)
   const [resetTarget, setResetTarget] = useState<LockedNote | null>(null)
   const [toastMsg, setToastMsg] = useState<{ text: string; type: 'success' | 'error' } | null>(null)
+  const [aiLogs, setAiLogs] = useState<AiSession[]>([])
+  const [aiLogsTotal, setAiLogsTotal] = useState(0)
+  const [aiLogsPage, setAiLogsPage] = useState(1)
+  const [aiLogsStats, setAiLogsStats] = useState<AiStats | null>(null)
+  const [loadingAiLogs, setLoadingAiLogs] = useState(false)
+  const [aiLogFilterUser, setAiLogFilterUser] = useState<string>('')
+  const [expandedSession, setExpandedSession] = useState<string | null>(null)
+  const [userModal, setUserModal] = useState<{ user: User; action: 'edit' | 'password' | 'delete' } | null>(null)
+  const [organizations, setOrganizations] = useState<Organization[]>([])
+  const [loadingOrgs, setLoadingOrgs] = useState(false)
+  const [showOrgForm, setShowOrgForm] = useState(false)
+  const [orgForm, setOrgForm] = useState({ name: '', description: '' })
+  const [savingOrg, setSavingOrg] = useState(false)
+  const [editingOrg, setEditingOrg] = useState<Organization | null>(null)
+  const [editOrgForm, setEditOrgForm] = useState({ name: '', description: '' })
+  const [expandedOrg, setExpandedOrg] = useState<string | null>(null)
 
   const [isMobile, setIsMobile] = useState(false)
 
@@ -429,7 +574,26 @@ function UsersPage() {
 
   useEffect(() => {
     if (activeTab === 'pins') loadLockedNotes()
-  }, [activeTab])
+    if (activeTab === 'ai-history') loadAiLogs()
+    if (activeTab === 'organizations') loadOrganizations()
+  }, [activeTab, aiLogFilterUser, aiLogsPage])
+
+  async function loadAiLogs() {
+    setLoadingAiLogs(true)
+    try {
+      const params = new URLSearchParams({ page: String(aiLogsPage), page_size: '30' })
+      if (aiLogFilterUser) params.set('user_id', aiLogFilterUser)
+      const res = await fetch(`/api/admin/ai-logs?${params}`)
+      if (res.ok) {
+        const data = await res.json()
+        setAiLogs(data.sessions || [])
+        setAiLogsTotal(data.total || 0)
+        setAiLogsStats(data.stats || null)
+      }
+    } finally {
+      setLoadingAiLogs(false)
+    }
+  }
 
   function showToast(text: string, type: 'success' | 'error' = 'success') {
     setToastMsg({ text, type })
@@ -479,20 +643,46 @@ function UsersPage() {
     router.invalidate()
   }
   async function handleDelete(id: string, username: string) {
-    if (!window.confirm(`Hapus user "${username}"?`)) return
-    await fetch(`/api/auth/users/${id}`, { method: 'DELETE' })
-    router.invalidate()
+    const target = users.find(u => u.id === id)
+    if (target) setUserModal({ user: target, action: 'delete' })
   }
   async function handleResetPassword(id: string, username: string) {
-    const newPw = window.prompt(`Password baru untuk user "${username}" (min 4 karakter):`)
-    if (newPw === null) return
-    if (newPw.trim().length < 4) { alert('Password minimal 4 karakter!'); return }
-    const res = await fetch(`/api/auth/users/${id}/reset-password`, {
-      method: 'PUT', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ newPassword: newPw.trim() }),
-    })
-    if (res.ok) { showToast(`Password "${username}" berhasil direset`) }
-    else { const d = await res.json(); showToast(d.error || 'Gagal reset password', 'error') }
+    const target = users.find(u => u.id === id)
+    if (target) setUserModal({ user: target, action: 'password' })
+  }
+  async function handleEditUser(id: string, username: string, currentRole: string) {
+    const target = users.find(u => u.id === id)
+    if (target) setUserModal({ user: target, action: 'edit' })
+  }
+
+  // ── Organization handlers ──
+  async function loadOrganizations() {
+    setLoadingOrgs(true)
+    try {
+      const res = await fetch('/api/organizations')
+      if (res.ok) setOrganizations(await res.json())
+    } finally { setLoadingOrgs(false) }
+  }
+  async function handleCreateOrg(e: React.FormEvent) {
+    e.preventDefault(); setSavingOrg(true)
+    await fetch('/api/organizations', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(orgForm) })
+    setSavingOrg(false); setOrgForm({ name: '', description: '' }); setShowOrgForm(false); loadOrganizations()
+  }
+  async function handleEditOrg(e: React.FormEvent) {
+    e.preventDefault(); if (!editingOrg) return; setSavingOrg(true)
+    await fetch(`/api/organizations/${editingOrg.id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(editOrgForm) })
+    setSavingOrg(false); setEditingOrg(null); loadOrganizations()
+  }
+  async function handleDeleteOrg(id: string, name: string) {
+    if (!window.confirm(`Hapus organisasi "${name}"? Semua anggota akan dikeluarkan.`)) return
+    await fetch(`/api/organizations/${id}`, { method: 'DELETE' })
+    loadOrganizations()
+  }
+  async function assignUser(orgId: string, userId: string) {
+    await fetch(`/api/organizations/${orgId}/members/${userId}`, { method: 'PUT' }); loadOrganizations()
+  }
+  async function removeUser(orgId: string, userId: string) {
+    await fetch(`/api/organizations/${orgId}/members/${userId}`, { method: 'DELETE' }); loadOrganizations()
   }
 
   const inputBase: React.CSSProperties = {
@@ -503,14 +693,16 @@ function UsersPage() {
 
   const tabs = [
     { id: 'users' as const, label: 'Pengguna', icon: <UsersIcon size={14} /> },
+    { id: 'organizations' as const, label: 'Organisasi', icon: <UsersRound size={14} /> },
     { id: 'pins' as const, label: 'Reset PIN Catatan', icon: <Lock size={14} />, badge: activeTab === 'pins' ? lockedNotes.length : undefined },
+    { id: 'ai-history' as const, label: 'Riwayat AI', icon: <Sparkles size={14} /> },
   ]
 
   return (
     <div className="flex h-screen overflow-hidden">
       <Sidebar activeNoteId={null} />
       <main className="flex-1 overflow-y-auto" style={{ background: 'var(--bg)' }}>
-        <div style={{ padding: isMobile ? '64px 16px 24px' : '40px 40px', maxWidth: 680 }}>
+        <div style={{ padding: isMobile ? '64px 16px 24px' : '40px 40px' }}>
 
           {/* Header */}
           <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', alignItems: isMobile ? 'flex-start' : 'center', justifyContent: 'space-between', gap: isMobile ? 12 : 8, marginBottom: 24 }}>
@@ -572,59 +764,74 @@ function UsersPage() {
               {users.some(u => u.status === 'pending') && (
                 <div style={{ marginBottom: 32 }}>
                   <h2 style={{ fontFamily: 'var(--font-heading)', fontWeight: 600, fontSize: '1.1rem', color: 'var(--fg)', marginBottom: 12 }}>Permintaan Pendaftaran</h2>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                    {users.filter(u => u.status === 'pending').map(u => (
-                      <div key={u.id} style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', alignItems: isMobile ? 'stretch' : 'center', justifyContent: 'space-between', padding: '12px 16px', gap: isMobile ? 12 : 8, border: '1px solid var(--border)', borderRadius: 10, background: 'var(--card-bg)' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                          <div style={{ width: 36, height: 36, borderRadius: 8, background: 'var(--muted)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--fg-subtle)', flexShrink: 0 }}><Eye size={16} /></div>
-                          <div>
-                            <span style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--fg)', fontFamily: 'var(--font-body)' }}>{u.username}</span>
-                            <div style={{ fontSize: '0.72rem', color: 'var(--fg-subtle)', marginTop: 2 }}>Mendaftar pada {new Date(u.createdAt).toLocaleDateString('id-ID')}</div>
-                          </div>
-                        </div>
-                        <div style={{ display: 'flex', gap: 8, justifyContent: isMobile ? 'flex-end' : 'flex-start' }}>
-                          <button onClick={() => handleApprove(u.id)} style={{ padding: '6px 14px', fontSize: '0.8rem', fontWeight: 600, background: 'var(--primary)', color: 'var(--primary-fg)', border: 'none', borderRadius: 6, cursor: 'pointer', fontFamily: 'var(--font-body)' }} onMouseEnter={e => (e.currentTarget.style.opacity = '0.9')} onMouseLeave={e => (e.currentTarget.style.opacity = '1')}>Setujui</button>
-                          <button onClick={() => handleReject(u.id)} style={{ padding: '6px 14px', fontSize: '0.8rem', fontWeight: 600, background: 'rgba(224,49,49,0.05)', color: '#e03131', border: '1px solid rgba(224,49,49,0.3)', borderRadius: 6, cursor: 'pointer', fontFamily: 'var(--font-body)' }} onMouseEnter={e => (e.currentTarget.style.background = 'rgba(224,49,49,0.12)')} onMouseLeave={e => (e.currentTarget.style.background = 'rgba(224,49,49,0.05)')}>Tolak</button>
-                        </div>
-                      </div>
-                    ))}
+                  <div style={{ border: '1px solid var(--border)', borderRadius: 10, overflow: 'hidden' }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.875rem', fontFamily: 'var(--font-body)' }}>
+                      <thead>
+                        <tr style={{ background: 'var(--muted)' }}>
+                          <th style={{ padding: '10px 16px', fontWeight: 600, fontSize: '0.8125rem', color: 'var(--fg-muted)', textAlign: 'left' }}>Pengguna</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {users.filter(u => u.status === 'pending').map(u => (
+                          <tr key={u.id} style={{ borderTop: '1px solid var(--border)' }}>
+                            <td style={{ padding: '10px 16px' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                <div style={{ width: 30, height: 30, borderRadius: 7, background: 'var(--muted)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--fg-subtle)', flexShrink: 0 }}><Eye size={14} /></div>
+                                <span style={{ fontWeight: 600, color: 'var(--fg)' }}>{u.username}</span>
+                                <span style={{ fontSize: '0.72rem', color: 'var(--fg-subtle)' }}>Mendaftar {new Date(u.createdAt).toLocaleDateString('id-ID')}</span>
+                                <span style={{ flex: 1 }} />
+                                <button onClick={() => handleApprove(u.id)} style={{ padding: '4px 10px', fontSize: '0.72rem', fontWeight: 600, background: 'var(--primary)', color: 'var(--primary-fg)', border: 'none', borderRadius: 5, cursor: 'pointer' }}>Setujui</button>
+                                <button onClick={() => handleReject(u.id)} style={{ padding: '4px 10px', fontSize: '0.72rem', fontWeight: 600, background: 'rgba(224,49,49,0.05)', color: '#e03131', border: '1px solid rgba(224,49,49,0.3)', borderRadius: 5, cursor: 'pointer' }}>Tolak</button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
                   </div>
                 </div>
               )}
 
               <div>
                 <h2 style={{ fontFamily: 'var(--font-heading)', fontWeight: 600, fontSize: '1.1rem', color: 'var(--fg)', marginBottom: 12 }}>Daftar Pengguna</h2>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                  {users.filter(u => u.status !== 'pending').map(u => (
-                    <div key={u.id} style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', alignItems: isMobile ? 'stretch' : 'center', justifyContent: 'space-between', padding: '12px 16px', gap: isMobile ? 12 : 8, border: '1px solid var(--border)', borderRadius: 10, background: u.id === user?.userId ? 'var(--accent)' : 'var(--card-bg)' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                        <div style={{ width: 36, height: 36, borderRadius: 8, background: u.role === 'admin' ? 'var(--accent)' : 'var(--muted)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: u.role === 'admin' ? 'var(--primary)' : 'var(--fg-subtle)', flexShrink: 0 }}>
-                          {u.role === 'admin' ? <Shield size={16} /> : <Eye size={16} />}
-                        </div>
-                        <div>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                            <span style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--fg)', fontFamily: 'var(--font-body)' }}>{u.username}</span>
-                            {u.status === 'rejected' && <span style={{ fontSize: '0.7rem', padding: '1px 7px', background: 'rgba(224,49,49,0.1)', color: '#e03131', borderRadius: 20, fontWeight: 500 }}>Ditolak</span>}
-                            {u.id === user?.userId && <span style={{ fontSize: '0.7rem', padding: '1px 7px', background: 'var(--primary)', color: 'var(--primary-fg)', borderRadius: 20, fontWeight: 500 }}>Kamu</span>}
-                          </div>
-                          <span style={{ fontSize: '0.75rem', fontWeight: 500, textTransform: 'capitalize', color: u.role === 'admin' ? 'var(--primary)' : 'var(--fg-subtle)' }}>{u.role}</span>
-                        </div>
-                      </div>
-                      {u.id !== user?.userId && (
-                        <div style={{ display: 'flex', gap: 8, justifyContent: isMobile ? 'flex-end' : 'flex-start' }}>
-                          {u.status === 'rejected' && (
-                            <button onClick={() => handleApprove(u.id)} style={{ padding: '4px 10px', fontSize: '0.75rem', fontWeight: 600, background: 'transparent', color: 'var(--primary)', border: '1.5px solid var(--primary)', borderRadius: 6, cursor: 'pointer', fontFamily: 'var(--font-body)' }}>Aktifkan</button>
-                          )}
-                          <button onClick={() => handleResetPassword(u.id, u.username)} title="Reset Password" style={{ width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'transparent', border: 'none', borderRadius: 6, cursor: 'pointer', color: 'var(--fg-subtle)' }} onMouseEnter={e => { e.currentTarget.style.background = 'var(--accent)'; e.currentTarget.style.color = 'var(--primary)' }} onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--fg-subtle)' }}>
-                            <KeyRound size={15} />
-                          </button>
-                          <button onClick={() => handleDelete(u.id, u.username)} style={{ width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'transparent', border: 'none', borderRadius: 6, cursor: 'pointer', color: 'var(--fg-subtle)' }} onMouseEnter={e => { e.currentTarget.style.background = 'rgba(224,49,49,0.1)'; e.currentTarget.style.color = '#e03131' }} onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--fg-subtle)' }}>
-                            <Trash2 size={15} />
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  ))}
+                <div style={{ border: '1px solid var(--border)', borderRadius: 10, overflow: 'hidden' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.875rem', fontFamily: 'var(--font-body)' }}>
+                    <thead>
+                      <tr style={{ background: 'var(--muted)' }}>
+                        <th style={{ padding: '10px 16px', fontWeight: 600, fontSize: '0.8125rem', color: 'var(--fg-muted)', textAlign: 'left' }}>Pengguna</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {users.filter(u => u.status !== 'pending').map(u => (
+                        <tr key={u.id} style={{ borderTop: '1px solid var(--border)', background: u.id === user?.userId ? 'var(--accent)' : 'transparent' }}>
+                          <td style={{ padding: '10px 16px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                              <div style={{ width: 30, height: 30, borderRadius: 7, background: u.role === 'admin' ? 'var(--accent)' : 'var(--muted)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: u.role === 'admin' ? 'var(--primary)' : 'var(--fg-subtle)', flexShrink: 0 }}>
+                                {u.role === 'admin' ? <Shield size={14} /> : <Eye size={14} />}
+                              </div>
+                              <span style={{ fontWeight: 600, color: 'var(--fg)' }}>{u.username}</span>
+                              <span style={{ fontSize: '0.72rem', textTransform: 'capitalize', color: u.role === 'admin' ? 'var(--primary)' : 'var(--fg-subtle)' }}>{u.role}</span>
+                              {u.status === 'rejected' && <span style={{ fontSize: '0.68rem', padding: '1px 6px', background: 'rgba(224,49,49,0.1)', color: '#e03131', borderRadius: 20, fontWeight: 500 }}>Ditolak</span>}
+                              {u.id === user?.userId && <span style={{ fontSize: '0.68rem', padding: '1px 6px', background: 'var(--primary)', color: 'var(--primary-fg)', borderRadius: 20, fontWeight: 500 }}>Kamu</span>}
+                              <span style={{ flex: 1 }} />
+                              {u.status === 'rejected' && (
+                                <button onClick={() => handleApprove(u.id)} style={{ padding: '3px 8px', fontSize: '0.7rem', fontWeight: 600, background: 'transparent', color: 'var(--primary)', border: '1.5px solid var(--primary)', borderRadius: 5, cursor: 'pointer' }}>Aktifkan</button>
+                              )}
+                              <button onClick={() => handleEditUser(u.id, u.username, u.role)} title="Edit user" style={{ width: 26, height: 26, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: 'transparent', border: 'none', borderRadius: 5, cursor: 'pointer', color: 'var(--fg-subtle)' }} onMouseEnter={e => { e.currentTarget.style.background = 'var(--accent)'; e.currentTarget.style.color = 'var(--primary)' }} onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--fg-subtle)' }}>
+                                <Pencil size={12} />
+                              </button>
+                              <button onClick={() => handleResetPassword(u.id, u.username)} title="Reset Password" style={{ width: 26, height: 26, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: 'transparent', border: 'none', borderRadius: 5, cursor: 'pointer', color: 'var(--fg-subtle)' }} onMouseEnter={e => { e.currentTarget.style.background = 'var(--accent)'; e.currentTarget.style.color = 'var(--primary)' }} onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--fg-subtle)' }}>
+                                <KeyRound size={12} />
+                              </button>
+                              <button onClick={() => handleDelete(u.id, u.username)} title="Hapus user" style={{ width: 26, height: 26, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: 'transparent', border: 'none', borderRadius: 5, cursor: 'pointer', color: 'var(--fg-subtle)' }} onMouseEnter={e => { e.currentTarget.style.background = 'rgba(224,49,49,0.1)'; e.currentTarget.style.color = '#e03131' }} onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--fg-subtle)' }}>
+                                <Trash2 size={12} />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
               </div>
             </>
@@ -657,39 +864,315 @@ function UsersPage() {
                   </div>
                 </div>
               ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                  {lockedNotes.map(note => (
-                    <div key={note.id} style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', alignItems: isMobile ? 'stretch' : 'center', justifyContent: 'space-between', padding: '14px 16px', gap: 12, border: '1px solid var(--border)', borderRadius: 10, background: 'var(--card-bg)' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0 }}>
-                        <div style={{ width: 38, height: 38, borderRadius: 9, flexShrink: 0, background: 'rgba(224,49,49,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#e03131' }}>
-                          <Lock size={16} />
-                        </div>
-                        <div style={{ minWidth: 0 }}>
-                          <div style={{ fontWeight: 600, fontSize: '0.9rem', color: 'var(--fg)', fontFamily: 'var(--font-body)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                            {note.title || 'Untitled'}
-                          </div>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 3, flexWrap: 'wrap' }}>
-                            <span style={{ fontSize: '0.72rem', color: 'var(--fg-muted)', fontFamily: 'var(--font-body)' }}>@{note.ownerUsername}</span>
-                            <span style={{ fontSize: '0.68rem', padding: '1px 7px', borderRadius: 20, fontWeight: 500, background: note.type === 'organization' ? 'var(--accent)' : 'var(--muted)', color: note.type === 'organization' ? 'var(--primary)' : 'var(--fg-subtle)' }}>
-                              {note.type === 'organization' ? 'Organisasi' : 'Pribadi'}
-                            </span>
-                            <span style={{ fontSize: '0.72rem', color: 'var(--fg-subtle)', fontFamily: 'var(--font-body)' }}>
-                              {new Date(note.updatedAt).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' })}
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-                      <button
-                        onClick={() => setResetTarget(note)}
-                        title="Kelola PIN catatan ini"
-                        style={{ display: 'flex', alignItems: 'center', gap: 7, flexShrink: 0, padding: '7px 14px', fontSize: '0.8rem', fontWeight: 600, fontFamily: 'var(--font-body)', background: 'var(--muted)', color: 'var(--fg)', border: '1px solid var(--border)', borderRadius: 7, cursor: 'pointer', transition: 'all 0.15s', alignSelf: isMobile ? 'flex-end' : 'auto' }}
-                        onMouseEnter={e => { e.currentTarget.style.background = 'var(--accent)'; e.currentTarget.style.color = 'var(--primary)'; e.currentTarget.style.borderColor = 'var(--primary)' }}
-                        onMouseLeave={e => { e.currentTarget.style.background = 'var(--muted)'; e.currentTarget.style.color = 'var(--fg)'; e.currentTarget.style.borderColor = 'var(--border)' }}
-                      >
-                        <KeyRound size={13} /> Kelola PIN
-                      </button>
-                    </div>
+                <div style={{ border: '1px solid var(--border)', borderRadius: 10, overflow: 'hidden' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.875rem', fontFamily: 'var(--font-body)' }}>
+                    <colgroup>
+                      <col style={{ width: '100%' }} />
+                      <col style={{ width: 170 }} />
+                    </colgroup>
+                    <thead>
+                      <tr style={{ background: 'var(--muted)' }}>
+                        <th style={{ padding: '10px 16px', fontWeight: 600, fontSize: '0.8125rem', color: 'var(--fg-muted)', textAlign: 'left' }}>Catatan</th>
+                        <th style={{ padding: '10px 16px', fontWeight: 600, fontSize: '0.8125rem', color: 'var(--fg-muted)', textAlign: 'right' }}>Aksi</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {lockedNotes.map(note => (
+                        <tr key={note.id} style={{ borderTop: '1px solid var(--border)' }}>
+                          <td style={{ padding: '10px 16px', minWidth: 0 }}>
+                            <div style={{ fontWeight: 600, color: 'var(--fg)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                              {note.title || 'Untitled'}
+                            </div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 3 }}>
+                              <span style={{ fontSize: '0.75rem', color: 'var(--fg-muted)' }}>@{note.ownerUsername}</span>
+                              <span style={{ fontSize: '0.68rem', padding: '1px 7px', borderRadius: 20, fontWeight: 500, background: note.type === 'organization' ? 'var(--accent)' : 'var(--muted)', color: note.type === 'organization' ? 'var(--primary)' : 'var(--fg-subtle)' }}>
+                                {note.type === 'organization' ? 'Organisasi' : 'Pribadi'}
+                              </span>
+                              <span style={{ fontSize: '0.72rem', color: 'var(--fg-subtle)' }}>
+                                {new Date(note.updatedAt).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' })}
+                              </span>
+                            </div>
+                          </td>
+                          <td style={{ padding: '10px 16px', textAlign: 'right' }}>
+                            <button onClick={() => setResetTarget(note)} title="Kelola PIN" style={{ width: 30, height: 30, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: 'var(--muted)', color: 'var(--fg-subtle)', border: '1px solid var(--border)', borderRadius: 6, cursor: 'pointer' }} onMouseEnter={e => { e.currentTarget.style.background = 'var(--accent)'; e.currentTarget.style.color = 'var(--primary)' }} onMouseLeave={e => { e.currentTarget.style.background = 'var(--muted)'; e.currentTarget.style.color = 'var(--fg-subtle)' }}>
+                              <KeyRound size={14} />
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ── Tab: Organisasi ── */}
+          {activeTab === 'organizations' && (
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+                <div>
+                  <h2 style={{ fontFamily: 'var(--font-heading)', fontWeight: 600, fontSize: '1.1rem', color: 'var(--fg)', margin: 0 }}>Kelola Organisasi</h2>
+                  <p style={{ fontSize: '0.8125rem', color: 'var(--fg-muted)', margin: '4px 0 0', fontFamily: 'var(--font-body)' }}>Buat dan kelola organisasi serta anggotanya</p>
+                </div>
+                <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                  <button onClick={loadOrganizations} disabled={loadingOrgs} style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '6px 12px', fontSize: '0.8rem', fontWeight: 500, fontFamily: 'var(--font-body)', background: 'var(--muted)', color: 'var(--fg-muted)', border: '1px solid var(--border)', borderRadius: 7, cursor: 'pointer', opacity: loadingOrgs ? 0.6 : 1 }}>
+                    <RefreshCw size={12} style={loadingOrgs ? { animation: 'spin 0.8s linear infinite' } : {}} />
+                  </button>
+                  <button onClick={() => setShowOrgForm(v => !v)} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 14px', fontSize: '0.8125rem', fontWeight: 500, fontFamily: 'var(--font-body)', background: 'var(--primary)', color: 'var(--primary-fg)', border: 'none', borderRadius: 7, cursor: 'pointer' }}>
+                    <Plus size={14} /> Buat
+                  </button>
+                </div>
+              </div>
+
+              {/* Create form */}
+              {showOrgForm && (
+                <form onSubmit={handleCreateOrg} style={{ background: 'var(--muted)', border: '1px solid var(--border)', borderRadius: 10, padding: '16px', marginBottom: 16, display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 10 }}>
+                    <input style={inputBase} placeholder="Nama organisasi" required value={orgForm.name} onChange={e => setOrgForm(f => ({ ...f, name: e.target.value }))} onFocus={e => (e.currentTarget.style.borderColor = 'var(--primary)')} onBlur={e => (e.currentTarget.style.borderColor = 'var(--border)')} />
+                    <input style={inputBase} placeholder="Deskripsi (opsional)" value={orgForm.description} onChange={e => setOrgForm(f => ({ ...f, description: e.target.value }))} onFocus={e => (e.currentTarget.style.borderColor = 'var(--primary)')} onBlur={e => (e.currentTarget.style.borderColor = 'var(--border)')} />
+                  </div>
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <button type="submit" disabled={savingOrg} style={{ padding: '7px 18px', fontSize: '0.8125rem', fontWeight: 500, fontFamily: 'var(--font-body)', background: 'var(--primary)', color: 'var(--primary-fg)', border: 'none', borderRadius: 7, cursor: 'pointer', opacity: savingOrg ? 0.7 : 1 }}>{savingOrg ? 'Menyimpan…' : 'Simpan'}</button>
+                    <button type="button" onClick={() => setShowOrgForm(false)} style={{ padding: '7px 18px', fontSize: '0.8125rem', fontFamily: 'var(--font-body)', background: 'var(--bg)', color: 'var(--fg-muted)', border: '1px solid var(--border)', borderRadius: 7, cursor: 'pointer' }}>Batal</button>
+                  </div>
+                </form>
+              )}
+
+              {loadingOrgs ? (
+                <div style={{ textAlign: 'center', padding: '48px 0', color: 'var(--fg-muted)', fontSize: '0.875rem', fontFamily: 'var(--font-body)' }}>Memuat…</div>
+              ) : organizations.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '48px 24px', border: '1px dashed var(--border)', borderRadius: 12, color: 'var(--fg-muted)', fontSize: '0.875rem', fontFamily: 'var(--font-body)' }}>Belum ada organisasi</div>
+              ) : (
+                <div style={{ border: '1px solid var(--border)', borderRadius: 10, overflow: 'hidden' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.875rem', fontFamily: 'var(--font-body)' }}>
+                    <thead>
+                      <tr style={{ background: 'var(--muted)' }}>
+                        <th style={{ padding: '10px 16px', fontWeight: 600, fontSize: '0.8125rem', color: 'var(--fg-muted)', textAlign: 'left' }}>Organisasi</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {organizations.map(org => {
+                        const members = users.filter(u => u.organizationIds?.includes(org.id))
+                        const nonMembers = users.filter(u => !u.organizationIds?.includes(org.id))
+                        const isExpanded = expandedOrg === org.id
+                        const isEditing = editingOrg?.org?.id === org.id
+                        return (
+                          <tr key={org.id} style={{ borderTop: '1px solid var(--border)' }}>
+                            <td style={{ padding: '10px 16px' }}>
+                              {isEditing ? (
+                                <form onSubmit={handleEditOrg} style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                                  <input style={{ ...inputBase, flex: 1 }} placeholder="Nama" required value={editOrgForm.name} onChange={e => setEditOrgForm(f => ({ ...f, name: e.target.value }))} autoFocus />
+                                  <input style={{ ...inputBase, flex: 1 }} placeholder="Deskripsi" value={editOrgForm.description} onChange={e => setEditOrgForm(f => ({ ...f, description: e.target.value }))} />
+                                  <button type="submit" style={{ width: 26, height: 26, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: 'transparent', border: 'none', borderRadius: 5, cursor: 'pointer', color: 'var(--primary)' }}><Check size={13} /></button>
+                                  <button type="button" onClick={() => setEditingOrg(null)} style={{ width: 26, height: 26, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: 'transparent', border: 'none', borderRadius: 5, cursor: 'pointer', color: 'var(--fg-muted)' }}><X size={13} /></button>
+                                </form>
+                              ) : (
+                                <div>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                    <div style={{ width: 30, height: 30, borderRadius: 7, background: 'var(--accent)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--primary)', flexShrink: 0 }}><UsersRound size={14} /></div>
+                                    <span style={{ fontWeight: 600, color: 'var(--fg)' }}>{org.name}</span>
+                                    {org.description && <span style={{ fontSize: '0.75rem', color: 'var(--fg-muted)' }}>{org.description}</span>}
+                                    <span style={{ fontSize: '0.72rem', color: 'var(--fg-subtle)' }}>{members.length} anggota</span>
+                                    <span style={{ flex: 1 }} />
+                                    <button onClick={() => setExpandedOrg(isExpanded ? null : org.id)} title="Kelola Anggota" style={{ width: 26, height: 26, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: isExpanded ? 'var(--accent)' : 'transparent', color: isExpanded ? 'var(--primary)' : 'var(--fg-subtle)', border: 'none', borderRadius: 5, cursor: 'pointer' }}><UserPlus size={12} /></button>
+                                    <button onClick={() => { setEditingOrg({ org }); setEditOrgForm({ name: org.name, description: org.description ?? '' }) }} title="Edit" style={{ width: 26, height: 26, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: 'transparent', border: 'none', borderRadius: 5, cursor: 'pointer', color: 'var(--fg-subtle)' }} onMouseEnter={e => { e.currentTarget.style.background = 'var(--accent)'; e.currentTarget.style.color = 'var(--primary)' }} onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--fg-subtle)' }}><Pencil size={12} /></button>
+                                    <button onClick={() => handleDeleteOrg(org.id, org.name)} title="Hapus" style={{ width: 26, height: 26, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: 'transparent', border: 'none', borderRadius: 5, cursor: 'pointer', color: 'var(--fg-subtle)' }} onMouseEnter={e => { e.currentTarget.style.background = 'rgba(224,49,49,0.1)'; e.currentTarget.style.color = '#e03131' }} onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--fg-subtle)' }}><Trash2 size={12} /></button>
+                                  </div>
+                                  {isExpanded && (
+                                    <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid var(--border)', display: 'flex', gap: 20, flexWrap: 'wrap' }}>
+                                      <div style={{ flex: 1, minWidth: 180 }}>
+                                        <p style={{ margin: '0 0 6px', fontSize: '0.7rem', fontWeight: 700, color: 'var(--fg-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Anggota ({members.length})</p>
+                                        {members.length === 0 && <p style={{ fontSize: '0.78rem', color: 'var(--fg-subtle)' }}>Belum ada anggota</p>}
+                                        {members.map(u => (
+                                          <div key={u.id} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '4px 8px', background: 'var(--muted)', borderRadius: 5, marginBottom: 3 }}>
+                                            <span style={{ fontSize: '0.78rem', fontWeight: 500, color: 'var(--fg)' }}>{u.username}</span>
+                                            <span style={{ flex: 1 }} />
+                                            <button onClick={() => removeUser(org.id, u.id)} style={{ width: 20, height: 20, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'transparent', border: 'none', borderRadius: 4, cursor: 'pointer', color: 'var(--fg-subtle)' }} onMouseEnter={e => { e.currentTarget.style.background = 'rgba(224,49,49,0.1)'; e.currentTarget.style.color = '#e03131' }} onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--fg-subtle)' }}><UserMinus size={10} /></button>
+                                          </div>
+                                        ))}
+                                      </div>
+                                      {nonMembers.length > 0 && (
+                                        <div style={{ flex: 1, minWidth: 180 }}>
+                                          <p style={{ margin: '0 0 6px', fontSize: '0.7rem', fontWeight: 700, color: 'var(--fg-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Tambah Anggota</p>
+                                          {nonMembers.map(u => (
+                                            <div key={u.id} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '4px 8px', background: 'var(--muted)', borderRadius: 5, marginBottom: 3 }}>
+                                              <span style={{ fontSize: '0.78rem', color: 'var(--fg-muted)' }}>{u.username}</span>
+                                              <span style={{ flex: 1 }} />
+                                              <button onClick={() => assignUser(org.id, u.id)} style={{ width: 20, height: 20, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'transparent', border: 'none', borderRadius: 4, cursor: 'pointer', color: 'var(--fg-subtle)' }} onMouseEnter={e => { e.currentTarget.style.background = 'var(--accent)'; e.currentTarget.style.color = 'var(--primary)' }} onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--fg-subtle)' }}><UserPlus size={10} /></button>
+                                            </div>
+                                          ))}
+                                        </div>
+                                      )}
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+                            </td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ── Tab: Riwayat AI ── */}
+          {activeTab === 'ai-history' && (
+            <div>
+              {/* Stats bar */}
+              {aiLogsStats && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 16, flexWrap: 'wrap' }}>
+                  {[
+                    { label: 'Sesi', value: aiLogsStats.total_sessions },
+                    { label: 'Pesan', value: aiLogsStats.total_messages },
+                    { label: 'Tools', value: aiLogsStats.total_tool_calls },
+                    { label: 'Tokens', value: ((aiLogsStats.total_prompt_tokens || 0) + (aiLogsStats.total_completion_tokens || 0)).toLocaleString() },
+                  ].map((s, i) => (
+                    <span key={i} style={{ fontSize: '0.8rem', color: 'var(--fg-muted)' }}>
+                      <strong style={{ color: 'var(--fg)' }}>{s.value}</strong> {s.label}
+                    </span>
                   ))}
+                  <div style={{ flex: 1 }} />
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <select
+                      value={aiLogFilterUser}
+                      onChange={e => { setAiLogFilterUser(e.target.value); setAiLogsPage(1) }}
+                      style={{ padding: '6px 10px', fontSize: '0.8rem', fontFamily: 'var(--font-body)', border: '1px solid var(--border)', borderRadius: 7, background: 'var(--input-bg)', color: 'var(--fg)', outline: 'none' }}
+                    >
+                      <option value="">Semua User</option>
+                      {users.filter(u => u.status !== 'pending').map(u => (
+                        <option key={u.id} value={u.id}>{u.username}</option>
+                      ))}
+                    </select>
+                    <button onClick={loadAiLogs} disabled={loadingAiLogs} style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '6px 12px', fontSize: '0.8rem', fontWeight: 500, fontFamily: 'var(--font-body)', background: 'var(--muted)', color: 'var(--fg-muted)', border: '1px solid var(--border)', borderRadius: 7, cursor: 'pointer', opacity: loadingAiLogs ? 0.6 : 1 }}>
+                      <RefreshCw size={12} style={loadingAiLogs ? { animation: 'spin 0.8s linear infinite' } : {}} />
+                      Refresh
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Table */}
+              {loadingAiLogs ? (
+                <div style={{ textAlign: 'center', padding: '60px 0', color: 'var(--fg-muted)' }}>Memuat…</div>
+              ) : aiLogs.length === 0 ? (
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '60px 24px', gap: 12 }}>
+                  <Sparkles size={32} style={{ color: 'var(--fg-subtle)' }} />
+                  <p style={{ margin: 0, fontWeight: 600, color: 'var(--fg)' }}>Belum ada riwayat AI</p>
+                </div>
+              ) : (
+                <div style={{ overflowX: 'auto', border: '1px solid var(--border)', borderRadius: 10 }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8rem', fontFamily: 'var(--font-body)', tableLayout: 'fixed' }}>
+                    <colgroup>
+                      <col style={{ width: '11%' }} />
+                      <col style={{ width: '15%' }} />
+                      <col style={{ width: '14%' }} />
+                      <col style={{ width: '38%' }} />
+                      <col style={{ width: '12%' }} />
+                      <col style={{ width: '10%' }} />
+                    </colgroup>
+                    <thead>
+                      <tr style={{ borderBottom: '2px solid var(--border)' }}>
+                        {['User', 'Session ID', 'Judul Catatan', 'JSON Pesan', 'Token Usage', 'Waktu'].map(h => (
+                          <th key={h} style={{ textAlign: 'left', padding: '10px 14px', fontWeight: 600, color: 'var(--fg-muted)', fontSize: '0.72rem', textTransform: 'uppercase', letterSpacing: '0.04em', whiteSpace: 'nowrap', background: 'var(--muted)' }}>{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {aiLogs.map(sess => {
+                        const createdDate = new Date(sess.created_at)
+                        const isExpanded = expandedSession === sess.session_id
+                        const totalTokens = (sess.prompt_tokens || 0) + (sess.completion_tokens || 0)
+                        return (
+                          <tr
+                            key={sess.session_id}
+                            onClick={() => setExpandedSession(isExpanded ? null : sess.session_id)}
+                            style={{ borderBottom: '1px solid var(--border)', cursor: 'pointer', background: isExpanded ? 'var(--accent)' : 'transparent', transition: 'background 0.1s' }}
+                            onMouseEnter={e => { if (!isExpanded) e.currentTarget.style.background = 'var(--muted)' }}
+                            onMouseLeave={e => { if (!isExpanded) e.currentTarget.style.background = 'transparent' }}
+                          >
+                            <td style={{ padding: '10px 14px', verticalAlign: 'top' }}>
+                              <span style={{ fontWeight: 600, color: 'var(--fg)' }}>
+                                {sess.username ? `@${sess.username}` : <span style={{ color: 'var(--fg-subtle)', fontStyle: 'italic' }}>—</span>}
+                              </span>
+                            </td>
+                            <td style={{ padding: '10px 14px', verticalAlign: 'top', fontFamily: 'monospace', fontSize: '0.72rem', color: 'var(--fg-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                              {sess.session_id}
+                            </td>
+                            <td style={{ padding: '10px 14px', verticalAlign: 'top', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                              {sess.note_title ? (
+                                <span style={{ color: 'var(--fg)' }}>{sess.note_title}</span>
+                              ) : (
+                                <span style={{ color: 'var(--fg-subtle)', fontStyle: 'italic' }}>—</span>
+                              )}
+                            </td>
+                            <td style={{ padding: '10px 14px', verticalAlign: 'top' }}>
+                              {isExpanded ? (
+                                <pre style={{ margin: 0, fontSize: '0.68rem', lineHeight: 1.5, color: 'var(--fg)', background: 'var(--muted)', padding: '8px 10px', borderRadius: 6, maxHeight: 350, overflow: 'auto', whiteSpace: 'pre-wrap', wordBreak: 'break-word', fontFamily: 'monospace' }}>
+                                  {JSON.stringify(sess.messages, null, 2)}
+                                </pre>
+                              ) : (
+                                <span style={{ color: 'var(--fg-muted)', fontSize: '0.75rem' }}>
+                                  {sess.messages.length} pesan — klik untuk lihat
+                                </span>
+                              )}
+                              {sess.has_error && sess.error_message && (
+                                <div style={{ marginTop: 6, padding: '4px 8px', background: 'rgba(224,49,49,0.06)', border: '1px solid rgba(224,49,49,0.2)', borderRadius: 5, fontSize: '0.7rem', color: '#e03131' }}>
+                                  {sess.error_message}
+                                </div>
+                              )}
+                            </td>
+                            <td style={{ padding: '10px 14px', verticalAlign: 'top', whiteSpace: 'nowrap' }}>
+                              {totalTokens > 0 ? (
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                                  <span style={{ fontWeight: 600, color: 'var(--fg)', fontVariantNumeric: 'tabular-nums' }}>{totalTokens.toLocaleString()}</span>
+                                  <span style={{ fontSize: '0.65rem', color: 'var(--fg-subtle)' }}>
+                                    {sess.prompt_tokens.toLocaleString()} in / {sess.completion_tokens.toLocaleString()} out
+                                  </span>
+                                </div>
+                              ) : (
+                                <span style={{ color: 'var(--fg-subtle)', fontSize: '0.72rem' }}>—</span>
+                              )}
+                            </td>
+                            <td style={{ padding: '10px 14px', verticalAlign: 'top', whiteSpace: 'nowrap' }}>
+                              <div style={{ fontSize: '0.72rem', color: 'var(--fg-muted)' }}>
+                                {createdDate.toLocaleDateString('id-ID', { day: '2-digit', month: 'short' })}
+                              </div>
+                              <div style={{ fontSize: '0.68rem', color: 'var(--fg-subtle)' }}>
+                                {createdDate.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}
+                              </div>
+                            </td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+
+              {/* Pagination */}
+              {aiLogsTotal > 30 && (
+                <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 8, marginTop: 16 }}>
+                  <button
+                    onClick={() => setAiLogsPage(p => Math.max(1, p - 1))}
+                    disabled={aiLogsPage === 1}
+                    style={{ padding: '5px 12px', fontSize: '0.8rem', fontFamily: 'var(--font-body)', background: 'var(--muted)', color: 'var(--fg-muted)', border: '1px solid var(--border)', borderRadius: 6, cursor: aiLogsPage === 1 ? 'not-allowed' : 'pointer', opacity: aiLogsPage === 1 ? 0.5 : 1 }}
+                  >
+                    ← Prev
+                  </button>
+                  <span style={{ fontSize: '0.8rem', color: 'var(--fg-muted)' }}>
+                    {aiLogsPage} / {Math.ceil(aiLogsTotal / 30)}
+                  </span>
+                  <button
+                    onClick={() => setAiLogsPage(p => p + 1)}
+                    disabled={aiLogsPage >= Math.ceil(aiLogsTotal / 30)}
+                    style={{ padding: '5px 12px', fontSize: '0.8rem', fontFamily: 'var(--font-body)', background: 'var(--muted)', color: 'var(--fg-muted)', border: '1px solid var(--border)', borderRadius: 6, cursor: aiLogsPage >= Math.ceil(aiLogsTotal / 30) ? 'not-allowed' : 'pointer', opacity: aiLogsPage >= Math.ceil(aiLogsTotal / 30) ? 0.5 : 1 }}
+                  >
+                    Next →
+                  </button>
                 </div>
               )}
             </div>
@@ -703,6 +1186,16 @@ function UsersPage() {
           note={resetTarget}
           onClose={() => setResetTarget(null)}
           onSuccess={handleResetSuccess}
+        />
+      )}
+
+      {/* User Action Modal */}
+      {userModal && (
+        <UserActionModal
+          user={userModal.user}
+          action={userModal.action}
+          onClose={() => setUserModal(null)}
+          onDone={() => { setUserModal(null); showToast(userModal.action === 'delete' ? 'User berhasil dihapus' : userModal.action === 'password' ? 'Password berhasil diubah' : 'User berhasil diupdate'); router.invalidate() }}
         />
       )}
 

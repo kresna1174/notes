@@ -1,7 +1,7 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from './dialog'
 import { ABOUT_MARKDOWN } from '../../lib/aboutContent'
 import { marked } from 'marked'
-import { Info } from 'lucide-react'
+import { Info, X } from 'lucide-react'
 
 interface AboutModalProps {
   open: boolean
@@ -13,21 +13,60 @@ export function AboutModal({ open, onOpenChange }: AboutModalProps) {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[80vh] flex flex-col p-6 overflow-hidden bg-card border">
-        <DialogHeader className="flex flex-row items-center gap-2 border-b pb-4 shrink-0">
-          <div className="w-8 h-8 rounded-lg bg-accent flex items-center justify-center text-primary">
-            <Info className="h-4 w-4" />
+      <DialogContent 
+        className="max-w-2xl max-h-[80vh] flex flex-col overflow-hidden"
+        showCloseButton={false}
+        style={{
+          background: 'var(--card-bg)',
+          border: '1px solid var(--border)',
+          borderRadius: 14,
+          padding: 24,
+        }}
+      >
+        <button
+          onClick={() => onOpenChange(false)}
+          style={{
+            position: 'absolute', top: 16, right: 16,
+            width: 30, height: 30,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            background: 'transparent', border: 'none', borderRadius: 6,
+            cursor: 'pointer', color: 'var(--fg-muted)',
+          }}
+          onMouseEnter={e => { e.currentTarget.style.background = 'var(--muted)'; e.currentTarget.style.color = 'var(--fg)' }}
+          onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--fg-muted)' }}
+        >
+          <X size={16} />
+        </button>
+        <DialogHeader 
+          className="flex flex-row items-center gap-2 shrink-0"
+          style={{ borderBottom: '1px solid var(--border)', paddingBottom: 16 }}
+        >
+          <div style={{ 
+            width: 36, height: 36, borderRadius: 8, 
+            background: 'var(--accent)', 
+            display: 'flex', alignItems: 'center', justifyContent: 'center', 
+            color: 'var(--primary)' 
+          }}>
+            <Info size={18} />
           </div>
           <div>
-            <DialogTitle className="text-lg font-bold font-heading text-fg">Tentang & Catatan Rilis</DialogTitle>
-            <p className="text-xs text-fg-muted">Mindspace Changelog & Info</p>
+            <DialogTitle 
+              className="text-lg font-bold"
+              style={{ fontFamily: 'var(--font-heading)', color: 'var(--fg)' }}
+            >
+              Tentang & Catatan Rilis
+            </DialogTitle>
+            <p style={{ fontSize: '0.75rem', color: 'var(--fg-muted)', margin: 0 }}>
+              Mindspace Changelog & Info
+            </p>
           </div>
         </DialogHeader>
         <div 
-          className="flex-1 overflow-y-auto pr-2 mt-4 text-sm text-fg"
+          className="flex-1 overflow-y-auto pr-2 mt-4 text-sm"
           style={{
             lineHeight: 1.6,
             fontFamily: 'var(--font-body)',
+            color: 'var(--fg)',
           }}
         >
           {/* Custom Styled Markdown Container for maximum compatibility */}

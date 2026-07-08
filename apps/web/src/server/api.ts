@@ -222,6 +222,10 @@ app.post('/api/auth/change-password', authMiddleware, async (c) => {
 
 app.put('/api/auth/users/:id/reset-password', adminMiddleware, async (c) => {
   const userId = c.req.param('id')
+  const session = c.get('session')
+  if (userId === session.userId) {
+    return c.json({ error: 'Cannot change your own password here' }, 400)
+  }
   const body = await c.req.json().catch(() => ({})) as { newPassword?: string }
   const { newPassword } = body
   if (!newPassword) {
@@ -229,6 +233,31 @@ app.put('/api/auth/users/:id/reset-password', adminMiddleware, async (c) => {
   }
   const hash = bcrypt.hashSync(newPassword, 10)
   await db.update(users).set({ passwordHash: hash }).where(eq(users.id, userId))
+  return c.json({ ok: true })
+})
+
+app.put('/api/auth/users/:id', adminMiddleware, async (c) => {
+  const userId = c.req.param('id')
+  const session = c.get('session')
+  const body = await c.req.json().catch(() => ({})) as { username?: string; role?: string }
+  const updates: Record<string, unknown> = {}
+  if (body.username) {
+    if (userId === session.userId) {
+      return c.json({ error: 'Cannot change your own username' }, 400)
+    }
+    const duplicate = await db.select().from(users).where(eq(users.username, body.username)).limit(1)
+    if (duplicate.length > 0 && duplicate[0].id !== userId) {
+      return c.json({ error: 'Username already taken' }, 400)
+    }
+    updates.username = body.username
+  }
+  if (body.role && (body.role === 'admin' || body.role === 'viewer')) {
+    updates.role = body.role
+  }
+  if (Object.keys(updates).length === 0) {
+    return c.json({ error: 'No valid fields to update' }, 400)
+  }
+  await db.update(users).set(updates).where(eq(users.id, userId))
   return c.json({ ok: true })
 })
 
@@ -1003,6 +1032,43 @@ app.delete('/api/attachments/:id', authMiddleware, async (c) => {
   deleteFile(att.storedAs)
   await db.delete(attachments).where(eq(attachments.id, id))
   return c.json({ ok: true })
+})
+
+// --- AI LOGS ADMIN ENDPOINT ---
+
+app.get('/api/admin/ai-logs', adminMiddleware, async (c) => {
+  const url = new URL(c.req.url)
+  const userId = url.searchParams.get('userId')
+  const page = url.searchParams.get('page') || '1'
+  const pageSize = url.searchParams.get('pageSize') || '30'
+
+  try {
+    const params = new URLSearchParams({ page, page_size: pageSize })
+    if (userId) params.set('user_id', userId)
+    const forwardRes = await fetch(`${AI_AGENT_URL}/api/admin/sessions?${params}`)
+    if (!forwardRes.ok) {
+      const errText = await forwardRes.text()
+      return c.json({ error: `AI service error: ${errText}` }, forwardRes.status as any)
+    }
+    const data = await forwardRes.json()
+
+    // Enrich sessions with usernames from web app DB
+    if (data.sessions?.length > 0) {
+      const userIds = [...new Set(data.sessions.map((s: any) => s.user_id).filter(Boolean))]
+      if (userIds.length > 0) {
+        const placeholders = userIds.map(() => '?').join(',')
+        const userRows = sqlite.prepare(`SELECT id, username FROM users WHERE id IN (${placeholders})`).all(...userIds) as { id: string; username: string }[]
+        const userMap = Object.fromEntries(userRows.map(u => [u.id, u.username]))
+        for (const sess of data.sessions) {
+          sess.username = sess.user_id ? (userMap[sess.user_id] || null) : null
+        }
+      }
+    }
+
+    return c.json(data)
+  } catch (err) {
+    return c.json({ error: `Failed to communicate with AI agent: ${String(err)}` }, 500)
+  }
 })
 
 // --- AI AGENT PROXY ENDPOINTS ---
