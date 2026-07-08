@@ -362,27 +362,24 @@ export function EditDiagramDialog({
   }
 
   function save() {
-    let foundPos = -1
-    editor.state.doc.descendants((node: any, pos: number) => {
-      if (node.type.name === 'diagram' && node.attrs.id === data.id) {
-        foundPos = pos
-        return false // Stop traversing
-      }
-    })
+    editor.commands.command(({ tr, dispatch }) => {
+      let foundPos = -1
+      tr.doc.descendants((node: any, pos: number) => {
+        if (node.type.name === 'diagram' && node.attrs.id === data.id) {
+          foundPos = pos
+          return false // Stop traversing
+        }
+      })
 
-    if (foundPos !== -1) {
-      const node = editor.state.doc.nodeAt(foundPos)
-      if (node) {
-        editor.view.dispatch(
-          editor.state.tr.setNodeMarkup(foundPos, null, {
-            ...node.attrs,
-            data: JSON.stringify({ nodes, edges })
-          })
-        )
+      if (foundPos !== -1 && dispatch) {
+        tr.setNodeMarkup(foundPos, null, {
+          ...tr.doc.nodeAt(foundPos)?.attrs,
+          data: JSON.stringify({ nodes, edges })
+        })
+        return true
       }
-    } else {
-      console.error('Could not find diagram node with ID:', data.id)
-    }
+      return false
+    })
     onClose()
   }
 

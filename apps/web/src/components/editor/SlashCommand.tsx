@@ -116,7 +116,12 @@ const COMMANDS = [
     title: 'Diagram',
     description: 'Buat bagan alir interaktif (ReactFlow).',
     icon: Network,
-    command: ({ editor, range }: any) => editor.chain().focus().deleteRange(range).insertContent({ type: 'diagram', attrs: { data: JSON.stringify({ nodes: [], edges: [] }) } }).run()
+    command: ({ editor, range }: any) => {
+      const id = typeof crypto !== 'undefined' && crypto.randomUUID
+        ? crypto.randomUUID()
+        : Math.random().toString(36).substring(2, 15)
+      editor.chain().focus().deleteRange(range).insertContent({ type: 'diagram', attrs: { id, data: JSON.stringify({ nodes: [], edges: [] }) } }).run()
+    }
   },
   {
     category: 'Media & Advanced',
