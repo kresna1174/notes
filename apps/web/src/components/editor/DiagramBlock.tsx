@@ -311,14 +311,29 @@ export function EditDiagramDialog({
   const [aiLoading, setAiLoading] = useState(false)
   const [showAiInput, setShowAiInput] = useState(false)
 
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number; node?: any } | null>(null)
+  const [aiCoords, setAiCoords] = useState<{ x: number; y: number } | null>(null)
+  const [aiPromptTarget, setAiPromptTarget] = useState<any | null>(null)
+
   async function generateWithAi() {
     if (!aiPrompt.trim()) return
     setAiLoading(true)
     try {
+      let finalPrompt = aiPrompt
+      if (aiPromptTarget) {
+        finalPrompt = `Ubah/kembangkan node ini di diagram.
+Node Target: { id: "${aiPromptTarget.id}", label: "${aiPromptTarget.data?.label || ''}" }
+Instruksi Pengguna: ${aiPrompt}
+Diagram Saat Ini: ${JSON.stringify({ nodes, edges })}`
+      } else if (aiCoords) {
+        finalPrompt = `${aiPrompt}
+Catatan: Posisikan node utama/root di koordinat (x: ${Math.round(aiCoords.x)}, y: ${Math.round(aiCoords.y)}).`
+      }
+
       const res = await fetch('/api/ai/diagram', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt: aiPrompt })
+        body: JSON.stringify({ prompt: finalPrompt })
       })
       if (!res.ok) {
         throw new Error(await res.text())
@@ -331,6 +346,8 @@ export function EditDiagramDialog({
         setEdges(data.edges)
       }
       setShowAiInput(false)
+      setAiCoords(null)
+      setAiPromptTarget(null)
       setAiPrompt('')
     } catch (err) {
       console.error('Failed to generate diagram:', err)
@@ -339,6 +356,68 @@ export function EditDiagramDialog({
       setAiLoading(false)
     }
   }
+
+  const renameNode = useCallback((node: any) => {
+    const newLabel = prompt('Ganti label node:', node.data.label)
+    if (newLabel !== null) {
+      setNodes(ns => ns.map(n => (n.id === node.id ? { ...n, data: { ...n.data, label: newLabel } } : n)))
+    }
+    setContextMenu(null)
+  }, [setNodes])
+
+  const deleteNodeById = useCallback((nodeId: string) => {
+    setNodes(ns => ns.filter(n => n.id !== nodeId))
+    setEdges(eds => eds.filter(e => e.source !== nodeId && e.target !== nodeId))
+    setContextMenu(null)
+  }, [setNodes, setEdges])
+
+  const addNodeAtCoords = useCallback((type: string, x: number, y: number) => {
+    const id = typeof crypto !== 'undefined' && crypto.randomUUID
+      ? crypto.randomUUID()
+      : Math.random().toString(36).substring(2, 15)
+    setNodes(ns => [...ns, {
+      id,
+      type,
+      position: { x: x - 60, y: y - 30 },
+      data: { label: `Node Baru (${type})` },
+      style: {},
+    }])
+    setContextMenu(null)
+  }, [setNodes])
+
+  const handleNodeContextMenu = useCallback(
+    (event: React.MouseEvent, node: any) => {
+      event.preventDefault()
+      event.stopPropagation()
+      const rectFlowWrapper = event.currentTarget.closest('.react-flow-wrapper')
+      const rectFlowBounds = rectFlowWrapper?.getBoundingClientRect()
+      if (rectFlowBounds) {
+        setContextMenu({
+          x: event.clientX - rectFlowBounds.left,
+          y: event.clientY - rectFlowBounds.top,
+          node,
+        })
+      }
+    },
+    []
+  )
+
+  const handlePaneContextMenu = useCallback(
+    (event: React.MouseEvent) => {
+      event.preventDefault()
+      event.stopPropagation()
+      const rectFlowBounds = event.currentTarget.getBoundingClientRect()
+      setContextMenu({
+        x: event.clientX - rectFlowBounds.left,
+        y: event.clientY - rectFlowBounds.top,
+      })
+    },
+    []
+  )
+
+  const handlePaneClick = useCallback(() => {
+    setContextMenu(null)
+  }, [])
 
   const onConnect = useCallback(
     (params: Connection) => setEdges(eds => addEdge(params, eds)),
@@ -465,8 +544,8 @@ export function EditDiagramDialog({
           </button>
         </div>
 
-        <div style={{ flex: 1, minHeight: 0 }}>
-          <div style={{ width: '100%', height: '100%' }}>
+        <div style={{ flex: 1, minHeight: 0, position: 'relative' }}>
+          <div className="react-flow-wrapper" style={{ width: '100%', height: '100%', position: 'relative' }}>
             <ReactFlow
               nodes={nodes}
               edges={edges}
@@ -475,6 +554,9 @@ export function EditDiagramDialog({
               onEdgesChange={onEdgesChange}
               onConnect={onConnect}
               onNodeDoubleClick={onNodeDoubleClick}
+              onNodeContextMenu={handleNodeContextMenu}
+              onPaneContextMenu={handlePaneContextMenu}
+              onPaneClick={handlePaneClick}
               fitView
             >
               <Controls />
@@ -510,8 +592,154 @@ export function EditDiagramDialog({
           </button>
         </div>
 
+        {contextMenu && (
+          <div
+            onClick={() => setContextMenu(null)}
+            onContextMenu={e => { e.preventDefault(); setContextMenu(null) }}
+            style={{
+              position: 'absolute',
+              inset: 0,
+              zIndex: 999,
+              background: 'transparent',
+            }}
+          />
+        )}
+
+        {contextMenu && (
+          <div
+            style={{
+              position: 'absolute',
+              top: `${contextMenu.y}px`,
+              left: `${contextMenu.x}px`,
+              zIndex: 1001,
+              background: 'var(--card-bg)',
+              border: '1px solid var(--border)',
+              borderRadius: '8px',
+              padding: '4px',
+              boxShadow: '0 10px 15px -3px rgba(0,0,0,0.3), 0 4px 6px -2px rgba(0,0,0,0.2)',
+              minWidth: '160px',
+              fontFamily: 'var(--font-body)',
+              fontSize: '0.8rem',
+            }}
+          >
+            {contextMenu.node ? (
+              <>
+                <div style={{ padding: '4px 8px', color: 'var(--fg-muted)', fontSize: '0.7rem', fontWeight: 600, borderBottom: '1px solid var(--border)', marginBottom: '4px' }}>
+                  Node: {contextMenu.node.data?.label || 'Tanpa Nama'}
+                </div>
+                <button
+                  onClick={() => {
+                    setAiPromptTarget(contextMenu.node)
+                    setAiCoords({ x: contextMenu.x, y: contextMenu.y })
+                    setShowAiInput(true)
+                    setContextMenu(null)
+                  }}
+                  style={{
+                    width: '100%', padding: '6px 8px', display: 'flex', alignItems: 'center', gap: 6,
+                    border: 'none', background: 'transparent', color: 'var(--primary)', cursor: 'pointer', textAlign: 'left',
+                    borderRadius: 4, fontWeight: 600
+                  }}
+                  onMouseEnter={e => e.currentTarget.style.background = 'var(--accent)'}
+                  onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                >
+                  <Sparkles size={12} style={{ color: '#a855f7' }} />
+                  <span style={{ color: '#c084fc' }}>Edit dengan AI ✨</span>
+                </button>
+                <button
+                  onClick={() => renameNode(contextMenu.node)}
+                  style={{
+                    width: '100%', padding: '6px 8px', display: 'flex', alignItems: 'center', gap: 6,
+                    border: 'none', background: 'transparent', color: 'var(--fg)', cursor: 'pointer', textAlign: 'left',
+                    borderRadius: 4
+                  }}
+                  onMouseEnter={e => e.currentTarget.style.background = 'var(--accent)'}
+                  onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                >
+                  <span>✏️ Ubah Label</span>
+                </button>
+                <button
+                  onClick={() => deleteNodeById(contextMenu.node.id)}
+                  style={{
+                    width: '100%', padding: '6px 8px', display: 'flex', alignItems: 'center', gap: 6,
+                    border: 'none', background: 'transparent', color: '#e03131', cursor: 'pointer', textAlign: 'left',
+                    borderRadius: 4
+                  }}
+                  onMouseEnter={e => e.currentTarget.style.background = 'rgba(224, 49, 49, 0.1)'}
+                  onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                >
+                  <span>🗑️ Hapus Node</span>
+                </button>
+              </>
+            ) : (
+              <>
+                <button
+                  onClick={() => {
+                    setAiPromptTarget(null)
+                    setAiCoords({ x: contextMenu.x, y: contextMenu.y })
+                    setShowAiInput(true)
+                    setContextMenu(null)
+                  }}
+                  style={{
+                    width: '100%', padding: '6px 8px', display: 'flex', alignItems: 'center', gap: 6,
+                    border: 'none', background: 'transparent', color: 'var(--primary)', cursor: 'pointer', textAlign: 'left',
+                    borderRadius: 4, fontWeight: 600
+                  }}
+                  onMouseEnter={e => e.currentTarget.style.background = 'var(--accent)'}
+                  onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                >
+                  <Sparkles size={12} style={{ color: '#a855f7' }} />
+                  <span style={{ color: '#c084fc' }}>Generate dengan AI ✨</span>
+                </button>
+                <div style={{ height: '1px', background: 'var(--border)', margin: '4px 0' }} />
+                <button
+                  onClick={() => addNodeAtCoords('rectangle', contextMenu.x, contextMenu.y)}
+                  style={{
+                    width: '100%', padding: '6px 8px', display: 'flex', alignItems: 'center', gap: 6,
+                    border: 'none', background: 'transparent', color: 'var(--fg)', cursor: 'pointer', textAlign: 'left',
+                    borderRadius: 4
+                  }}
+                  onMouseEnter={e => e.currentTarget.style.background = 'var(--accent)'}
+                  onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                >
+                  <span>+ Tambah Rectangle</span>
+                </button>
+                <button
+                  onClick={() => addNodeAtCoords('circle', contextMenu.x, contextMenu.y)}
+                  style={{
+                    width: '100%', padding: '6px 8px', display: 'flex', alignItems: 'center', gap: 6,
+                    border: 'none', background: 'transparent', color: 'var(--fg)', cursor: 'pointer', textAlign: 'left',
+                    borderRadius: 4
+                  }}
+                  onMouseEnter={e => e.currentTarget.style.background = 'var(--accent)'}
+                  onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                >
+                  <span>+ Tambah Circle</span>
+                </button>
+                <button
+                  onClick={() => addNodeAtCoords('diamond', contextMenu.x, contextMenu.y)}
+                  style={{
+                    width: '100%', padding: '6px 8px', display: 'flex', alignItems: 'center', gap: 6,
+                    border: 'none', background: 'transparent', color: 'var(--fg)', cursor: 'pointer', textAlign: 'left',
+                    borderRadius: 4
+                  }}
+                  onMouseEnter={e => e.currentTarget.style.background = 'var(--accent)'}
+                  onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                >
+                  <span>+ Tambah Diamond</span>
+                </button>
+              </>
+            )}
+          </div>
+        )}
+
         {showAiInput && (
-          <div style={{
+          <div style={aiCoords ? {
+            position: 'absolute',
+            top: `${Math.max(10, Math.min(aiCoords.y, window.innerHeight - 300))}px`,
+            left: `${Math.max(10, Math.min(aiCoords.x, window.innerWidth - 480))}px`,
+            zIndex: 1000,
+            pointerEvents: 'auto',
+          } : {
             position: 'absolute',
             bottom: '80px',
             left: '50%',
