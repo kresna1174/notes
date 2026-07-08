@@ -136,28 +136,36 @@ export function ExportModal({ note, onClose }: ExportModalProps) {
     }
   }
 
-  // PDF Export Logic using temporary CSS injector & print wrapper
+  // PDF Export Logic using html2pdf.js library via script download
   const exportPdf = () => {
     const printStyles = getThemeStyles(pdfTheme)
     const fontFam = getFontFamily(pdfFont)
     const marginSize = getMarginSize(pdfMargin)
 
-    // Create container for print content
-    const printDiv = document.createElement('div')
-    printDiv.id = 'premium-print-section'
+    // Create a temporary element for capturing without scroll-clipping
+    const tempDiv = document.createElement('div')
+    tempDiv.style.position = 'absolute'
+    tempDiv.style.left = '-9999px'
+    tempDiv.style.top = '-9999px'
+    tempDiv.style.width = '794px' // Standard A4 width (~210mm at 96 dpi)
+    tempDiv.style.background = printStyles.bg
+    tempDiv.style.color = printStyles.fg
+    tempDiv.style.fontFamily = fontFam
     
-    // Construct PDF DOM structure
-    printDiv.innerHTML = `
-      <div class="print-container" style="
-        font-family: ${fontFam};
-        color: ${printStyles.fg};
-        background: ${printStyles.bg};
+    // Inject the theme variables to allow Cascade to Tiptap nodes
+    tempDiv.style.setProperty('--fg', printStyles.fg)
+    tempDiv.style.setProperty('--bg', printStyles.bg)
+    tempDiv.style.setProperty('--border', printStyles.border)
+    tempDiv.style.setProperty('--card-bg', printStyles.bg)
+    tempDiv.style.setProperty('--fg-muted', printStyles.muted)
+
+    tempDiv.innerHTML = `
+      <div style="
         padding: ${marginSize};
-        min-height: 100%;
         box-sizing: border-box;
       ">
         ${includeCover && note.coverImage ? `
-          <div class="print-cover" style="
+          <div style="
             width: 100%;
             height: 150px;
             background-image: ${note.coverImage.startsWith('linear-gradient') ? note.coverImage : `url(${note.coverImage})`};
@@ -189,49 +197,43 @@ export function ExportModal({ note, onClose }: ExportModalProps) {
           </div>
         ` : ''}
 
-        <div class="print-content" style="font-size: 1rem; line-height: 1.6;">
+        <div class="editor-preview-doc-content" style="font-size: 1.05rem; line-height: 1.6;">
           ${document.querySelector('.editor-preview-doc-content')?.innerHTML || ''}
         </div>
       </div>
     `
 
-    // Stylesheet injection
-    const styleEl = document.createElement('style')
-    styleEl.id = 'premium-print-style'
-    styleEl.innerHTML = `
-      @media print {
-        body * {
-          visibility: hidden !important;
-        }
-        #premium-print-section, #premium-print-section * {
-          visibility: visible !important;
-        }
-        #premium-print-section {
-          position: absolute;
-          left: 0;
-          top: 0;
-          width: 100%;
-          background: ${printStyles.bg} !important;
-        }
-        @page {
-          size: A4;
-          margin: 0;
-        }
-      }
-    `
+    document.body.appendChild(tempDiv)
 
-    // Append nodes to DOM
-    document.body.appendChild(printDiv)
-    document.head.appendChild(styleEl)
+    const opt = {
+      margin:       0,
+      filename:     `${note.title.toLowerCase().replace(/[^a-z0-9]+/g, '_') || 'untitled'}.pdf`,
+      image:        { type: 'jpeg', quality: 0.98 },
+      html2canvas:  { 
+        scale: 2, 
+        useCORS: true, 
+        backgroundColor: printStyles.bg,
+        logging: false
+      },
+      jsPDF:        { unit: 'px', format: 'a4', orientation: 'portrait', hotfixes: ['px_scaling'] }
+    };
 
-    // Trigger Print
-    setTimeout(() => {
-      window.print()
-      // Cleanup DOM
-      document.body.removeChild(printDiv)
-      document.head.removeChild(styleEl)
-      onClose()
-    }, 200)
+    // @ts-ignore
+    import('html2pdf.js').then((html2pdfModule) => {
+      const html2pdf = html2pdfModule.default;
+      html2pdf().from(tempDiv).set(opt).save().then(() => {
+        document.body.removeChild(tempDiv)
+        onClose()
+      }).catch((err: any) => {
+        console.error('PDF generation error:', err)
+        document.body.removeChild(tempDiv)
+        alert('Gagal membuat PDF: ' + String(err))
+      })
+    }).catch(err => {
+      console.error('Failed to load html2pdf.js module:', err)
+      document.body.removeChild(tempDiv)
+      alert('Gagal mengunduh modul PDF: ' + String(err))
+    })
   }
 
   // Tiptap JSON to Markdown Parser
@@ -561,7 +563,14 @@ export function ExportModal({ note, onClose }: ExportModalProps) {
                 fontFamily: format === 'pdf' ? fontFam : 'var(--font-body)',
                 boxSizing: 'border-box',
                 transition: 'all 0.2s',
-              }}
+                ...(format === 'pdf' ? {
+                  '--fg': themeStyles.fg,
+                  '--bg': themeStyles.bg,
+                  '--border': themeStyles.border,
+                  '--card-bg': themeStyles.bg,
+                  '--fg-muted': themeStyles.muted,
+                } : {})
+              } as any}
             >
               {/* Simulated cover image */}
               {format === 'pdf' && includeCover && note.coverImage && (

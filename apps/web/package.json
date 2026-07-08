@@ -54,6 +54,7 @@
     "clsx": "^2.1.1",
     "drizzle-orm": "^0.45.2",
     "hono": "^4.12.28",
+    "html2pdf.js": "^0.14.0",
     "lowlight": "^3.3.0",
     "lucide-react": "^0.545.0",
     "mammoth": "^1.12.0",
