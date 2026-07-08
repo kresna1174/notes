@@ -249,7 +249,7 @@ function fmt(ts: number) {
     ', ' + d.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })
 }
 
-type SaveStatus = 'saved' | 'saving' | 'unsaved'
+type SaveStatus = 'saved' | 'saving' | 'unsaved' | 'generating'
 
 const COVER_GRADIENTS = [
   'linear-gradient(to right, #ff7e5f, #feb47b)',
@@ -742,8 +742,34 @@ export function Editor({ note, onUpdate, onSaveStatusChange, onLockChange, share
   async function handleAiGenerate() {
     if (!aiPromptText.trim() || !editor) return
     setAiLoading(true)
+    setStatus('generating')
+    
+    const startPos = editor.state.selection.from
+    let fullText = ''
+    let promptBarClosed = false
+
+    const cursorChar = ' ▋'
+    let hasCursor = false
+
+    const insertDeltaWithCursor = (delta: string) => {
+      if (hasCursor) {
+        const cur = editor.state.selection.from
+        editor.chain().focus().deleteRange({ from: cur - cursorChar.length, to: cur }).run()
+      }
+      editor.chain().focus().insertContent(delta + cursorChar).run()
+      hasCursor = true
+    }
+
+    const removeCursor = () => {
+      if (hasCursor) {
+        const cur = editor.state.selection.from
+        editor.chain().focus().deleteRange({ from: cur - cursorChar.length, to: cur }).run()
+        hasCursor = false
+      }
+    }
+
     try {
-      const response = await fetch('/api/ai/chat', {
+      const response = await fetch('/api/ai/chat/stream', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -756,21 +782,84 @@ export function Editor({ note, onUpdate, onSaveStatusChange, onLockChange, share
         throw new Error(await response.text())
       }
 
-      const data = await response.json()
-      const text = data.response || ''
-      
-      if (text) {
-        // Compile markdown to HTML so TipTap parses lists, bold, headings, etc. correctly
-        const html = await marked.parse(text, { breaks: true, gfm: true })
-        editor.chain().focus().insertContent(html).run()
+      const reader = response.body?.getReader()
+      if (!reader) return
+
+      const decoder = new TextDecoder()
+      let buffer = ''
+
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+
+        if (!promptBarClosed) {
+          setAiPromptActive(false)
+          promptBarClosed = true
+        }
+
+        buffer += decoder.decode(value, { stream: true })
+        const lines = buffer.split('\n')
+        buffer = lines.pop() || ''
+
+        for (const line of lines) {
+          const cleanLine = line.trim()
+          if (!cleanLine.startsWith('data: ')) continue
+          
+          const jsonStr = cleanLine.substring(6)
+          if (jsonStr === '[DONE]') continue
+          
+          try {
+            const data = JSON.parse(jsonStr)
+            if (data.type === 'text-delta' && data.delta) {
+              const delta = data.delta
+              fullText += delta
+              insertDeltaWithCursor(delta)
+            }
+          } catch (e) {
+            // Ignore JSON parsing errors for partial or non-json lines
+          }
+        }
       }
+
+      // Handle any remaining buffer content
+      if (buffer.trim().startsWith('data: ')) {
+        try {
+          const jsonStr = buffer.trim().substring(6)
+          if (jsonStr !== '[DONE]') {
+            const data = JSON.parse(jsonStr)
+            if (data.type === 'text-delta' && data.delta) {
+              const delta = data.delta
+              fullText += delta
+              insertDeltaWithCursor(delta)
+            }
+          }
+        } catch (e) {}
+      }
+
+      // Remove the inline cursor before final compilation
+      removeCursor()
+
+      // Replace the entire streamed raw text with compiled markdown HTML
+      if (fullText) {
+        if (!promptBarClosed) {
+          setAiPromptActive(false)
+          promptBarClosed = true
+        }
+        const endPos = editor.state.selection.from
+        const html = await marked.parse(fullText, { breaks: true, gfm: true })
+        editor.chain().focus().deleteRange({ from: startPos, to: endPos }).insertContent(html).run()
+      }
+
       setAiPromptText('')
-      setAiPromptActive(false)
     } catch (err) {
+      removeCursor()
       console.error(err)
       alert('Gagal membuat teks dengan AI: ' + String(err))
     } finally {
+      removeCursor()
       setAiLoading(false)
+      setAiPromptActive(false)
+      setStatus('saved')
     }
   }
 
@@ -1362,6 +1451,12 @@ export function Editor({ note, onUpdate, onSaveStatusChange, onLockChange, share
                 style={{ outline: 'none' }}
                 className="max-w-none [&_.ProseMirror]:outline-none"
               />
+              {aiLoading && (
+                <div className="absolute -bottom-10 left-0 flex items-center gap-2 px-3 py-1.5 rounded-md bg-purple-500/10 border border-purple-500/30 text-purple-600 dark:text-purple-400 text-[0.75rem] font-medium animate-pulse pointer-events-none z-20">
+                  <Sparkles size={12} className="animate-spin text-purple-500" />
+                  <span>AI sedang menulis...</span>
+                </div>
+              )}
             </div>
             <div
               style={{ minHeight: '35vh', cursor: 'text' }}
