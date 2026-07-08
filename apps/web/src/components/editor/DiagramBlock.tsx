@@ -15,7 +15,7 @@ import ReactFlow, {
 import 'reactflow/dist/style.css'
 import { useState, useCallback, useEffect } from 'react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../ui/dialog'
-import { Trash2 } from 'lucide-react'
+import { Trash2, Sparkles } from 'lucide-react'
 
 const NODE_TYPES_AVAILABLE = ['rectangle', 'circle', 'diamond'] as const
 
@@ -438,89 +438,34 @@ export function EditDiagramDialog({
             </button>
           ))}
 
-          {showAiInput ? (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginLeft: 'auto', maxWidth: '60%', width: '400px' }}>
-              <input
-                value={aiPrompt}
-                onChange={e => setAiPrompt(e.target.value)}
-                placeholder="Deskripsikan diagram (e.g. Alur Autentikasi JWT)..."
-                disabled={aiLoading}
-                style={{
-                  flex: 1,
-                  padding: '4px 10px',
-                  fontSize: '0.8125rem',
-                  borderRadius: 6,
-                  border: '1px solid var(--border)',
-                  background: 'var(--bg)',
-                  color: 'var(--fg)',
-                  outline: 'none',
-                }}
-                onKeyDown={e => {
-                  if (e.key === 'Enter') generateWithAi()
-                  if (e.key === 'Escape') setShowAiInput(false)
-                }}
-              />
-              <button
-                onClick={generateWithAi}
-                disabled={aiLoading}
-                style={{
-                  padding: '4px 12px',
-                  fontSize: '0.8125rem',
-                  borderRadius: 6,
-                  border: 'none',
-                  background: 'var(--primary)',
-                  color: 'var(--primary-fg)',
-                  cursor: 'pointer',
-                  fontWeight: 500,
-                }}
-              >
-                {aiLoading ? 'Membuat...' : 'Buat'}
-              </button>
-              <button
-                onClick={() => setShowAiInput(false)}
-                disabled={aiLoading}
-                style={{
-                  padding: '4px 10px',
-                  fontSize: '0.8125rem',
-                  borderRadius: 6,
-                  border: '1px solid var(--border)',
-                  background: 'transparent',
-                  cursor: 'pointer',
-                  color: 'var(--fg-muted)',
-                }}
-              >
-                Batal
-              </button>
-            </div>
-          ) : (
-            <button
-              onClick={() => setShowAiInput(true)}
-              style={{
-                marginLeft: 'auto',
-                padding: '4px 12px',
-                fontSize: '0.8125rem',
-                fontFamily: 'var(--font-body)',
-                border: '1px solid #a855f7',
-                borderRadius: 6,
-                background: 'rgba(168, 85, 247, 0.1)',
-                cursor: 'pointer',
-                color: '#c084fc',
-                fontWeight: 600,
-                display: 'flex',
-                alignItems: 'center',
-                gap: 6,
-                transition: 'all 0.15s',
-              }}
-              onMouseEnter={e => {
-                e.currentTarget.style.background = 'rgba(168, 85, 247, 0.2)'
-              }}
-              onMouseLeave={e => {
-                e.currentTarget.style.background = 'rgba(168, 85, 247, 0.1)'
-              }}
-            >
-              <span>Generate dengan AI ✨</span>
-            </button>
-          )}
+          <button
+            onClick={() => setShowAiInput(true)}
+            style={{
+              marginLeft: 'auto',
+              padding: '4px 12px',
+              fontSize: '0.8125rem',
+              fontFamily: 'var(--font-body)',
+              border: '1px solid #a855f7',
+              borderRadius: 6,
+              background: 'rgba(168, 85, 247, 0.1)',
+              cursor: 'pointer',
+              color: '#c084fc',
+              fontWeight: 600,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 6,
+              transition: 'all 0.15s',
+            }}
+            onMouseEnter={e => {
+              e.currentTarget.style.background = 'rgba(168, 85, 247, 0.2)'
+            }}
+            onMouseLeave={e => {
+              e.currentTarget.style.background = 'rgba(168, 85, 247, 0.1)'
+            }}
+          >
+            <Sparkles size={13} />
+            <span>Generate dengan AI ✨</span>
+          </button>
         </div>
 
         <div style={{ flex: 1, minHeight: 0 }}>
@@ -567,6 +512,120 @@ export function EditDiagramDialog({
             Save
           </button>
         </div>
+
+        {showAiInput && (
+          <div style={{
+            position: 'absolute',
+            inset: 0,
+            background: 'rgba(0, 0, 0, 0.45)',
+            backdropFilter: 'blur(4px)',
+            zIndex: 1000,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}>
+            <div style={{
+              background: 'var(--card-bg)',
+              border: '1px solid var(--border)',
+              borderRadius: '12px',
+              boxShadow: '0 20px 25px -5px rgba(0,0,0,0.3), 0 10px 10px -5px rgba(0,0,0,0.2)',
+              width: '450px',
+              maxWidth: '90%',
+              padding: '20px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 12,
+              fontFamily: 'var(--font-body)',
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '0.95rem', fontWeight: 600, color: '#a855f7' }}>
+                <Sparkles size={16} />
+                <span>Buat Diagram dengan AI</span>
+              </div>
+              
+              <p style={{ fontSize: '0.75rem', color: 'var(--fg-muted)', margin: 0 }}>
+                Jelaskan diagram yang ingin Anda buat. AI akan secara otomatis merancang node, alur hubungan, koordinat, dan tata letak diagram untuk Anda.
+              </p>
+
+              {aiLoading ? (
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, padding: '20px 0' }}>
+                  <div className="dot-blink" style={{ display: 'flex', gap: 4 }}>
+                    <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#a855f7' }} />
+                    <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#a855f7', animationDelay: '0.2s' }} />
+                    <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#a855f7', animationDelay: '0.4s' }} />
+                  </div>
+                  <span style={{ fontSize: '0.75rem', color: 'var(--fg-muted)' }}>AI sedang merancang diagram...</span>
+                </div>
+              ) : (
+                <>
+                  <textarea
+                    autoFocus
+                    placeholder="Contoh: Alur registrasi user baru dengan verifikasi OTP email, jika sukses masuk dashboard, jika gagal kembali ke form..."
+                    value={aiPrompt}
+                    onChange={e => setAiPrompt(e.target.value)}
+                    style={{
+                      width: '100%',
+                      height: '100px',
+                      padding: '10px',
+                      fontSize: '0.85rem',
+                      borderRadius: '8px',
+                      border: '1px solid var(--border)',
+                      background: 'var(--bg)',
+                      color: 'var(--fg)',
+                      outline: 'none',
+                      resize: 'none',
+                      fontFamily: 'var(--font-body)',
+                    }}
+                    onKeyDown={e => {
+                      if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault()
+                        generateWithAi()
+                      }
+                      if (e.key === 'Escape') {
+                        setShowAiInput(false)
+                      }
+                    }}
+                  />
+                  
+                  <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 4 }}>
+                    <button
+                      onClick={() => setShowAiInput(false)}
+                      style={{
+                        padding: '6px 14px',
+                        fontSize: '0.8125rem',
+                        borderRadius: 6,
+                        border: '1px solid var(--border)',
+                        background: 'transparent',
+                        cursor: 'pointer',
+                        color: 'var(--fg-muted)',
+                        fontFamily: 'var(--font-body)',
+                      }}
+                    >
+                      Batal
+                    </button>
+                    <button
+                      onClick={generateWithAi}
+                      disabled={!aiPrompt.trim()}
+                      style={{
+                        padding: '6px 16px',
+                        fontSize: '0.8125rem',
+                        borderRadius: 6,
+                        border: 'none',
+                        background: 'var(--primary)',
+                        color: 'var(--primary-fg)',
+                        cursor: 'pointer',
+                        fontWeight: 600,
+                        fontFamily: 'var(--font-body)',
+                        opacity: aiPrompt.trim() ? 1 : 0.6,
+                      }}
+                    >
+                      Buat Diagram
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        )}
       </DialogContent>
     </Dialog>
   )

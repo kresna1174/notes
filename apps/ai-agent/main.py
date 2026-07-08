@@ -994,7 +994,11 @@ async def generate_diagram(request: DiagramRequest):
             api_key=os.getenv("OPENROUTER_API_KEY"),
             base_url=os.getenv("OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1"),
         )
-        model = os.getenv("OPENROUTER_MODEL", "google/gemini-2.5-flash:free")
+        model = os.getenv("OPENROUTER_MODEL", "google/gemini-2.5-flash")
+        if model.startswith("openrouter/"):
+            model = model.replace("openrouter/", "", 1)
+        if "gemini-3.5" in model:
+            model = model.replace("gemini-3.5", "gemini-2.5")
 
         system_instruction = (
             "You are an expert flowchart and diagram generator.\n"
