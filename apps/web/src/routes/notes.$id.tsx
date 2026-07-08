@@ -241,6 +241,7 @@ function NotePageComponent() {
             {historyOpen && (
               <VersionHistory
                 noteId={id}
+                currentContent={note.content}
                 onClose={() => setHistoryOpen(false)}
                 onRestore={(updatedNote) => {
                   window.location.reload()

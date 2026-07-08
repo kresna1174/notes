@@ -31,11 +31,12 @@ interface VersionRecord {
 
 interface VersionHistoryProps {
   noteId: string
+  currentContent: string
   onClose: () => void
   onRestore: (version: VersionRecord) => void
 }
 
-export function VersionHistory({ noteId, onClose, onRestore }: VersionHistoryProps) {
+export function VersionHistory({ noteId, currentContent, onClose, onRestore }: VersionHistoryProps) {
   const [history, setHistory] = useState<VersionRecord[]>([])
   const [loading, setLoading] = useState(true)
   const [showSaveDialog, setShowSaveDialog] = useState(false)
@@ -532,6 +533,7 @@ export function VersionHistory({ noteId, onClose, onRestore }: VersionHistoryPro
       {previewVersion && (
         <VersionPreviewDialog
           version={previewVersion}
+          currentContent={currentContent}
           onClose={() => setPreviewVersion(null)}
           onRestore={() => {
             const v = previewVersion
@@ -544,7 +546,75 @@ export function VersionHistory({ noteId, onClose, onRestore }: VersionHistoryPro
   )
 }
 
-function VersionPreviewDialog({ version, onClose, onRestore }: { version: VersionRecord; onClose: () => void; onRestore: () => void }) {
+function VersionPreviewDialog({ version, currentContent, onClose, onRestore }: {
+  version: VersionRecord
+  currentContent: string
+  onClose: () => void
+  onRestore: () => void
+}) {
+  const [activeTab, setActiveTab] = useState<'preview' | 'diff'>('diff')
+
+  // ── Diff Engine ──────────────────────────────────────────────────────────
+  // Convert Tiptap JSON → array of readable text lines
+  const tiptapToLines = (raw: string): string[] => {
+    const lines: string[] = []
+    let doc: any
+    try { doc = JSON.parse(raw) } catch { return raw.split('\n').filter(Boolean) }
+    if (!doc?.content) return []
+
+    const inlineText = (nodes: any[]): string =>
+      (nodes || []).map((n: any) => n.text || '').join('')
+
+    const walk = (node: any) => {
+      switch (node.type) {
+        case 'heading':   lines.push(`${'#'.repeat(node.attrs?.level || 1)} ${inlineText(node.content)}`); break
+        case 'paragraph': { const t = inlineText(node.content); if (t) lines.push(t); break }
+        case 'bulletList':  (node.content||[]).forEach((li: any) => lines.push(`• ${inlineText(li.content?.[0]?.content)}`)); break
+        case 'orderedList': (node.content||[]).forEach((li: any, i: number) => lines.push(`${i+1}. ${inlineText(li.content?.[0]?.content)}`)); break
+        case 'codeBlock':   lines.push('```'); lines.push(inlineText(node.content)); lines.push('```'); break
+        case 'blockquote':  lines.push(`> ${inlineText(node.content?.[0]?.content)}`); break
+        case 'horizontalRule': lines.push('───────────────────────'); break
+        case 'callout':     lines.push(`[${node.attrs?.emoji||'💡'}] ${inlineText(node.content?.[0]?.content)}`); break
+        case 'taskList':    (node.content||[]).forEach((li: any) => lines.push(`${li.attrs?.checked ? '☑' : '☐'} ${inlineText(li.content?.[0]?.content)}`)); break
+        case 'table':       lines.push('[Tabel]'); break
+        case 'diagram':     lines.push('[Diagram]'); break
+        case 'attachment':  lines.push(`[Lampiran: ${node.attrs?.filename||''}]`); break
+        default: if (node.content) node.content.forEach(walk); break
+      }
+    }
+    doc.content.forEach(walk)
+    return lines
+  }
+
+  // LCS-based diff — returns { type: 'same'|'add'|'remove', text: string }[]
+  const computeDiff = (oldLines: string[], newLines: string[]) => {
+    const m = oldLines.length, n = newLines.length
+    // Build LCS table
+    const dp: number[][] = Array.from({ length: m + 1 }, () => new Array(n + 1).fill(0))
+    for (let i = 1; i <= m; i++)
+      for (let j = 1; j <= n; j++)
+        dp[i][j] = oldLines[i-1] === newLines[j-1] ? dp[i-1][j-1] + 1 : Math.max(dp[i-1][j], dp[i][j-1])
+    // Traceback
+    const result: { type: 'same'|'add'|'remove'; text: string }[] = []
+    let i = m, j = n
+    while (i > 0 || j > 0) {
+      if (i > 0 && j > 0 && oldLines[i-1] === newLines[j-1]) {
+        result.unshift({ type: 'same', text: oldLines[i-1] }); i--; j--
+      } else if (j > 0 && (i === 0 || dp[i][j-1] >= dp[i-1][j])) {
+        result.unshift({ type: 'add', text: newLines[j-1] }); j--
+      } else {
+        result.unshift({ type: 'remove', text: oldLines[i-1] }); i--
+      }
+    }
+    return result
+  }
+
+  const oldLines = tiptapToLines(version.content)         // historical (before)
+  const newLines = tiptapToLines(currentContent)           // current   (after)
+  const diffResult = computeDiff(oldLines, newLines)
+  const adds    = diffResult.filter(d => d.type === 'add').length
+  const removes = diffResult.filter(d => d.type === 'remove').length
+  // ─────────────────────────────────────────────────────────────────────────
   const parsedContent = (() => {
     try {
       return JSON.parse(version.content)
@@ -594,123 +664,214 @@ function VersionPreviewDialog({ version, onClose, onRestore }: { version: Versio
       <DialogContent
         aria-describedby={undefined}
         style={{
-          maxWidth: '85vw', width: '85vw', height: '85vh',
+          maxWidth: '90vw', width: '90vw', height: '88vh',
           display: 'flex', flexDirection: 'column',
           padding: 0, gap: 0, overflow: 'hidden',
           background: 'var(--bg)', color: 'var(--fg)',
           borderRadius: 16, border: '1px solid var(--border)',
           boxShadow: '0 24px 64px rgba(0,0,0,0.25)',
+          fontFamily: 'var(--font-body)',
         }}
       >
-        {/* Banner Alert */}
-        <div
-          style={{
-            background: 'rgba(168, 85, 247, 0.1)',
-            borderBottom: '1px solid rgba(168, 85, 247, 0.2)',
-            padding: '10px 20px',
-            fontSize: '0.8125rem',
-            color: '#c084fc',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            flexShrink: 0,
-            fontFamily: 'var(--font-body)',
-          }}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <Clock size={14} />
-            <span>
-              Pratinjau Versi: <strong>{version.versionName || 'Penyimpanan Otomatis'}</strong> ({fmtDate(version.createdAt)})
+        {/* Header */}
+        <div style={{
+          padding: '14px 20px',
+          borderBottom: '1px solid var(--border)',
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          flexShrink: 0, background: 'var(--card-bg)',
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <Clock size={15} style={{ color: 'var(--primary)' }} />
+            <span style={{ fontWeight: 600, fontSize: '0.875rem', color: 'var(--fg)' }}>
+              {version.versionName || 'Penyimpanan Otomatis'}
+            </span>
+            <span style={{ fontSize: '0.75rem', color: 'var(--fg-muted)' }}>
+              · {fmtDate(version.createdAt)}
             </span>
           </div>
-          <button
-            onClick={onRestore}
-            style={{
-              padding: '4px 12px',
-              fontSize: '0.75rem',
-              fontWeight: 600,
-              background: '#a855f7',
-              color: '#ffffff',
-              border: 'none',
-              borderRadius: 6,
-              cursor: 'pointer',
-            }}
-          >
-            Pulihkan Versi Ini
-          </button>
-        </div>
-
-        {/* Note Preview Body (similar to Note Page layout) */}
-        <div style={{ flex: 1, overflowY: 'auto', background: 'var(--bg)', position: 'relative' }}>
-          {/* Cover image */}
-          {version.coverImage ? (
-            <div
-              style={{
-                width: '100%',
-                height: '140px',
-                backgroundImage: version.coverImage.startsWith('linear-gradient') ? version.coverImage : `url(${version.coverImage})`,
-                backgroundSize: 'cover',
-                backgroundPosition: 'center',
-                position: 'relative',
-              }}
-            />
-          ) : null}
-
-          {/* Content Wrapper */}
-          <div style={{ padding: '32px 60px', width: '100%', position: 'relative' }}>
-            {/* Page Icon */}
-            {version.icon ? (
-              <div style={{ marginTop: version.coverImage ? '-65px' : '0', marginBottom: '16px', display: 'inline-block' }}>
-                <NoteIcon icon={version.icon} size={48} />
-              </div>
-            ) : null}
-
-            {/* Note Title */}
-            <h1
-              style={{
-                fontSize: '2rem',
-                fontWeight: 700,
-                color: 'var(--fg)',
-                letterSpacing: '-0.02em',
-                lineHeight: 1.2,
-                fontFamily: 'var(--font-heading)',
-                marginBottom: '24px',
-                marginTop: 0,
-              }}
-            >
-              {version.title || 'Untitled'}
-            </h1>
-
-            {/* Editor Content */}
-            <div className="editor-content-wrapper prose max-w-none">
-              <EditorContent editor={previewEditor} />
-            </div>
+          {/* Diff stats badge */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            {removes > 0 && (
+              <span style={{
+                fontSize: '0.75rem', fontWeight: 700, fontFamily: 'monospace',
+                color: '#f87171', background: 'rgba(248,113,113,0.12)',
+                border: '1px solid rgba(248,113,113,0.25)',
+                padding: '2px 8px', borderRadius: 20,
+              }}>−{removes}</span>
+            )}
+            {adds > 0 && (
+              <span style={{
+                fontSize: '0.75rem', fontWeight: 700, fontFamily: 'monospace',
+                color: '#4ade80', background: 'rgba(74,222,128,0.12)',
+                border: '1px solid rgba(74,222,128,0.25)',
+                padding: '2px 8px', borderRadius: 20,
+              }}>+{adds}</span>
+            )}
           </div>
         </div>
 
-        {/* Footer Actions */}
-        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, padding: '12px 20px', borderTop: '1px solid var(--border)', flexShrink: 0, background: 'var(--card-bg)' }}>
+        {/* Tab bar */}
+        <div style={{
+          display: 'flex', borderBottom: '1px solid var(--border)',
+          background: 'var(--card-bg)', flexShrink: 0, padding: '0 20px',
+        }}>
+          {(['diff', 'preview'] as const).map(tab => (
+            <button
+              key={tab}
+              onClick={() => setActiveTab(tab)}
+              style={{
+                padding: '10px 16px', fontSize: '0.8rem', fontWeight: activeTab === tab ? 700 : 500,
+                border: 'none', background: 'none', cursor: 'pointer',
+                color: activeTab === tab ? 'var(--primary)' : 'var(--fg-muted)',
+                borderBottom: activeTab === tab ? '2px solid var(--primary)' : '2px solid transparent',
+                marginBottom: -1, fontFamily: 'var(--font-body)',
+                transition: 'all 0.15s',
+              }}
+            >
+              {tab === 'diff' ? '📊 Perubahan' : '👁 Pratinjau'}
+            </button>
+          ))}
+        </div>
+
+        {/* Body */}
+        <div style={{ flex: 1, overflow: 'hidden', display: 'flex' }}>
+          {activeTab === 'diff' ? (
+            /* ── DIFF VIEW ── */
+            <div style={{ flex: 1, overflowY: 'auto', fontFamily: 'monospace', fontSize: '0.8rem', lineHeight: 1.6 }}>
+              {/* File header bar */}
+              <div style={{
+                padding: '8px 16px',
+                background: 'var(--card-bg)',
+                borderBottom: '1px solid var(--border)',
+                fontSize: '0.75rem', color: 'var(--fg-muted)',
+                display: 'flex', alignItems: 'center', gap: 8,
+              }}>
+                <span style={{
+                  padding: '1px 8px', borderRadius: 4,
+                  background: 'color-mix(in srgb, var(--primary) 12%, var(--card-bg))',
+                  border: '1px solid color-mix(in srgb, var(--primary) 25%, var(--border))',
+                  color: 'var(--primary)', fontWeight: 600,
+                }}>
+                  {version.title || 'Untitled'}
+                </span>
+                <span>@@ versi lama → versi saat ini @@</span>
+              </div>
+
+              {/* Diff lines */}
+              {diffResult.length === 0 ? (
+                <div style={{ padding: '40px', textAlign: 'center', color: 'var(--fg-muted)', fontSize: '0.85rem' }}>
+                  Tidak ada perubahan yang terdeteksi antara versi ini dan catatan saat ini.
+                </div>
+              ) : (
+                diffResult.map((line, i) => {
+                  const isAdd = line.type === 'add'
+                  const isRem = line.type === 'remove'
+                  return (
+                    <div
+                      key={i}
+                      style={{
+                        display: 'flex',
+                        background: isAdd
+                          ? 'rgba(74,222,128,0.08)'
+                          : isRem
+                          ? 'rgba(248,113,113,0.08)'
+                          : 'transparent',
+                        borderLeft: `3px solid ${isAdd ? '#4ade80' : isRem ? '#f87171' : 'transparent'}`,
+                      }}
+                    >
+                      {/* Gutter sign */}
+                      <span style={{
+                        width: 28, flexShrink: 0, textAlign: 'center',
+                        color: isAdd ? '#4ade80' : isRem ? '#f87171' : 'var(--fg-muted)',
+                        userSelect: 'none', paddingTop: 2,
+                        fontWeight: 700, fontSize: '0.85rem',
+                      }}>
+                        {isAdd ? '+' : isRem ? '−' : ' '}
+                      </span>
+                      {/* Line number */}
+                      <span style={{
+                        width: 36, flexShrink: 0, textAlign: 'right', paddingRight: 10,
+                        color: 'var(--fg-muted)', userSelect: 'none',
+                        opacity: 0.5, paddingTop: 2, fontSize: '0.72rem',
+                      }}>
+                        {i + 1}
+                      </span>
+                      {/* Content */}
+                      <span style={{
+                        flex: 1, padding: '2px 12px',
+                        color: isAdd ? '#86efac' : isRem ? '#fca5a5' : 'var(--fg)',
+                        whiteSpace: 'pre-wrap', wordBreak: 'break-word',
+                      }}>
+                        {line.text || ' '}
+                      </span>
+                    </div>
+                  )
+                })
+              )}
+            </div>
+          ) : (
+            /* ── PREVIEW VIEW ── */
+            <div style={{ flex: 1, overflowY: 'auto', background: 'var(--bg)' }}>
+              {version.coverImage ? (
+                <div style={{
+                  width: '100%', height: '140px',
+                  backgroundImage: version.coverImage.startsWith('linear-gradient') ? version.coverImage : `url(${version.coverImage})`,
+                  backgroundSize: 'cover', backgroundPosition: 'center',
+                }} />
+              ) : null}
+              <div style={{ padding: '32px 60px', width: '100%' }}>
+                {version.icon ? (
+                  <div style={{ marginTop: version.coverImage ? '-65px' : '0', marginBottom: '16px', display: 'inline-block' }}>
+                    <NoteIcon icon={version.icon} size={48} />
+                  </div>
+                ) : null}
+                <h1 style={{
+                  fontSize: '2rem', fontWeight: 700, color: 'var(--fg)',
+                  letterSpacing: '-0.02em', lineHeight: 1.2,
+                  fontFamily: 'var(--font-heading)', marginBottom: '24px', marginTop: 0,
+                }}>
+                  {version.title || 'Untitled'}
+                </h1>
+                <div className="editor-content-wrapper prose max-w-none">
+                  <EditorContent editor={previewEditor} />
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div style={{
+          display: 'flex', justifyContent: 'flex-end', gap: 8,
+          padding: '12px 20px', borderTop: '1px solid var(--border)',
+          flexShrink: 0, background: 'var(--card-bg)',
+        }}>
           <button
             onClick={onClose}
             style={{
-              padding: '6px 16px', fontSize: '0.875rem',
+              padding: '7px 18px', fontSize: '0.875rem',
               fontFamily: 'var(--font-body)',
-              border: '1px solid var(--border)', borderRadius: 6,
+              border: '1px solid var(--border)', borderRadius: 8,
               background: 'var(--bg)', cursor: 'pointer', color: 'var(--fg-muted)',
             }}
+            onMouseEnter={e => { e.currentTarget.style.background = 'var(--accent)' }}
+            onMouseLeave={e => { e.currentTarget.style.background = 'var(--bg)' }}
           >
             Tutup
           </button>
           <button
             onClick={onRestore}
             style={{
-              padding: '6px 16px', fontSize: '0.875rem',
-              fontFamily: 'var(--font-body)',
-              border: 'none', borderRadius: 6,
+              padding: '7px 18px', fontSize: '0.875rem', fontWeight: 600,
+              fontFamily: 'var(--font-body)', border: 'none', borderRadius: 8,
               background: 'var(--primary)', cursor: 'pointer',
-              color: 'var(--primary-fg)', fontWeight: 500,
+              color: 'var(--primary-fg)',
+              display: 'flex', alignItems: 'center', gap: 6,
             }}
+            onMouseEnter={e => { e.currentTarget.style.opacity = '0.88' }}
+            onMouseLeave={e => { e.currentTarget.style.opacity = '1' }}
           >
+            <RotateCcw size={14} />
             Pulihkan Versi Ini
           </button>
         </div>
