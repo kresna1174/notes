@@ -307,6 +307,39 @@ export function EditDiagramDialog({
   const [nodes, setNodes, onNodesChange] = useNodesState(parsed.nodes)
   const [edges, setEdges, onEdgesChange] = useEdgesState(parsed.edges)
 
+  const [aiPrompt, setAiPrompt] = useState('')
+  const [aiLoading, setAiLoading] = useState(false)
+  const [showAiInput, setShowAiInput] = useState(false)
+
+  async function generateWithAi() {
+    if (!aiPrompt.trim()) return
+    setAiLoading(true)
+    try {
+      const res = await fetch('/api/ai/diagram', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt: aiPrompt })
+      })
+      if (!res.ok) {
+        throw new Error(await res.text())
+      }
+      const data = await res.json()
+      if (data.nodes) {
+        setNodes(data.nodes)
+      }
+      if (data.edges) {
+        setEdges(data.edges)
+      }
+      setShowAiInput(false)
+      setAiPrompt('')
+    } catch (err) {
+      console.error('Failed to generate diagram:', err)
+      alert('Gagal membuat diagram: ' + String(err))
+    } finally {
+      setAiLoading(false)
+    }
+  }
+
   const onConnect = useCallback(
     (params: Connection) => setEdges(eds => addEdge(params, eds)),
     [setEdges]
@@ -387,7 +420,7 @@ export function EditDiagramDialog({
           </DialogTitle>
         </DialogHeader>
 
-        <div style={{ display: 'flex', gap: 8, padding: '10px 20px', borderBottom: '1px solid var(--border)', flexShrink: 0 }}>
+        <div style={{ display: 'flex', gap: 8, padding: '10px 20px', borderBottom: '1px solid var(--border)', flexShrink: 0, alignItems: 'center' }}>
           {NODE_TYPES_AVAILABLE.map(t => (
             <button
               key={t}
@@ -404,6 +437,90 @@ export function EditDiagramDialog({
               + {t}
             </button>
           ))}
+
+          {showAiInput ? (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginLeft: 'auto', maxWidth: '60%', width: '400px' }}>
+              <input
+                value={aiPrompt}
+                onChange={e => setAiPrompt(e.target.value)}
+                placeholder="Deskripsikan diagram (e.g. Alur Autentikasi JWT)..."
+                disabled={aiLoading}
+                style={{
+                  flex: 1,
+                  padding: '4px 10px',
+                  fontSize: '0.8125rem',
+                  borderRadius: 6,
+                  border: '1px solid var(--border)',
+                  background: 'var(--bg)',
+                  color: 'var(--fg)',
+                  outline: 'none',
+                }}
+                onKeyDown={e => {
+                  if (e.key === 'Enter') generateWithAi()
+                  if (e.key === 'Escape') setShowAiInput(false)
+                }}
+              />
+              <button
+                onClick={generateWithAi}
+                disabled={aiLoading}
+                style={{
+                  padding: '4px 12px',
+                  fontSize: '0.8125rem',
+                  borderRadius: 6,
+                  border: 'none',
+                  background: 'var(--primary)',
+                  color: 'var(--primary-fg)',
+                  cursor: 'pointer',
+                  fontWeight: 500,
+                }}
+              >
+                {aiLoading ? 'Membuat...' : 'Buat'}
+              </button>
+              <button
+                onClick={() => setShowAiInput(false)}
+                disabled={aiLoading}
+                style={{
+                  padding: '4px 10px',
+                  fontSize: '0.8125rem',
+                  borderRadius: 6,
+                  border: '1px solid var(--border)',
+                  background: 'transparent',
+                  cursor: 'pointer',
+                  color: 'var(--fg-muted)',
+                }}
+              >
+                Batal
+              </button>
+            </div>
+          ) : (
+            <button
+              onClick={() => setShowAiInput(true)}
+              style={{
+                marginLeft: 'auto',
+                padding: '4px 12px',
+                fontSize: '0.8125rem',
+                fontFamily: 'var(--font-body)',
+                border: '1px solid #a855f7',
+                borderRadius: 6,
+                background: 'rgba(168, 85, 247, 0.1)',
+                cursor: 'pointer',
+                color: '#c084fc',
+                fontWeight: 600,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 6,
+                transition: 'all 0.15s',
+              }}
+              onMouseEnter={e => {
+                e.currentTarget.style.background = 'rgba(168, 85, 247, 0.2)'
+              }}
+              onMouseLeave={e => {
+                e.currentTarget.style.background = 'rgba(168, 85, 247, 0.1)'
+              }}
+            >
+              <span>Generate dengan AI ✨</span>
+            </button>
+          )}
         </div>
 
         <div style={{ flex: 1, minHeight: 0 }}>

@@ -1051,6 +1051,25 @@ app.post('/api/ai/tags', authMiddleware, async (c) => {
   }
 })
 
+app.post('/api/ai/diagram', authMiddleware, async (c) => {
+  try {
+    const body = await c.req.json() as any
+    const forwardRes = await fetch(`${AI_AGENT_URL}/api/diagram`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    })
+    if (!forwardRes.ok) {
+      const errText = await forwardRes.text()
+      return c.json({ error: `AI service error: ${errText}` }, forwardRes.status as any)
+    }
+    const data = await forwardRes.json()
+    return c.json(data)
+  } catch (err) {
+    return c.json({ error: `Failed to communicate with AI agent: ${String(err)}` }, 500)
+  }
+})
+
 // Hono handler wrapper for backward compatibility with Vite middleware and server.ts
 const nodeHandler = getRequestListener(app.fetch)
 

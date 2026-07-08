@@ -980,3 +980,74 @@ async def get_chat_history(session_id: str):
 @app.get("/agent")
 async def run_agent():
     return {"status": "running", "database_url": os.getenv("DATABASE_URL")}
+
+class DiagramRequest(BaseModel):
+    prompt: str
+    note_content: str | None = None
+    note_title: str | None = None
+
+@app.post("/api/diagram")
+async def generate_diagram(request: DiagramRequest):
+    try:
+        from openai import AsyncOpenAI
+        client = AsyncOpenAI(
+            api_key=os.getenv("OPENROUTER_API_KEY"),
+            base_url=os.getenv("OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1"),
+        )
+        model = os.getenv("OPENROUTER_MODEL", "google/gemini-2.5-flash:free")
+
+        system_instruction = (
+            "You are an expert flowchart and diagram generator.\n"
+            "Your task is to generate a structured JSON object representing a ReactFlow diagram based on the user's prompt.\n"
+            "The JSON object MUST follow this exact structure:\n"
+            "{\n"
+            '  "nodes": [\n'
+            '    {\n'
+            '      "id": "unique-string-id",\n'
+            '      "type": "rectangle" | "circle" | "diamond",\n'
+            '      "position": { "x": number, "y": number },\n'
+            '      "data": { "label": "Node Label Text" }\n'
+            '    }\n'
+            '  ],\n'
+            '  "edges": [\n'
+            '    {\n'
+            '      "id": "edge-id-string",\n'
+            '      "source": "source-node-id",\n'
+            '      "target": "target-node-id"\n'
+            '    }\n'
+            '  ]\n'
+            "}\n\n"
+            "Rules for layout and styling:\n"
+            "1. Node Types:\n"
+            "   - 'circle': Use for start, end, or simple terminators.\n"
+            "   - 'rectangle': Use for standard process steps.\n"
+            "   - 'diamond': Use for decision points (e.g., 'Is authenticated?', 'Yes/No').\n"
+            "2. Coordinates and Spacing:\n"
+            "   - Plan the coordinates (x, y) carefully so that there is no overlap and the flow is clear.\n"
+            "   - Flow direction: Top-to-Bottom. Standard vertical spacing between levels should be 100-150px (e.g., y=50, y=180, y=310).\n"
+            "   - Horizontal spacing: Nodes on the same horizontal level should be spaced 150-200px apart (e.g., x=100, x=300, x=500).\n"
+            "   - Align nodes centered around x=300 for a symmetrical vertical flow.\n"
+            "3. Return ONLY a valid JSON object. Do not include markdown codeblock wrappers, backticks, or extra text."
+        )
+
+        user_message = f"Prompt: {request.prompt}"
+        if request.note_title or request.note_content:
+            user_message += f"\n\nContext Note Title: {request.note_title or ''}\nContext Note Content:\n{request.note_content or ''}"
+
+        response = await client.chat.completions.create(
+            model=model,
+            messages=[
+                {"role": "system", "content": system_instruction},
+                {"role": "user", "content": user_message}
+            ],
+            response_format={"type": "json_object"},
+            temperature=0.2,
+        )
+
+        result_str = response.choices[0].message.content.strip()
+        data = json.loads(result_str)
+        return data
+
+    except Exception as e:
+        logger.error(f"[diagram generation error] {e}")
+        raise HTTPException(status_code=500, detail=str(e))
