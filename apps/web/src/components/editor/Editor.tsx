@@ -274,9 +274,13 @@ const EMOJI_OPTIONS = [
   '🏠', '✈️', '🍀', '🍎', '🍕', '⚽', '🎸', '🐱', '🐶', '🦊', '🌍', '❤️'
 ]
 
-function EmojiSelector({ currentIcon, onSelect, onRemove }: { currentIcon: string; onSelect: (emoji: string) => void; onRemove: () => void }) {
+function EmojiSelector({ currentIcon, onSelect, onRemove, onOpenChange }: { currentIcon: string; onSelect: (emoji: string) => void; onRemove: () => void; onOpenChange?: (open: boolean) => void }) {
   const [open, setOpen] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    onOpenChange?.(open)
+  }, [open, onOpenChange])
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -489,6 +493,7 @@ export function Editor({ note, onUpdate, onSaveStatusChange, onLockChange, share
   const [icon, setIcon] = useState<string | null>(note.icon ?? null)
 
   const [isMobile, setIsMobile] = useState(false)
+  const [isEmojiPickerOpen, setIsEmojiPickerOpen] = useState(false)
 
   async function updatePageDecorator(fields: { coverImage?: string | null; icon?: string | null }) {
     if (fields.coverImage !== undefined) setCoverImage(fields.coverImage)
@@ -1448,13 +1453,13 @@ export function Editor({ note, onUpdate, onSaveStatusChange, onLockChange, share
                   position: 'absolute',
                   top: isMobile ? '-50px' : '-60px',
                   left: isMobile ? '16px' : '60px',
-                  zIndex: 10,
+                  zIndex: isEmojiPickerOpen ? 200 : 10,
                   display: 'inline-block'
                 } : {
                   marginTop: '16px',
                   marginBottom: '16px',
                   position: 'relative',
-                  zIndex: 10,
+                  zIndex: isEmojiPickerOpen ? 200 : 10,
                   display: 'inline-block'
                 }}
               >
@@ -1462,6 +1467,7 @@ export function Editor({ note, onUpdate, onSaveStatusChange, onLockChange, share
                   currentIcon={icon}
                   onSelect={(emoji) => updatePageDecorator({ icon: emoji })}
                   onRemove={() => updatePageDecorator({ icon: null })}
+                  onOpenChange={setIsEmojiPickerOpen}
                 />
               </div>
             ) : null}
