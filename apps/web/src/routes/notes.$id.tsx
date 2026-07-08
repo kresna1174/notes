@@ -41,13 +41,15 @@ function NoteLoadingSkeleton() {
 
 type SaveStatus = 'saved' | 'saving' | 'unsaved' | 'generating'
 
-function SaveIndicator({ status, sidebarOpen, isMobile }: { status: SaveStatus; sidebarOpen: boolean; isMobile: boolean }) {
+function SaveIndicator({ status, sidebarOpen, isMobile, historyOpen }: { status: SaveStatus; sidebarOpen: boolean; isMobile: boolean; historyOpen: boolean }) {
   if (isMobile && sidebarOpen) return null
+
+  const bottomOffset = historyOpen ? 280 + 12 : 20
 
   return (
     <div style={{
       position: 'absolute',
-      bottom: 20,
+      bottom: bottomOffset,
       right: sidebarOpen ? 404 : 24,
       display: 'flex',
       alignItems: 'center',
@@ -60,7 +62,7 @@ function SaveIndicator({ status, sidebarOpen, isMobile }: { status: SaveStatus; 
       borderRadius: 20,
       padding: '5px 12px',
       boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
-      transition: 'right 0.2s ease, color 0.2s',
+      transition: 'right 0.2s ease, bottom 0.2s ease, color 0.2s',
       pointerEvents: 'none',
       zIndex: 50,
     }}>
@@ -269,7 +271,7 @@ function NotePageComponent() {
             </button>
           </div>
         )}
-        {note && isContentVisible && <SaveIndicator status={saveStatus} sidebarOpen={chatOpen || historyOpen} isMobile={isMobile} />}
+        {note && isContentVisible && <SaveIndicator status={saveStatus} sidebarOpen={chatOpen} isMobile={isMobile} historyOpen={historyOpen} />}
       </main>
 
       {showUnlockModal && (
