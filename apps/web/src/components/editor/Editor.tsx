@@ -739,8 +739,19 @@ export function Editor({ note, onUpdate, onSaveStatusChange, onLockChange, share
     return () => window.removeEventListener('open-ai-prompt-bar', handleOpenAi)
   }, [editor])
 
-  async function handleAiGenerate() {
-    if (!aiPromptText.trim() || !editor) return
+  useEffect(() => {
+    function handleTriggerAi(e: Event) {
+      const customEvent = e as CustomEvent<{ prompt: string }>
+      const prompt = customEvent.detail.prompt
+      handleAiGenerate(prompt)
+    }
+    window.addEventListener('trigger-ai-action', handleTriggerAi)
+    return () => window.removeEventListener('trigger-ai-action', handleTriggerAi)
+  }, [editor, aiPromptText])
+
+  async function handleAiGenerate(overridePrompt?: string) {
+    const prompt = overridePrompt || aiPromptText
+    if (!prompt.trim() || !editor) return
     setAiLoading(true)
     setStatus('generating')
     
@@ -773,8 +784,10 @@ export function Editor({ note, onUpdate, onSaveStatusChange, onLockChange, share
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          message: aiPromptText,
-          session_id: note.id
+          message: prompt,
+          session_id: note.id,
+          note_title: note.title,
+          note_content: editor.getText()
         })
       })
 
