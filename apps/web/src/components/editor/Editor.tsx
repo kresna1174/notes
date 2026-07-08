@@ -1237,7 +1237,7 @@ export function Editor({ note, onUpdate, onSaveStatusChange, onLockChange, share
               justifyContent: 'flex-end', 
               alignItems: 'center', 
               gap: isMobile ? 6 : 8,
-              zIndex: 100,
+              zIndex: 30,
               background: 'var(--bg)',
               padding: isMobile ? '12px 16px' : '16px 60px',
               margin: isMobile ? '-64px -16px 24px' : '-40px -60px 32px',
