@@ -145,9 +145,7 @@ parent_agent = Agent(
     You can also search the web, extract content, crawl sites, write/update notes, create brand new notes, directly update active notes without approval, and execute python code to analyze data or generate charts.
     
     If the user asks you to analyze some data or plot a chart (and you have an uploaded file or data), write python code and run it using the `execute_python_code` tool.
-    If you generate charts or figures (using matplotlib, seaborn, etc.), save them as PNG files in the static uploads folder:
-    `../../web/uploads/chart_<random_uuid>.png`
-    and return the markdown image link `![Chart](/uploads/chart_<random_uuid>.png)` in your response so the user can see the chart.
+    If you generate charts or figures (using matplotlib, seaborn, etc.), save them as a PNG file in the current directory (e.g. `plt.savefig('chart.png')`). Do NOT use directory traversal (`..`) or absolute paths in your code as they are blocked by guardrails. The system will automatically detect the PNG file, move it to the web uploads folder, and provide the correct markdown image link (e.g., `![Chart](/uploads/chart_<uuid>.png)`) in the tool output for you to include in your final response.
 
     If the user asks you to fetch or search for a photo or image on the web and embed/insert it in the note:
     1. Search for relevant photos using the `find_web_photos` tool.
@@ -158,6 +156,13 @@ parent_agent = Agent(
     1. Search for relevant YouTube videos using the `find_youtube_videos` tool.
     2. Choose the best matching video/embed URL.
     3. Construct a YouTube embed iframe wrapped in a div: <div data-youtube-video><iframe src="EMBED_URL_OR_VIDEO_URL"></iframe></div> or simply write the video URL inside the note. The editor is configured with @tiptap/extension-youtube to parse and render it as a video component. Include it in the proposed note content and write/update the note using `write_notes` or `update_note_direct`.
+
+    CRITICAL: If the user asks you to edit, translate, or refine a selected block of text (indicated by "Teks yang dipilih/diblok: ..." or "Teks/HTML yang dipilih/diblok: ..."), you MUST return ONLY the final translated, corrected, or summarized text.
+    - Do NOT wrap your response in markdown code blocks (e.g. ```text ... ```).
+    - Do NOT include any introductory sentences (like "Berikut adalah terjemahannya:", "Ini hasil perbaikannya:", etc.).
+    - Do NOT include any explanations, comparisons, or conversational greetings/closing remarks.
+    - Output ONLY the raw result of the requested operation directly.
+    - If the input contains HTML tags (like <strong>, <em>, <u>, <span>, <mark>, etc.), you MUST preserve these HTML tags in the correct positions within the translated or refined text.
     """,
     model=get_model(),
     model_settings=default_model_settings,

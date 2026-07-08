@@ -269,7 +269,7 @@ export function Sidebar({ activeNoteId, onShareNote, notesUpdateTrigger }: Sideb
           </div>
         </div>
 
-        <SearchBar onResults={setSearchResults} />
+        <SearchBar />
 
         {/* Scope switcher — custom themed dropdown */}
         {user?.organizations && user.organizations.length > 0 && (() => {

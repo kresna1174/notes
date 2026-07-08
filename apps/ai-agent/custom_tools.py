@@ -15,7 +15,10 @@ import tempfile
 import ast
 
 def format_as_tiptap(text: str) -> str:
-    """Check if the text is already JSON. If not, wrap it in standard TipTap format."""
+    """
+    Check if the text is already JSON. If not, convert it from Markdown to HTML 
+    so that Tiptap can parse all headings, lists, links, images, and videos correctly on the frontend.
+    """
     if not text:
         return json.dumps({"type": "doc", "content": []})
     try:
@@ -24,19 +27,14 @@ def format_as_tiptap(text: str) -> str:
     except ValueError:
         pass
     
-    lines = text.split("\n")
-    paragraphs = []
-    for line in lines:
-        if line.strip() or not paragraphs:
-            paragraphs.append({
-                "type": "paragraph",
-                "content": [{"type": "text", "text": line}]
-            })
-    tiptap_doc = {
-        "type": "doc",
-        "content": paragraphs
-    }
-    return json.dumps(tiptap_doc)
+    try:
+        import markdown
+        # Enable extensions like extra (for tables, list styles) and nl2br (for line breaks)
+        html_content = markdown.markdown(text, extensions=['extra', 'nl2br'])
+        return html_content
+    except Exception:
+        # Fallback to wrapping as paragraph if markdown fails
+        return f"<p>{text}</p>"
 
 @function_tool
 def write_notes(
@@ -344,9 +342,9 @@ def execute_python_code(code: str) -> str:
     Execute python code in a temporary subprocess sandbox inside the `.sandbox` directory.
     This is highly useful for data analysis, complex calculations, and visualization (like generating charts using matplotlib).
     
-    If you generate charts or figures (using matplotlib, seaborn, etc.), you MUST save them as PNG files in the static uploads folder:
-    `../../web/uploads/chart_<random_uuid>.png`
-    and return the markdown image link `![Chart](/uploads/chart_<random_uuid>.png)` in your response so the user can see the chart.
+    If you generate charts or figures (using matplotlib, seaborn, etc.), save them as a PNG file in the current directory (e.g. `plt.savefig('my_chart.png')`).
+    Do NOT use directory traversal (`..`) or absolute paths in your code.
+    The system will automatically detect the PNG file, move it to the web uploads folder, and return the correct markdown link.
     
     Args:
         code: The complete python code string to execute.
@@ -368,6 +366,12 @@ def execute_python_code(code: str) -> str:
                 f_git.write("# Ignore all files in this sandbox directory\n*\n!.gitignore\n")
         except Exception:
             pass
+
+    # Scan for existing PNG files in the sandbox
+    try:
+        initial_pngs = {f for f in os.listdir(sandbox_dir) if f.endswith('.png')}
+    except Exception:
+        initial_pngs = set()
 
     # Create temporary script file inside the sandbox directory
     temp_filename = f"sandbox_run_{uuid.uuid4().hex[:8]}.py"
@@ -396,11 +400,42 @@ def execute_python_code(code: str) -> str:
             timeout=30 # 30 seconds limit
         )
         
+        # Check for newly generated PNG files
+        try:
+            final_pngs = {f for f in os.listdir(sandbox_dir) if f.endswith('.png')}
+        except Exception:
+            final_pngs = set()
+            
+        new_pngs = final_pngs - initial_pngs
+        
+        # Define uploads directory relative to this file
+        uploads_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "web", "uploads"))
+        os.makedirs(uploads_dir, exist_ok=True)
+        
+        generated_charts = []
+        for png in new_pngs:
+            src_path = os.path.join(sandbox_dir, png)
+            new_filename = f"chart_{uuid.uuid4().hex[:12]}.png"
+            dest_path = os.path.join(uploads_dir, new_filename)
+            
+            try:
+                import shutil
+                shutil.copy2(src_path, dest_path)
+                # Keep file in sandbox for user inspection
+                # os.unlink(src_path)
+                generated_charts.append(f"![Chart](/uploads/{new_filename})")
+            except Exception:
+                pass
+
         output_parts = []
         if result.stdout:
             output_parts.append(f"STDOUT:\n{result.stdout}")
         if result.stderr:
             output_parts.append(f"STDERR:\n{result.stderr}")
+            
+        if generated_charts:
+            charts_str = "\n".join(generated_charts)
+            output_parts.append(f"GENERATED CHARTS:\n{charts_str}\nYou can use these markdown image links in your response to show the chart to the user.")
             
         if not output_parts:
             return "Execution completed successfully with no output (empty stdout/stderr)."
@@ -411,9 +446,10 @@ def execute_python_code(code: str) -> str:
     except Exception as e:
         return f"Execution Error: {str(e)}"
     finally:
-        # Clean up the script file inside the sandbox
-        try:
-            if os.path.exists(temp_file_path):
-                os.unlink(temp_file_path)
-        except Exception:
-            pass
+        # Keep script file in sandbox for user inspection
+        # try:
+        #     if os.path.exists(temp_file_path):
+        #         os.unlink(temp_file_path)
+        # except Exception:
+        #     pass
+        pass

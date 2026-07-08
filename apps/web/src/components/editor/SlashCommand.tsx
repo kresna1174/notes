@@ -146,8 +146,9 @@ const COMMANDS = [
     icon: Paperclip,
     command: ({ editor, range }: any) => editor.chain().focus().deleteRange(range).insertContent({ type: 'attachment', attrs: {} }).run()
   },
+  // AI Assistants
   {
-    category: 'Media & Advanced',
+    category: 'Asisten AI',
     title: 'Tulis dengan AI',
     description: 'Hasilkan teks otomatis menggunakan asisten AI.',
     icon: Sparkles,

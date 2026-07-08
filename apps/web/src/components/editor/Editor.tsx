@@ -33,8 +33,9 @@ import { TableOfContentsBlock } from './TableOfContentsBlock'
 import { WebBookmarkBlock } from './WebBookmarkBlock'
 import { ToggleBlock } from './ToggleBlock'
 import { DragHandle } from './DragHandle'
+import { NoteIcon } from '../ui/NoteIcon'
 import { useEffect, useRef, useState, useMemo } from 'react'
-import { Eye, EyeOff, Lock, LockOpen, Share2, FileUp, Paperclip, Sparkles } from 'lucide-react'
+import { Eye, EyeOff, Lock, LockOpen, Share2, FileUp, Paperclip, Sparkles, Smile, Image as ImageIcon } from 'lucide-react'
 import { marked } from 'marked'
 import mammoth from 'mammoth'
 import * as XLSX from 'xlsx'
@@ -273,9 +274,13 @@ const EMOJI_OPTIONS = [
   '🏠', '✈️', '🍀', '🍎', '🍕', '⚽', '🎸', '🐱', '🐶', '🦊', '🌍', '❤️'
 ]
 
-function EmojiSelector({ currentIcon, onSelect, onRemove }: { currentIcon: string; onSelect: (emoji: string) => void; onRemove: () => void }) {
+function EmojiSelector({ currentIcon, onSelect, onRemove, onOpenChange }: { currentIcon: string; onSelect: (emoji: string) => void; onRemove: () => void; onOpenChange?: (open: boolean) => void }) {
   const [open, setOpen] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    onOpenChange?.(open)
+  }, [open, onOpenChange])
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -307,7 +312,7 @@ function EmojiSelector({ currentIcon, onSelect, onRemove }: { currentIcon: strin
           height: '78px',
         }}
       >
-        {currentIcon}
+        <NoteIcon icon={currentIcon} size={48} />
       </button>
 
       {open && (
@@ -488,6 +493,7 @@ export function Editor({ note, onUpdate, onSaveStatusChange, onLockChange, share
   const [icon, setIcon] = useState<string | null>(note.icon ?? null)
 
   const [isMobile, setIsMobile] = useState(false)
+  const [isEmojiPickerOpen, setIsEmojiPickerOpen] = useState(false)
 
   async function updatePageDecorator(fields: { coverImage?: string | null; icon?: string | null }) {
     if (fields.coverImage !== undefined) setCoverImage(fields.coverImage)
@@ -739,12 +745,52 @@ export function Editor({ note, onUpdate, onSaveStatusChange, onLockChange, share
     return () => window.removeEventListener('open-ai-prompt-bar', handleOpenAi)
   }, [editor])
 
-  async function handleAiGenerate() {
-    if (!aiPromptText.trim() || !editor) return
+  useEffect(() => {
+    function handleTriggerAi(e: Event) {
+      const customEvent = e as CustomEvent<{ prompt: string; action?: 'replace' | 'insert_below' | 'append_to_end'; from?: number; to?: number }>
+      const { prompt, action, from, to } = customEvent.detail
+      handleAiGenerate(prompt, action, from, to)
+    }
+    window.addEventListener('trigger-ai-action', handleTriggerAi)
+    return () => window.removeEventListener('trigger-ai-action', handleTriggerAi)
+  }, [editor, aiPromptText])
+
+  async function handleAiGenerate(
+    overridePrompt?: string,
+    action?: 'replace' | 'insert_below' | 'append_to_end',
+    from?: number,
+    to?: number
+  ) {
+    const prompt = overridePrompt || aiPromptText
+    if (!prompt.trim() || !editor) return
     setAiLoading(true)
     setStatus('generating')
     
-    const startPos = editor.state.selection.from
+    let startPos = editor.state.selection.from
+    let endPos = editor.state.selection.to
+
+    if (from !== undefined && to !== undefined) {
+      startPos = from
+      endPos = to
+    }
+
+    if (action === 'replace') {
+      editor.chain().focus().deleteRange({ from: startPos, to: endPos }).run()
+      editor.commands.setTextSelection(startPos)
+    } else if (action === 'insert_below') {
+      editor.commands.setTextSelection(endPos)
+      editor.chain().focus().insertContent('\n').run()
+      startPos = editor.state.selection.from
+    } else if (action === 'append_to_end') {
+      const docEnd = editor.state.doc.content.size
+      editor.commands.setTextSelection(docEnd)
+      editor.chain().focus().insertContent([
+        { type: 'heading', attrs: { level: 1 }, content: [{ type: 'text', text: 'Summary' }] },
+        { type: 'paragraph' }
+      ]).run()
+      startPos = editor.state.selection.from
+    }
+
     let fullText = ''
     let promptBarClosed = false
 
@@ -773,8 +819,10 @@ export function Editor({ note, onUpdate, onSaveStatusChange, onLockChange, share
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          message: aiPromptText,
-          session_id: note.id
+          message: prompt,
+          session_id: note.id,
+          note_title: note.title,
+          note_content: editor.getText()
         })
       })
 
@@ -1179,8 +1227,59 @@ export function Editor({ note, onUpdate, onSaveStatusChange, onLockChange, share
               position: 'relative',
             }}
           >
-            {/* Top-right action buttons */}
-            <div style={{ position: 'absolute', top: isMobile ? 12 : 20, right: isMobile ? 16 : 20, display: 'flex', alignItems: 'center', gap: isMobile ? 6 : 8 }}>
+            {/* Top-right action buttons (Sticky Action Bar) */}
+            <div style={{ 
+              position: 'sticky', 
+              top: 0, 
+              display: 'flex', 
+              justifyContent: 'flex-end', 
+              alignItems: 'center', 
+              gap: isMobile ? 6 : 8,
+              zIndex: 100,
+              background: 'var(--bg)',
+              padding: isMobile ? '12px 16px' : '16px 60px',
+              margin: isMobile ? '-64px -16px 24px' : '-40px -60px 32px',
+              borderBottom: '1px solid var(--border)',
+            }}>
+              {/* Add Icon (if not present) */}
+              {!icon && (
+                <button
+                  onClick={() => updatePageDecorator({ icon: '📝' })}
+                  title="Tambah Ikon"
+                  style={{
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    width: 32, height: 32,
+                    border: '1px solid var(--border)', borderRadius: '50%',
+                    background: 'var(--bg)',
+                    color: 'var(--fg-muted)',
+                    cursor: 'pointer', transition: 'all 0.15s',
+                  }}
+                  onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--primary)'; e.currentTarget.style.color = 'var(--primary)' }}
+                  onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.color = 'var(--fg-muted)' }}
+                >
+                  <Smile size={14} />
+                </button>
+              )}
+
+              {/* Add Cover (if not present) */}
+              {!coverImage && (
+                <button
+                  onClick={() => updatePageDecorator({ coverImage: COVER_GRADIENTS[0] })}
+                  title="Tambah Cover"
+                  style={{
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    width: 32, height: 32,
+                    border: '1px solid var(--border)', borderRadius: '50%',
+                    background: 'var(--bg)',
+                    color: 'var(--fg-muted)',
+                    cursor: 'pointer', transition: 'all 0.15s',
+                  }}
+                  onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--primary)'; e.currentTarget.style.color = 'var(--primary)' }}
+                  onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.color = 'var(--fg-muted)' }}
+                >
+                  <ImageIcon size={14} />
+                </button>
+              )}
               {/* Active Users Presence Indicator */}
               {activeUsers.length > 1 && (
                 <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginRight: 8 }}>
@@ -1349,69 +1448,31 @@ export function Editor({ note, onUpdate, onSaveStatusChange, onLockChange, share
 
             {/* Page Icon (Emoji Selector) */}
             {icon ? (
-              <div style={{ marginTop: coverImage ? '-75px' : '0', marginBottom: '16px', position: 'relative', zIndex: 10, display: 'inline-block' }}>
+              <div 
+                style={coverImage ? {
+                  position: 'absolute',
+                  top: isMobile ? '-50px' : '-60px',
+                  left: isMobile ? '16px' : '60px',
+                  zIndex: isEmojiPickerOpen ? 200 : 10,
+                  display: 'inline-block'
+                } : {
+                  marginTop: '16px',
+                  marginBottom: '16px',
+                  position: 'relative',
+                  zIndex: isEmojiPickerOpen ? 200 : 10,
+                  display: 'inline-block'
+                }}
+              >
                 <EmojiSelector
                   currentIcon={icon}
                   onSelect={(emoji) => updatePageDecorator({ icon: emoji })}
                   onRemove={() => updatePageDecorator({ icon: null })}
+                  onOpenChange={setIsEmojiPickerOpen}
                 />
               </div>
             ) : null}
 
-            {/* Add Icon / Add Cover Quick Actions */}
-            {(!coverImage || !icon) && (
-              <div
-                style={{
-                  display: 'flex',
-                  gap: '12px',
-                  marginBottom: '16px',
-                  fontSize: '0.8rem',
-                  color: 'var(--fg-subtle)',
-                }}
-                className="opacity-0 hover:opacity-100 focus-within:opacity-100 transition-opacity duration-200"
-              >
-                {!icon && (
-                  <button
-                    onClick={() => updatePageDecorator({ icon: '📝' })}
-                    style={{
-                      background: 'transparent',
-                      border: 'none',
-                      color: 'var(--fg-muted)',
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '4px',
-                      padding: '2px 6px',
-                      borderRadius: '4px',
-                    }}
-                    onMouseEnter={e => (e.currentTarget.style.backgroundColor = 'var(--accent)')}
-                    onMouseLeave={e => (e.currentTarget.style.backgroundColor = 'transparent')}
-                  >
-                    ➕ Tambah Ikon
-                  </button>
-                )}
-                {!coverImage && (
-                  <button
-                    onClick={() => updatePageDecorator({ coverImage: COVER_GRADIENTS[0] })}
-                    style={{
-                      background: 'transparent',
-                      border: 'none',
-                      color: 'var(--fg-muted)',
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '4px',
-                      padding: '2px 6px',
-                      borderRadius: '4px',
-                    }}
-                    onMouseEnter={e => (e.currentTarget.style.backgroundColor = 'var(--accent)')}
-                    onMouseLeave={e => (e.currentTarget.style.backgroundColor = 'transparent')}
-                  >
-                    ➕ Tambah Cover
-                  </button>
-                )}
-              </div>
-            )}
+            {/* Add Icon / Add Cover Quick Actions (moved to header) */}
 
             {/* metadata bar */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', marginBottom: 20, fontSize: '0.75rem', color: 'var(--fg-subtle)', fontFamily: 'var(--font-body)', marginTop: isMobile ? 8 : 0 }}>
