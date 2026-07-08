@@ -1221,8 +1221,20 @@ export function Editor({ note, onUpdate, onSaveStatusChange, onLockChange, share
               position: 'relative',
             }}
           >
-            {/* Top-right action buttons */}
-            <div style={{ position: 'absolute', top: isMobile ? 12 : 20, right: isMobile ? 16 : 20, display: 'flex', alignItems: 'center', gap: isMobile ? 6 : 8 }}>
+            {/* Top-right action buttons (Sticky Action Bar) */}
+            <div style={{ 
+              position: 'sticky', 
+              top: 0, 
+              display: 'flex', 
+              justifyContent: 'flex-end', 
+              alignItems: 'center', 
+              gap: isMobile ? 6 : 8,
+              zIndex: 100,
+              background: 'var(--bg)',
+              padding: isMobile ? '12px 16px' : '16px 60px',
+              margin: isMobile ? '-64px -16px 24px' : '-40px -60px 32px',
+              borderBottom: '1px solid var(--border)',
+            }}>
               {/* Add Icon (if not present) */}
               {!icon && (
                 <button
