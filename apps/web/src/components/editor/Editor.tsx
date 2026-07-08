@@ -34,7 +34,7 @@ import { WebBookmarkBlock } from './WebBookmarkBlock'
 import { ToggleBlock } from './ToggleBlock'
 import { DragHandle } from './DragHandle'
 import { useEffect, useRef, useState, useMemo } from 'react'
-import { Eye, EyeOff, Lock, LockOpen, Share2, FileUp, Paperclip, Sparkles } from 'lucide-react'
+import { Eye, EyeOff, Lock, LockOpen, Share2, FileUp, Paperclip, Sparkles, Smile, Image as ImageIcon } from 'lucide-react'
 import { marked } from 'marked'
 import mammoth from 'mammoth'
 import * as XLSX from 'xlsx'
@@ -1223,6 +1223,45 @@ export function Editor({ note, onUpdate, onSaveStatusChange, onLockChange, share
           >
             {/* Top-right action buttons */}
             <div style={{ position: 'absolute', top: isMobile ? 12 : 20, right: isMobile ? 16 : 20, display: 'flex', alignItems: 'center', gap: isMobile ? 6 : 8 }}>
+              {/* Add Icon (if not present) */}
+              {!icon && (
+                <button
+                  onClick={() => updatePageDecorator({ icon: '📝' })}
+                  title="Tambah Ikon"
+                  style={{
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    width: 32, height: 32,
+                    border: '1px solid var(--border)', borderRadius: '50%',
+                    background: 'var(--bg)',
+                    color: 'var(--fg-muted)',
+                    cursor: 'pointer', transition: 'all 0.15s',
+                  }}
+                  onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--primary)'; e.currentTarget.style.color = 'var(--primary)' }}
+                  onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.color = 'var(--fg-muted)' }}
+                >
+                  <Smile size={14} />
+                </button>
+              )}
+
+              {/* Add Cover (if not present) */}
+              {!coverImage && (
+                <button
+                  onClick={() => updatePageDecorator({ coverImage: COVER_GRADIENTS[0] })}
+                  title="Tambah Cover"
+                  style={{
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    width: 32, height: 32,
+                    border: '1px solid var(--border)', borderRadius: '50%',
+                    background: 'var(--bg)',
+                    color: 'var(--fg-muted)',
+                    cursor: 'pointer', transition: 'all 0.15s',
+                  }}
+                  onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--primary)'; e.currentTarget.style.color = 'var(--primary)' }}
+                  onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.color = 'var(--fg-muted)' }}
+                >
+                  <ImageIcon size={14} />
+                </button>
+              )}
               {/* Active Users Presence Indicator */}
               {activeUsers.length > 1 && (
                 <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginRight: 8 }}>
@@ -1400,60 +1439,7 @@ export function Editor({ note, onUpdate, onSaveStatusChange, onLockChange, share
               </div>
             ) : null}
 
-            {/* Add Icon / Add Cover Quick Actions */}
-            {(!coverImage || !icon) && (
-              <div
-                style={{
-                  display: 'flex',
-                  gap: '12px',
-                  marginBottom: '16px',
-                  fontSize: '0.8rem',
-                  color: 'var(--fg-subtle)',
-                }}
-                className="opacity-0 hover:opacity-100 focus-within:opacity-100 transition-opacity duration-200"
-              >
-                {!icon && (
-                  <button
-                    onClick={() => updatePageDecorator({ icon: '📝' })}
-                    style={{
-                      background: 'transparent',
-                      border: 'none',
-                      color: 'var(--fg-muted)',
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '4px',
-                      padding: '2px 6px',
-                      borderRadius: '4px',
-                    }}
-                    onMouseEnter={e => (e.currentTarget.style.backgroundColor = 'var(--accent)')}
-                    onMouseLeave={e => (e.currentTarget.style.backgroundColor = 'transparent')}
-                  >
-                    ➕ Tambah Ikon
-                  </button>
-                )}
-                {!coverImage && (
-                  <button
-                    onClick={() => updatePageDecorator({ coverImage: COVER_GRADIENTS[0] })}
-                    style={{
-                      background: 'transparent',
-                      border: 'none',
-                      color: 'var(--fg-muted)',
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '4px',
-                      padding: '2px 6px',
-                      borderRadius: '4px',
-                    }}
-                    onMouseEnter={e => (e.currentTarget.style.backgroundColor = 'var(--accent)')}
-                    onMouseLeave={e => (e.currentTarget.style.backgroundColor = 'transparent')}
-                  >
-                    ➕ Tambah Cover
-                  </button>
-                )}
-              </div>
-            )}
+            {/* Add Icon / Add Cover Quick Actions (moved to header) */}
 
             {/* metadata bar */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', marginBottom: 20, fontSize: '0.75rem', color: 'var(--fg-subtle)', fontFamily: 'var(--font-body)', marginTop: isMobile ? 8 : 0 }}>
