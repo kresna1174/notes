@@ -33,6 +33,7 @@ import { TableOfContentsBlock } from './TableOfContentsBlock'
 import { WebBookmarkBlock } from './WebBookmarkBlock'
 import { ToggleBlock } from './ToggleBlock'
 import { DragHandle } from './DragHandle'
+import { NoteIcon } from '../ui/NoteIcon'
 import { useEffect, useRef, useState, useMemo } from 'react'
 import { Eye, EyeOff, Lock, LockOpen, Share2, FileUp, Paperclip, Sparkles, Smile, Image as ImageIcon } from 'lucide-react'
 import { marked } from 'marked'
@@ -307,7 +308,7 @@ function EmojiSelector({ currentIcon, onSelect, onRemove }: { currentIcon: strin
           height: '78px',
         }}
       >
-        {currentIcon}
+        <NoteIcon icon={currentIcon} size={48} />
       </button>
 
       {open && (
@@ -1442,7 +1443,21 @@ export function Editor({ note, onUpdate, onSaveStatusChange, onLockChange, share
 
             {/* Page Icon (Emoji Selector) */}
             {icon ? (
-              <div style={{ marginTop: coverImage ? '-75px' : '0', marginBottom: '16px', position: 'relative', zIndex: 10, display: 'inline-block' }}>
+              <div 
+                style={coverImage ? {
+                  position: 'absolute',
+                  top: isMobile ? '-50px' : '-60px',
+                  left: isMobile ? '16px' : '60px',
+                  zIndex: 10,
+                  display: 'inline-block'
+                } : {
+                  marginTop: '16px',
+                  marginBottom: '16px',
+                  position: 'relative',
+                  zIndex: 10,
+                  display: 'inline-block'
+                }}
+              >
                 <EmojiSelector
                   currentIcon={icon}
                   onSelect={(emoji) => updatePageDecorator({ icon: emoji })}

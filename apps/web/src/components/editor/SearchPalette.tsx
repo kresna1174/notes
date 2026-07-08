@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { Search, FileText, CornerDownLeft } from 'lucide-react'
+import { NoteIcon } from '../ui/NoteIcon'
 
 interface SearchResult {
   id: string
@@ -189,8 +190,8 @@ export function SearchPalette({ onClose, onSelectNote }: SearchPaletteProps) {
                       marginBottom: 4,
                     }}
                   >
-                    <div style={{ marginRight: 12, fontSize: '1.1rem', display: 'flex', alignItems: 'center' }}>
-                      {item.icon ? item.icon : <FileText size={16} style={{ color: isActive ? '#c084fc' : 'var(--fg-muted)' }} />}
+                    <div style={{ marginRight: 12, display: 'flex', alignItems: 'center', width: 16, height: 16, justifyContent: 'center' }}>
+                      {item.icon ? <NoteIcon icon={item.icon} size={16} /> : <FileText size={16} style={{ color: isActive ? '#c084fc' : 'var(--fg-muted)' }} />}
                     </div>
                     
                     <div style={{ flex: 1, minWidth: 0 }}>
