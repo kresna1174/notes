@@ -156,10 +156,16 @@ export function ExportModal({ note, onClose }: ExportModalProps) {
     clone.style.border = 'none'
     clone.style.borderRadius = '0'
     clone.style.margin = '0'
+    clone.style.background = printStyles.bg
+    clone.style.backgroundColor = printStyles.bg
 
     // Add page break helper styles to prevent elements from getting cut off across page boundaries
     const styleSheet = document.createElement('style')
     styleSheet.innerHTML = `
+      body, html {
+        background-color: ${printStyles.bg} !important;
+        background: ${printStyles.bg} !important;
+      }
       p, li, h1, h2, h3, h4, h5, h6, pre, table, tr, blockquote, img, .react-flow-wrapper {
         page-break-inside: avoid !important;
         break-inside: avoid-page !important;
