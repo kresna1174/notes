@@ -190,7 +190,7 @@ export function ExportModal({ note, onClose }: ExportModalProps) {
     document.body.appendChild(wrapper)
 
     const opt = {
-      margin:       [30, 30, 30, 30],
+      margin:       0,
       filename:     `${note.title.toLowerCase().replace(/[^a-z0-9]+/g, '_') || 'untitled'}.pdf`,
       image:        { type: 'jpeg', quality: 0.98 },
       html2canvas:  { 
