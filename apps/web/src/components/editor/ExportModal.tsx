@@ -287,7 +287,20 @@ export function ExportModal({ note, onClose }: ExportModalProps) {
         }
         case 'attachment': {
           const filename = node.attrs?.filename || 'attachment'
+          const mimeType = node.attrs?.mimeType || ''
+          const attachmentId = node.attrs?.attachmentId || ''
+          if (mimeType.startsWith('image/') && attachmentId) {
+            // Render as inline Markdown image using the inline API endpoint
+            const url = `${window.location.origin}/api/attachments/${attachmentId}/inline`
+            return `![${filename}](${url})\n\n`
+          }
           return `*[Lampiran: ${filename}]*\n\n`
+        }
+        case 'image': {
+          const src = node.attrs?.src || ''
+          const alt = node.attrs?.alt || 'image'
+          if (!src) return ''
+          return `![${alt}](${src})\n\n`
         }
         case 'webBookmark': {
           const url = node.attrs?.url || ''
