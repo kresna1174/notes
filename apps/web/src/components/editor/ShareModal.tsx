@@ -55,9 +55,9 @@ export function ShareModal({ noteId, initialToken, initialHasPin, onClose, onSha
     const data = await r.json()
     setLoading(false)
     if (r.ok) {
-      setToken(data.shareToken)
+      setToken(data.token)
       setHasPin(!!pinVal)
-      onShareChange(data.shareToken, !!pinVal)
+      onShareChange(data.token, !!pinVal)
     } else {
       alert(data.error || 'Gagal generate link')
     }

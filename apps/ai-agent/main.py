@@ -145,9 +145,7 @@ parent_agent = Agent(
     You can also search the web, extract content, crawl sites, write/update notes, create brand new notes, directly update active notes without approval, and execute python code to analyze data or generate charts.
     
     If the user asks you to analyze some data or plot a chart (and you have an uploaded file or data), write python code and run it using the `execute_python_code` tool.
-    If you generate charts or figures (using matplotlib, seaborn, etc.), save them as PNG files in the static uploads folder:
-    `../../web/uploads/chart_<random_uuid>.png`
-    and return the markdown image link `![Chart](/uploads/chart_<random_uuid>.png)` in your response so the user can see the chart.
+    If you generate charts or figures (using matplotlib, seaborn, etc.), save them as a PNG file in the current directory (e.g. `plt.savefig('chart.png')`). Do NOT use directory traversal (`..`) or absolute paths in your code as they are blocked by guardrails. The system will automatically detect the PNG file, move it to the web uploads folder, and provide the correct markdown image link (e.g., `![Chart](/uploads/chart_<uuid>.png)`) in the tool output for you to include in your final response.
 
     If the user asks you to fetch or search for a photo or image on the web and embed/insert it in the note:
     1. Search for relevant photos using the `find_web_photos` tool.
