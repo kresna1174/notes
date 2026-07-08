@@ -5,6 +5,7 @@ import { PinLockModal } from '../components/editor/PinLockModal'
 import { useState, useEffect } from 'react'
 import { Check, Loader2, Circle, PanelLeftClose, PanelLeftOpen, Sparkles } from 'lucide-react'
 import { ChatBot } from '../components/chat/ChatBot'
+import { VersionHistory } from '../components/editor/VersionHistory'
 import { SearchPalette } from '../components/editor/SearchPalette'
 
 
@@ -40,14 +41,14 @@ function NoteLoadingSkeleton() {
 
 type SaveStatus = 'saved' | 'saving' | 'unsaved' | 'generating'
 
-function SaveIndicator({ status, chatOpen, isMobile }: { status: SaveStatus; chatOpen: boolean; isMobile: boolean }) {
-  if (isMobile && chatOpen) return null
+function SaveIndicator({ status, sidebarOpen, isMobile }: { status: SaveStatus; sidebarOpen: boolean; isMobile: boolean }) {
+  if (isMobile && sidebarOpen) return null
 
   return (
     <div style={{
       position: 'absolute',
       bottom: 20,
-      right: chatOpen ? 404 : 24,
+      right: sidebarOpen ? 404 : 24,
       display: 'flex',
       alignItems: 'center',
       gap: 6,
@@ -84,6 +85,7 @@ function NotePageComponent() {
   const [sidebarVisible, setSidebarVisible] = useState(true)
   const [isMobile, setIsMobile] = useState(false)
   const [chatOpen, setChatOpen] = useState(false)
+  const [historyOpen, setHistoryOpen] = useState(false)
   const [showSearchPalette, setShowSearchPalette] = useState(false)
 
   useEffect(() => {
@@ -218,7 +220,15 @@ function NotePageComponent() {
               }}
               shareTrigger={shareTrigger}
               chatOpen={chatOpen}
-              onToggleChat={() => setChatOpen(v => !v)}
+              onToggleChat={() => {
+                setChatOpen(v => !v)
+                setHistoryOpen(false)
+              }}
+              historyOpen={historyOpen}
+              onToggleHistory={() => {
+                setHistoryOpen(v => !v)
+                setChatOpen(false)
+              }}
             />
             {chatOpen && (
               <ChatBot
@@ -226,6 +236,15 @@ function NotePageComponent() {
                 noteContent={note.content}
                 noteTitle={note.title}
                 onClose={() => setChatOpen(false)}
+              />
+            )}
+            {historyOpen && (
+              <VersionHistory
+                noteId={id}
+                onClose={() => setHistoryOpen(false)}
+                onRestore={(updatedNote) => {
+                  window.location.reload()
+                }}
               />
             )}
           </div>
@@ -245,7 +264,7 @@ function NotePageComponent() {
             </button>
           </div>
         )}
-        {note && isContentVisible && <SaveIndicator status={saveStatus} chatOpen={chatOpen} isMobile={isMobile} />}
+        {note && isContentVisible && <SaveIndicator status={saveStatus} sidebarOpen={chatOpen || historyOpen} isMobile={isMobile} />}
       </main>
 
       {showUnlockModal && (

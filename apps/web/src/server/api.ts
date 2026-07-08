@@ -1,7 +1,7 @@
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { createReadStream } from 'node:fs'
 import { db, sqlite } from '../lib/db'
-import { notes, attachments, users, organizations, userOrganizations } from '../../drizzle/schema'
+import { notes, attachments, users, organizations, userOrganizations, noteHistory } from '../../drizzle/schema'
 import { desc, eq, and, sql, or, inArray } from 'drizzle-orm'
 import { randomUUID } from 'crypto'
 import { saveFile, getFilePath, deleteFile } from '../lib/storage'
@@ -820,7 +820,31 @@ app.put('/api/notes/:id', authMiddleware, async (c) => {
   const [updated] = await db.select().from(notes).where(ownerFilter)
   if (!updated) return c.json({ error: 'not found' }, 404)
 
-
+  // Create auto-version snapshot if last version is older than 10 minutes or if there are no versions yet
+  try {
+    const lastHistory = await db.select()
+      .from(noteHistory)
+      .where(eq(noteHistory.noteId, id))
+      .orderBy(desc(noteHistory.createdAt))
+      .limit(1)
+      
+    const now = Date.now()
+    if (lastHistory.length === 0 || now - lastHistory[0].createdAt > 10 * 60 * 1000) {
+      await db.insert(noteHistory).values({
+        id: randomUUID(),
+        noteId: id,
+        title: updated.title,
+        content: updated.content,
+        coverImage: updated.coverImage,
+        icon: updated.icon,
+        createdById: session.userId,
+        createdAt: now,
+        versionName: 'Penyimpanan Otomatis'
+      })
+    }
+  } catch (err) {
+    console.error('Failed to auto-create note history snapshot:', err)
+  }
 
   return c.json(stripAndEnrich(updated))
 })
@@ -833,6 +857,79 @@ app.delete('/api/notes/:id', authMiddleware, async (c) => {
   const ownerFilter = await getOwnerFilter(id, session.userId, session.role)
   await db.delete(notes).where(ownerFilter)
   return c.json({ ok: true })
+})
+
+// --- VERSION HISTORY ACTIONS ---
+
+app.get('/api/notes/:id/history', authMiddleware, async (c) => {
+  const id = c.req.param('id')
+  const session = c.get('session')
+  const ownerFilter = await getOwnerFilter(id, session.userId, session.role)
+  
+  const [note] = await db.select().from(notes).where(ownerFilter)
+  if (!note) return c.json({ error: 'not found' }, 404)
+
+  const history = await db.select()
+    .from(noteHistory)
+    .where(eq(noteHistory.noteId, id))
+    .orderBy(desc(noteHistory.createdAt))
+
+  return c.json(history)
+})
+
+app.post('/api/notes/:id/history', authMiddleware, async (c) => {
+  const id = c.req.param('id')
+  const session = c.get('session')
+  const ownerFilter = await getOwnerFilter(id, session.userId, session.role)
+  const body = await c.req.json().catch(() => ({})) as { versionName?: string }
+  const versionName = body.versionName?.trim() || 'Snapshot Kustom'
+
+  const [note] = await db.select().from(notes).where(ownerFilter)
+  if (!note) return c.json({ error: 'not found' }, 404)
+
+  const newVersion = {
+    id: randomUUID(),
+    noteId: id,
+    title: note.title,
+    content: note.content,
+    coverImage: note.coverImage,
+    icon: note.icon,
+    createdById: session.userId,
+    createdAt: Date.now(),
+    versionName
+  }
+
+  await db.insert(noteHistory).values(newVersion)
+  return c.json(newVersion)
+})
+
+app.post('/api/notes/:id/history/restore/:versionId', authMiddleware, async (c) => {
+  const id = c.req.param('id')
+  const versionId = c.req.param('versionId')
+  const session = c.get('session')
+  const ownerFilter = await getOwnerFilter(id, session.userId, session.role)
+
+  const [note] = await db.select().from(notes).where(ownerFilter)
+  if (!note) return c.json({ error: 'not found' }, 404)
+
+  const [version] = await db.select()
+    .from(noteHistory)
+    .where(and(eq(noteHistory.id, versionId), eq(noteHistory.noteId, id)))
+  if (!version) return c.json({ error: 'version not found' }, 404)
+
+  await db.update(notes)
+    .set({
+      title: version.title,
+      content: version.content,
+      coverImage: version.coverImage,
+      icon: version.icon,
+      updatedByUserId: session.userId,
+      updatedAt: Date.now()
+    })
+    .where(ownerFilter)
+
+  const [updated] = await db.select().from(notes).where(ownerFilter)
+  return c.json(stripAndEnrich(updated))
 })
 
 // --- ATTACHMENT ACTIONS ---

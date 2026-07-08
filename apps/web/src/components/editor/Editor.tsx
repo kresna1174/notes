@@ -35,7 +35,7 @@ import { ToggleBlock } from './ToggleBlock'
 import { DragHandle } from './DragHandle'
 import { NoteIcon } from '../ui/NoteIcon'
 import { useEffect, useRef, useState, useMemo } from 'react'
-import { Eye, EyeOff, Lock, LockOpen, Share2, FileUp, Paperclip, Sparkles, Smile, Image as ImageIcon } from 'lucide-react'
+import { Eye, EyeOff, Lock, LockOpen, Share2, FileUp, Paperclip, Sparkles, Smile, Image as ImageIcon, Clock } from 'lucide-react'
 import { marked } from 'marked'
 import mammoth from 'mammoth'
 import * as XLSX from 'xlsx'
@@ -242,6 +242,8 @@ interface EditorProps {
   shareTrigger?: number
   chatOpen?: boolean
   onToggleChat?: () => void
+  historyOpen?: boolean
+  onToggleHistory?: () => void
 }
 
 function fmt(ts: number) {
@@ -484,7 +486,7 @@ function CoverSelector({ onSelect }: { onSelect: (gradient: string) => void }) {
   )
 }
 
-export function Editor({ note, onUpdate, onSaveStatusChange, onLockChange, shareTrigger, chatOpen, onToggleChat }: EditorProps) {
+export function Editor({ note, onUpdate, onSaveStatusChange, onLockChange, shareTrigger, chatOpen, onToggleChat, historyOpen, onToggleHistory }: EditorProps) {
   const [title, setTitle] = useState(note.title)
   const titleValRef = useRef(title)
   titleValRef.current = title
@@ -1442,6 +1444,25 @@ export function Editor({ note, onUpdate, onSaveStatusChange, onLockChange, share
                   onMouseLeave={e => { if (!chatOpen) { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.color = 'var(--fg-muted)' } }}
                 >
                   <Sparkles size={14} />
+                </button>
+              )}
+
+              {onToggleHistory && (
+                <button
+                  onClick={onToggleHistory}
+                  title={historyOpen ? 'Sembunyikan Riwayat Versi' : 'Tampilkan Riwayat Versi'}
+                  style={{
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    width: 32, height: 32,
+                    border: `1px solid ${historyOpen ? 'var(--primary)' : 'var(--border)'}`, borderRadius: '50%',
+                    background: historyOpen ? 'var(--accent)' : 'var(--bg)',
+                    color: historyOpen ? 'var(--primary)' : 'var(--fg-muted)',
+                    cursor: 'pointer', transition: 'all 0.15s',
+                  }}
+                  onMouseEnter={e => { if (!historyOpen) { e.currentTarget.style.borderColor = 'var(--primary)'; e.currentTarget.style.color = 'var(--primary)' } }}
+                  onMouseLeave={e => { if (!historyOpen) { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.color = 'var(--fg-muted)' } }}
+                >
+                  <Clock size={14} />
                 </button>
               )}
             </div>

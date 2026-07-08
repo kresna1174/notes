@@ -50,3 +50,16 @@ export const attachments = sqliteTable('attachments', {
   size: integer('size').notNull(),
   createdAt: integer('created_at').notNull(),
 })
+
+export const noteHistory = sqliteTable('note_history', {
+  id: text('id').primaryKey(),
+  noteId: text('note_id').notNull().references(() => notes.id, { onDelete: 'cascade' }),
+  title: text('title').notNull().default(''),
+  content: text('content').notNull().default(''),
+  coverImage: text('cover_image'),
+  icon: text('icon'),
+  createdById: text('created_by_id'),
+  createdAt: integer('created_at').notNull(),
+  versionName: text('version_name'),
+})
+
