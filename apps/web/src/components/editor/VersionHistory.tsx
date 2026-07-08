@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Clock, RotateCcw, Eye, X, Plus, AlertTriangle, GitCommit, Bookmark, GitDiff, FileText } from 'lucide-react'
+import { Clock, RotateCcw, Eye, X, Plus, AlertTriangle, GitCommit, Bookmark, GitCompareArrows, FileText } from 'lucide-react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../ui/dialog'
 import { useEditor, EditorContent } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
@@ -766,7 +766,7 @@ function VersionPreviewDialog({ version, currentContent, onClose, onRestore }: {
               }}
             >
               <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-                {tab === 'diff' ? <GitDiff size={13} /> : <FileText size={13} />}
+                {tab === 'diff' ? <GitCompareArrows size={13} /> : <FileText size={13} />}
                 {tab === 'diff' ? 'Perubahan' : 'Pratinjau'}
               </span>
             </button>
