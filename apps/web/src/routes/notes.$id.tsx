@@ -159,7 +159,7 @@ function NotePageComponent() {
               position: 'absolute',
               top: 16,
               left: 16,
-              zIndex: 20,
+              zIndex: 110,
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
