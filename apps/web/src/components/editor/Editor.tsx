@@ -12,6 +12,7 @@ import { TableRow } from '@tiptap/extension-table-row'
 import { TableCell } from '@tiptap/extension-table-cell'
 import { TableHeader } from '@tiptap/extension-table-header'
 import { Image } from '@tiptap/extension-image'
+import Youtube from '@tiptap/extension-youtube'
 import { HorizontalRule } from '@tiptap/extension-horizontal-rule'
 import { Placeholder } from '@tiptap/extension-placeholder'
 import { TextStyle } from '@tiptap/extension-text-style'
@@ -597,6 +598,11 @@ export function Editor({ note, onUpdate, onSaveStatusChange, onLockChange, share
       TableCell,
       TableHeader,
       Image,
+      Youtube.configure({
+        HTMLAttributes: {
+          class: 'rounded-lg max-w-full my-4 mx-auto aspect-video',
+        },
+      }),
       HorizontalRule,
       Placeholder.configure({ placeholder: "Ketik '/' untuk memanggil perintah…" }),
       TextStyle,
@@ -844,7 +850,7 @@ export function Editor({ note, onUpdate, onSaveStatusChange, onLockChange, share
           editor.commands.setContent(parsedContent)
         } catch {
           editor.commands.setContent(newContent)
-          parsedContent = { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: newContent }] }] }
+          parsedContent = editor.getJSON()
         }
       }
 

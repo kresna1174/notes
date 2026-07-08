@@ -134,6 +134,71 @@ async def search_web(query: str, max_results: int = 5) -> str:
         return f"Error performing web search: {str(e)}"
 
 @function_tool
+async def find_web_photos(query: str, max_results: int = 5) -> str:
+    """
+    Search the web for photos/images matching a query.
+    Returns a list of image source URLs and titles.
+
+    Args:
+        query: The keyword or description of the image to search for.
+        max_results: The maximum number of photos to return (default is 5).
+    """
+    try:
+        def _run():
+            with DDGS() as ddgs:
+                return list(ddgs.images(query, max_results=max_results))
+
+        results = await asyncio.to_thread(_run)
+        if not results:
+            return f"No photos found for query: {query}"
+
+        output = []
+        for idx, r in enumerate(results, 1):
+            title = r.get("title", f"Image {idx}")
+            img_url = r.get("image")
+            page_url = r.get("url")
+            if img_url:
+                output.append(f"Title: {title}\nImage URL: {img_url}\nPage URL: {page_url}\n")
+        return "\n---\n".join(output)
+    except Exception as e:
+        return f"Error performing photo search: {str(e)}"
+
+@function_tool
+async def find_youtube_videos(query: str, max_results: int = 5) -> str:
+    """
+    Search YouTube for videos matching a query.
+    Returns a list of video titles, URLs, and embed URLs.
+
+    Args:
+        query: The search query for YouTube videos.
+        max_results: The maximum number of videos to return (default is 5).
+    """
+    search_query = query
+    if "youtube" not in query.lower() and "site:youtube.com" not in query.lower():
+        search_query = f"{query} site:youtube.com"
+
+    try:
+        def _run():
+            with DDGS() as ddgs:
+                return list(ddgs.videos(search_query, max_results=max_results))
+
+        results = await asyncio.to_thread(_run)
+        if not results:
+            return f"No YouTube videos found for query: {query}"
+
+        output = []
+        for idx, r in enumerate(results, 1):
+            title = r.get("title", f"Video {idx}")
+            video_url = r.get("content")
+            embed_url = r.get("embed_url")
+            publisher = r.get("publisher", "YouTube")
+            if video_url:
+                output.append(f"Title: {title}\nVideo URL: {video_url}\nEmbed URL: {embed_url}\nPublisher: {publisher}\n")
+        return "\n---\n".join(output)
+    except Exception as e:
+        return f"Error performing YouTube search: {str(e)}"
+
+@function_tool
 async def extract_web(url: str) -> str:
     """
     Fetch a web page's URL and extract its main text content as markdown.
