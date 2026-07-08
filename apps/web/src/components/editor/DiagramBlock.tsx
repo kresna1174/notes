@@ -15,7 +15,7 @@ import ReactFlow, {
 import 'reactflow/dist/style.css'
 import { useState, useCallback, useEffect } from 'react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../ui/dialog'
-import { Trash2, Sparkles } from 'lucide-react'
+import { Trash2, Sparkles, GripVertical } from 'lucide-react'
 
 const NODE_TYPES_AVAILABLE = ['rectangle', 'circle', 'diamond'] as const
 
@@ -315,6 +315,51 @@ export function EditDiagramDialog({
   const [aiCoords, setAiCoords] = useState<{ x: number; y: number } | null>(null)
   const [aiPromptTarget, setAiPromptTarget] = useState<any | null>(null)
 
+  const [isDragging, setIsDragging] = useState(false)
+  const [dragStart, setDragStart] = useState({ x: 0, y: 0 })
+
+  const handleMouseDown = useCallback((e: React.MouseEvent) => {
+    const target = e.target as HTMLElement
+    if (!target.closest('.ai-drag-handle')) return
+
+    e.preventDefault()
+    setIsDragging(true)
+    
+    const currentX = aiCoords ? aiCoords.x : (window.innerWidth / 2) - 225
+    const currentY = aiCoords ? aiCoords.y : (window.innerHeight / 2) - 150
+
+    setDragStart({
+      x: e.clientX - currentX,
+      y: e.clientY - currentY,
+    })
+  }, [aiCoords])
+
+  const handleMouseMove = useCallback((e: MouseEvent) => {
+    if (!isDragging) return
+    const newX = e.clientX - dragStart.x
+    const newY = e.clientY - dragStart.y
+    setAiCoords({ x: newX, y: newY })
+  }, [isDragging, dragStart])
+
+  const handleMouseUp = useCallback(() => {
+    setIsDragging(false)
+  }, [])
+
+  useEffect(() => {
+    if (isDragging) {
+      window.addEventListener('mousemove', handleMouseMove)
+      window.addEventListener('mouseup', handleMouseUp)
+    } else {
+      window.removeEventListener('mousemove', handleMouseMove)
+      window.removeEventListener('mouseup', handleMouseUp)
+    }
+
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove)
+      window.removeEventListener('mouseup', handleMouseUp)
+    }
+  }, [isDragging, handleMouseMove, handleMouseUp])
+
   async function generateWithAi() {
     if (!aiPrompt.trim()) return
     setAiLoading(true)
@@ -515,7 +560,13 @@ Catatan: Posisikan node utama/root di koordinat (x: ${Math.round(aiCoords.x)}, y
           ))}
 
           <button
-            onClick={() => setShowAiInput(true)}
+            onClick={() => {
+              const x = (window.innerWidth / 2) - 225
+              const y = (window.innerHeight / 2) - 150
+              setAiCoords({ x, y })
+              setAiPromptTarget(null)
+              setShowAiInput(true)
+            }}
             style={{
               marginLeft: 'auto',
               padding: '4px 12px',
@@ -732,18 +783,11 @@ Catatan: Posisikan node utama/root di koordinat (x: ${Math.round(aiCoords.x)}, y
           </div>
         )}
 
-        {showAiInput && (
-          <div style={aiCoords ? {
+        {showAiInput && aiCoords && (
+          <div style={{
             position: 'absolute',
             top: `${Math.max(10, Math.min(aiCoords.y, window.innerHeight - 300))}px`,
             left: `${Math.max(10, Math.min(aiCoords.x, window.innerWidth - 480))}px`,
-            zIndex: 1000,
-            pointerEvents: 'auto',
-          } : {
-            position: 'absolute',
-            bottom: '80px',
-            left: '50%',
-            transform: 'translateX(-50%)',
             zIndex: 1000,
             pointerEvents: 'auto',
           }}>
@@ -760,9 +804,26 @@ Catatan: Posisikan node utama/root di koordinat (x: ${Math.round(aiCoords.x)}, y
               gap: 12,
               fontFamily: 'var(--font-body)',
             }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '0.95rem', fontWeight: 600, color: '#a855f7' }}>
-                <Sparkles size={16} />
-                <span>Buat Diagram dengan AI</span>
+              <div
+                className="ai-drag-handle"
+                onMouseDown={handleMouseDown}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 8,
+                  fontSize: '0.95rem',
+                  fontWeight: 600,
+                  color: '#a855f7',
+                  cursor: isDragging ? 'grabbing' : 'grab',
+                  userSelect: 'none',
+                  paddingBottom: '8px',
+                  borderBottom: '1px solid var(--border)',
+                  marginBottom: '8px',
+                }}
+              >
+                <GripVertical size={14} style={{ color: 'var(--fg-muted)', opacity: 0.5, cursor: 'inherit' }} />
+                <Sparkles size={16} style={{ cursor: 'inherit' }} />
+                <span style={{ cursor: 'inherit', flex: 1 }}>Buat Diagram dengan AI</span>
               </div>
               
               <p style={{ fontSize: '0.75rem', color: 'var(--fg-muted)', margin: 0 }}>
