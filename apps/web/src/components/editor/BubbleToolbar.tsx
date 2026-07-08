@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { Bold, Italic, Underline as UnderlineIcon, Strikethrough, Highlighter, Code, Sparkles, FileText, Globe } from 'lucide-react'
 import type { Editor } from '@tiptap/react'
+import { DOMSerializer } from '@tiptap/pm/model'
 
 interface BubbleToolbarProps {
   editor: Editor | null
@@ -18,7 +19,8 @@ export function BubbleToolbar({ editor }: BubbleToolbarProps) {
     let contentToSend = ''
     if (useHtml) {
       const fragment = editor.state.doc.slice(from, to).content
-      const dom = editor.view.domSerializer.serializeFragment(fragment)
+      const serializer = DOMSerializer.fromSchema(editor.schema)
+      const dom = serializer.serializeFragment(fragment)
       const temp = document.createElement('div')
       temp.appendChild(dom)
       contentToSend = temp.innerHTML
