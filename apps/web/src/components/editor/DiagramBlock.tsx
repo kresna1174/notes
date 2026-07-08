@@ -592,11 +592,11 @@ Catatan: Posisikan node utama/root di koordinat (x: ${Math.round(aiCoords.x)}, y
               padding: '4px 12px',
               fontSize: '0.8125rem',
               fontFamily: 'var(--font-body)',
-              border: '1px solid #a855f7',
+              border: '1px solid var(--primary)',
               borderRadius: 6,
-              background: 'rgba(168, 85, 247, 0.1)',
+              background: 'var(--accent)',
               cursor: 'pointer',
-              color: '#c084fc',
+              color: 'var(--primary)',
               fontWeight: 600,
               display: 'flex',
               alignItems: 'center',
@@ -604,10 +604,12 @@ Catatan: Posisikan node utama/root di koordinat (x: ${Math.round(aiCoords.x)}, y
               transition: 'all 0.15s',
             }}
             onMouseEnter={e => {
-              e.currentTarget.style.background = 'rgba(168, 85, 247, 0.2)'
+              e.currentTarget.style.background = 'var(--primary)'
+              e.currentTarget.style.color = 'var(--primary-fg)'
             }}
             onMouseLeave={e => {
-              e.currentTarget.style.background = 'rgba(168, 85, 247, 0.1)'
+              e.currentTarget.style.background = 'var(--accent)'
+              e.currentTarget.style.color = 'var(--primary)'
             }}
           >
             <Sparkles size={13} />
@@ -713,8 +715,8 @@ Catatan: Posisikan node utama/root di koordinat (x: ${Math.round(aiCoords.x)}, y
                   onMouseEnter={e => e.currentTarget.style.background = 'var(--accent)'}
                   onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
                 >
-                  <Sparkles size={12} style={{ color: '#a855f7' }} />
-                  <span style={{ color: '#c084fc' }}>Edit dengan AI ✨</span>
+                  <Sparkles size={12} />
+                  <span>Edit dengan AI ✨</span>
                 </button>
                 <button
                   onClick={() => renameNode(contextMenu.node)}
@@ -758,8 +760,8 @@ Catatan: Posisikan node utama/root di koordinat (x: ${Math.round(aiCoords.x)}, y
                   onMouseEnter={e => e.currentTarget.style.background = 'var(--accent)'}
                   onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
                 >
-                  <Sparkles size={12} style={{ color: '#a855f7' }} />
-                  <span style={{ color: '#c084fc' }}>Generate dengan AI ✨</span>
+                  <Sparkles size={12} />
+                  <span>Generate dengan AI ✨</span>
                 </button>
                 <div style={{ height: '1px', background: 'var(--border)', margin: '4px 0' }} />
                 <button
