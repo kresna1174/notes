@@ -741,21 +741,50 @@ export function Editor({ note, onUpdate, onSaveStatusChange, onLockChange, share
 
   useEffect(() => {
     function handleTriggerAi(e: Event) {
-      const customEvent = e as CustomEvent<{ prompt: string }>
-      const prompt = customEvent.detail.prompt
-      handleAiGenerate(prompt)
+      const customEvent = e as CustomEvent<{ prompt: string; action?: 'replace' | 'insert_below' | 'append_to_end'; from?: number; to?: number }>
+      const { prompt, action, from, to } = customEvent.detail
+      handleAiGenerate(prompt, action, from, to)
     }
     window.addEventListener('trigger-ai-action', handleTriggerAi)
     return () => window.removeEventListener('trigger-ai-action', handleTriggerAi)
   }, [editor, aiPromptText])
 
-  async function handleAiGenerate(overridePrompt?: string) {
+  async function handleAiGenerate(
+    overridePrompt?: string,
+    action?: 'replace' | 'insert_below' | 'append_to_end',
+    from?: number,
+    to?: number
+  ) {
     const prompt = overridePrompt || aiPromptText
     if (!prompt.trim() || !editor) return
     setAiLoading(true)
     setStatus('generating')
     
-    const startPos = editor.state.selection.from
+    let startPos = editor.state.selection.from
+    let endPos = editor.state.selection.to
+
+    if (from !== undefined && to !== undefined) {
+      startPos = from
+      endPos = to
+    }
+
+    if (action === 'replace') {
+      editor.chain().focus().deleteRange({ from: startPos, to: endPos }).run()
+      editor.commands.setTextSelection(startPos)
+    } else if (action === 'insert_below') {
+      editor.commands.setTextSelection(endPos)
+      editor.chain().focus().insertContent('\n').run()
+      startPos = editor.state.selection.from
+    } else if (action === 'append_to_end') {
+      const docEnd = editor.state.doc.content.size
+      editor.commands.setTextSelection(docEnd)
+      editor.chain().focus().insertContent([
+        { type: 'heading', attrs: { level: 1 }, content: [{ type: 'text', text: 'Summary' }] },
+        { type: 'paragraph' }
+      ]).run()
+      startPos = editor.state.selection.from
+    }
+
     let fullText = ''
     let promptBarClosed = false
 

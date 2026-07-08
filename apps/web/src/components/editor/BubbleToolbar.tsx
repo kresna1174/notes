@@ -128,7 +128,7 @@ export function BubbleToolbar({ editor }: BubbleToolbarProps) {
           <Btn 
             icon={<FileText size={13} style={{ color: '#c084fc' }} />} 
             active={false} 
-            onClick={() => handleAiAction('Tolong buat ringkasan singkat dalam bentuk poin-poin dari teks berikut.', 'insert_below')} 
+            onClick={() => handleAiAction('Tolong buat ringkasan singkat dalam bentuk poin-poin dari teks berikut.', 'append_to_end')} 
             title="Ringkas dengan AI" 
           />
           <Btn 
