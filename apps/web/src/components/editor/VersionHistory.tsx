@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Clock, RotateCcw, Eye, X, Plus, FileText } from 'lucide-react'
+import { Clock, RotateCcw, Eye, X, Plus, AlertTriangle } from 'lucide-react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../ui/dialog'
 import { useEditor, EditorContent } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
@@ -42,6 +42,8 @@ export function VersionHistory({ noteId, onClose, onRestore }: VersionHistoryPro
   const [snapshotName, setSnapshotName] = useState('')
   const [savingSnapshot, setSavingSnapshot] = useState(false)
   const [previewVersion, setPreviewVersion] = useState<VersionRecord | null>(null)
+  const [confirmRestore, setConfirmRestore] = useState<VersionRecord | null>(null)
+  const [restoring, setRestoring] = useState(false)
 
   const fetchHistory = async () => {
     setLoading(true)
@@ -84,20 +86,20 @@ export function VersionHistory({ noteId, onClose, onRestore }: VersionHistoryPro
   }
 
   const handleRestore = async (version: VersionRecord) => {
-    if (!confirm(`Apakah Anda yakin ingin memulihkan catatan ini ke versi "${version.versionName || 'Penyimpanan Otomatis'}"?`)) {
-      return
-    }
+    setRestoring(true)
     try {
       const res = await fetch(`/api/notes/${noteId}/history/restore/${version.id}`, {
         method: 'POST'
       })
       if (res.ok) {
         const updatedNote = await res.json()
+        setConfirmRestore(null)
         onRestore(updatedNote)
       }
     } catch (err) {
       console.error('Failed to restore version:', err)
-      alert('Gagal memulihkan versi catatan.')
+    } finally {
+      setRestoring(false)
     }
   }
 
@@ -376,7 +378,7 @@ export function VersionHistory({ noteId, onClose, onRestore }: VersionHistoryPro
                           <span>Lihat</span>
                         </button>
                         <button
-                          onClick={() => handleRestore(item)}
+                          onClick={() => setConfirmRestore(item)}
                           style={{
                             display: 'flex', alignItems: 'center', gap: 3,
                             padding: '2px 8px', fontSize: '0.7rem',
@@ -400,6 +402,132 @@ export function VersionHistory({ noteId, onClose, onRestore }: VersionHistoryPro
         })()}
       </div>
 
+      {/* Restore Confirmation Modal */}
+      {confirmRestore && (
+        <div
+          style={{
+            position: 'fixed', inset: 0, zIndex: 9999,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            background: 'rgba(0,0,0,0.45)',
+            backdropFilter: 'blur(4px)',
+            animation: 'fadeIn 0.15s ease',
+          }}
+          onClick={() => !restoring && setConfirmRestore(null)}
+        >
+          <div
+            onClick={e => e.stopPropagation()}
+            style={{
+              background: 'var(--card-bg)',
+              border: '1px solid var(--border)',
+              borderRadius: 16,
+              padding: '28px 28px 24px',
+              width: 360,
+              maxWidth: 'calc(100vw - 48px)',
+              boxShadow: '0 20px 60px rgba(0,0,0,0.3)',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 16,
+              fontFamily: 'var(--font-body)',
+              animation: 'slideUp 0.18s ease',
+            }}
+          >
+            {/* Icon + Title */}
+            <div style={{ display: 'flex', alignItems: 'flex-start', gap: 14 }}>
+              <div style={{
+                width: 44, height: 44, borderRadius: 12, flexShrink: 0,
+                background: 'color-mix(in srgb, #f59e0b 15%, var(--card-bg))',
+                border: '1px solid color-mix(in srgb, #f59e0b 30%, var(--border))',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+              }}>
+                <AlertTriangle size={22} style={{ color: '#f59e0b' }} />
+              </div>
+              <div>
+                <div style={{ fontWeight: 700, fontSize: '0.95rem', color: 'var(--fg)', marginBottom: 4 }}>
+                  Pulihkan versi ini?
+                </div>
+                <div style={{ fontSize: '0.8rem', color: 'var(--fg-muted)', lineHeight: 1.5 }}>
+                  Catatan saat ini akan digantikan dengan versi{' '}
+                  <strong style={{ color: 'var(--fg)' }}>
+                    &ldquo;{confirmRestore.versionName || 'Penyimpanan Otomatis'}&rdquo;
+                  </strong>.
+                  Tindakan ini tidak dapat dibatalkan.
+                </div>
+              </div>
+            </div>
+
+            {/* Meta info chip */}
+            <div style={{
+              background: 'var(--bg)',
+              border: '1px solid var(--border)',
+              borderRadius: 8,
+              padding: '8px 12px',
+              fontSize: '0.75rem',
+              color: 'var(--fg-muted)',
+              display: 'flex',
+              gap: 16,
+            }}>
+              <span>🕐 {new Date(confirmRestore.createdAt).toLocaleString('id-ID', {
+                day: '2-digit', month: 'short', year: 'numeric',
+                hour: '2-digit', minute: '2-digit'
+              })}</span>
+            </div>
+
+            {/* Action buttons */}
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+              <button
+                onClick={() => setConfirmRestore(null)}
+                disabled={restoring}
+                style={{
+                  padding: '8px 18px', fontSize: '0.85rem', fontWeight: 500,
+                  borderRadius: 8, border: '1px solid var(--border)',
+                  background: 'transparent', color: 'var(--fg-muted)',
+                  cursor: 'pointer', fontFamily: 'var(--font-body)',
+                  transition: 'all 0.15s',
+                }}
+                onMouseEnter={e => { e.currentTarget.style.background = 'var(--accent)'; e.currentTarget.style.color = 'var(--fg)' }}
+                onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--fg-muted)' }}
+              >
+                Batal
+              </button>
+              <button
+                onClick={() => handleRestore(confirmRestore)}
+                disabled={restoring}
+                style={{
+                  padding: '8px 20px', fontSize: '0.85rem', fontWeight: 700,
+                  borderRadius: 8, border: 'none',
+                  background: restoring ? 'var(--fg-muted)' : 'var(--primary)',
+                  color: 'var(--primary-fg)',
+                  cursor: restoring ? 'not-allowed' : 'pointer',
+                  fontFamily: 'var(--font-body)',
+                  display: 'flex', alignItems: 'center', gap: 7,
+                  transition: 'all 0.15s',
+                }}
+                onMouseEnter={e => { if (!restoring) e.currentTarget.style.opacity = '0.88' }}
+                onMouseLeave={e => { e.currentTarget.style.opacity = '1' }}
+              >
+                {restoring ? (
+                  <>
+                    <div style={{
+                      width: 14, height: 14,
+                      border: '2px solid var(--primary-fg)',
+                      borderTopColor: 'transparent',
+                      borderRadius: '50%',
+                      animation: 'spin 0.7s linear infinite',
+                    }} />
+                    Memulihkan...
+                  </>
+                ) : (
+                  <>
+                    <RotateCcw size={14} />
+                    Ya, Pulihkan
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Preview Dialog */}
       {previewVersion && (
         <VersionPreviewDialog
@@ -408,7 +536,7 @@ export function VersionHistory({ noteId, onClose, onRestore }: VersionHistoryPro
           onRestore={() => {
             const v = previewVersion
             setPreviewVersion(null)
-            handleRestore(v)
+            setConfirmRestore(v)
           }}
         />
       )}
