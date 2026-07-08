@@ -233,80 +233,171 @@ export function VersionHistory({ noteId, onClose, onRestore }: VersionHistoryPro
         )}
       </div>
 
-      {/* History List */}
-      <div style={{ flex: 1, overflowY: 'auto', padding: '12px' }}>
+      {/* Git Tree History */}
+      <div style={{ flex: 1, overflowY: 'auto', padding: '16px 12px' }}>
         {loading ? (
           <div style={{ textAlign: 'center', color: 'var(--fg-muted)', padding: '24px 0', fontSize: '0.8rem' }}>
-            Memuat riwayat versi...
+            <div style={{
+              width: 28, height: 28, border: '2px solid var(--primary)',
+              borderTopColor: 'transparent', borderRadius: '50%',
+              animation: 'spin 0.8s linear infinite', margin: '0 auto 10px',
+            }} />
+            Memuat riwayat...
           </div>
         ) : history.length === 0 ? (
           <div style={{ textAlign: 'center', color: 'var(--fg-muted)', padding: '32px 16px', fontSize: '0.8rem' }}>
-            <Clock size={24} style={{ margin: '0 auto 12px', opacity: 0.3 }} />
-            Belum ada riwayat versi. Versi akan otomatis disimpan setiap 10 menit ketika ada perubahan catatan.
+            <Clock size={24} style={{ margin: '0 auto 12px', opacity: 0.3, display: 'block' }} />
+            Belum ada riwayat versi.<br />Versi otomatis disimpan setiap 10 menit.
           </div>
-        ) : (
-          history.map(item => (
-            <div
-              key={item.id}
-              className="group"
-              style={{
-                padding: '12px 14px',
-                borderRadius: 10,
-                border: '1px solid var(--border)',
-                background: 'var(--bg)',
-                marginBottom: 8,
-                display: 'flex',
-                flexDirection: 'column',
-                gap: 6,
-                transition: 'all 0.15s',
-              }}
-            >
-              <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 }}>
-                <div style={{ fontWeight: 600, fontSize: '0.8125rem', color: 'var(--fg)', wordBreak: 'break-word' }}>
-                  {item.versionName || 'Penyimpanan Otomatis'}
-                </div>
-                <div style={{ fontSize: '0.725rem', color: 'var(--fg-subtle)', whiteSpace: 'nowrap' }}>
-                  {fmtDate(item.createdAt)}
-                </div>
+        ) : (() => {
+          // Group by day label
+          const groups: { label: string; items: typeof history }[] = []
+          history.forEach(item => {
+            const d = new Date(item.createdAt)
+            const today = new Date()
+            const yesterday = new Date(); yesterday.setDate(today.getDate() - 1)
+            let label: string
+            if (d.toDateString() === today.toDateString()) label = 'Hari ini'
+            else if (d.toDateString() === yesterday.toDateString()) label = 'Kemarin'
+            else label = d.toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })
+            const existing = groups.find(g => g.label === label)
+            if (existing) existing.items.push(item)
+            else groups.push({ label, items: [item] })
+          })
+
+          return groups.map((group, gi) => (
+            <div key={gi} style={{ marginBottom: 8 }}>
+              {/* Day label */}
+              <div style={{
+                fontSize: '0.7rem', fontWeight: 700, color: 'var(--fg-muted)',
+                textTransform: 'uppercase', letterSpacing: '0.08em',
+                padding: '0 0 8px 34px', marginBottom: 0,
+              }}>
+                {group.label}
               </div>
 
-              {/* Actions row */}
-              <div style={{ display: 'flex', gap: 6, marginTop: 4 }}>
-                <button
-                  onClick={() => setPreviewVersion(item)}
-                  style={{
-                    display: 'flex', alignItems: 'center', gap: 4,
-                    padding: '3px 8px', fontSize: '0.725rem',
-                    border: '1px solid var(--border)', borderRadius: 5,
-                    background: 'var(--card-bg)', color: 'var(--fg-muted)',
-                    cursor: 'pointer', fontFamily: 'var(--font-body)',
-                  }}
-                  onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--primary)'; e.currentTarget.style.color = 'var(--primary)' }}
-                  onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.color = 'var(--fg-muted)' }}
-                >
-                  <Eye size={12} />
-                  <span>Pratinjau</span>
-                </button>
-                
-                <button
-                  onClick={() => handleRestore(item)}
-                  style={{
-                    display: 'flex', alignItems: 'center', gap: 4,
-                    padding: '3px 8px', fontSize: '0.725rem',
-                    border: '1px solid transparent', borderRadius: 5,
-                    background: 'var(--primary)', color: 'var(--primary-fg)',
-                    cursor: 'pointer', fontFamily: 'var(--font-body)',
-                  }}
-                  onMouseEnter={e => (e.currentTarget.style.opacity = '0.9')}
-                  onMouseLeave={e => (e.currentTarget.style.opacity = '1')}
-                >
-                  <RotateCcw size={12} />
-                  <span>Pulihkan</span>
-                </button>
-              </div>
+              {/* Items in this group */}
+              {group.items.map((item, idx) => {
+                const isLast = gi === groups.length - 1 && idx === group.items.length - 1
+                const isSnapshot = !!item.versionName
+                return (
+                  <div key={item.id} style={{ display: 'flex', gap: 0, position: 'relative' }}>
+                    {/* Git line + dot column */}
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: 32, flexShrink: 0 }}>
+                      {/* Vertical line above dot */}
+                      <div style={{
+                        width: 2,
+                        height: 14,
+                        background: isSnapshot ? 'var(--primary)' : 'var(--border)',
+                        flexShrink: 0,
+                      }} />
+                      {/* Commit dot */}
+                      <div style={{
+                        width: isSnapshot ? 14 : 10,
+                        height: isSnapshot ? 14 : 10,
+                        borderRadius: '50%',
+                        background: isSnapshot ? 'var(--primary)' : 'var(--card-bg)',
+                        border: `2px solid ${isSnapshot ? 'var(--primary)' : 'var(--border)'}`,
+                        boxShadow: isSnapshot ? '0 0 0 3px color-mix(in srgb, var(--primary) 20%, transparent)' : 'none',
+                        flexShrink: 0,
+                        zIndex: 1,
+                        transition: 'all 0.15s',
+                      }} />
+                      {/* Vertical line below dot */}
+                      {!isLast && (
+                        <div style={{
+                          width: 2,
+                          flex: 1,
+                          minHeight: 20,
+                          background: 'var(--border)',
+                        }} />
+                      )}
+                    </div>
+
+                    {/* Content card */}
+                    <div
+                      style={{
+                        flex: 1,
+                        marginLeft: 8,
+                        marginBottom: 6,
+                        padding: '9px 12px',
+                        borderRadius: 9,
+                        border: `1px solid ${isSnapshot ? 'color-mix(in srgb, var(--primary) 35%, var(--border))' : 'var(--border)'}`,
+                        background: isSnapshot ? 'color-mix(in srgb, var(--primary) 6%, var(--card-bg))' : 'var(--card-bg)',
+                        cursor: 'pointer',
+                        transition: 'all 0.15s',
+                      }}
+                      onMouseEnter={e => {
+                        (e.currentTarget as HTMLDivElement).style.borderColor = 'var(--primary)'
+                        ;(e.currentTarget as HTMLDivElement).style.background = 'color-mix(in srgb, var(--primary) 10%, var(--card-bg))'
+                      }}
+                      onMouseLeave={e => {
+                        ;(e.currentTarget as HTMLDivElement).style.borderColor = isSnapshot ? 'color-mix(in srgb, var(--primary) 35%, var(--border))' : 'var(--border)'
+                        ;(e.currentTarget as HTMLDivElement).style.background = isSnapshot ? 'color-mix(in srgb, var(--primary) 6%, var(--card-bg))' : 'var(--card-bg)'
+                      }}
+                      onClick={() => setPreviewVersion(item)}
+                    >
+                      {/* Top row: name + time */}
+                      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 6, marginBottom: 5 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 5, flexWrap: 'wrap' }}>
+                          {isSnapshot && (
+                            <span style={{
+                              fontSize: '0.6rem', fontWeight: 700, padding: '1px 6px',
+                              background: 'var(--primary)', color: 'var(--primary-fg)',
+                              borderRadius: 4, letterSpacing: '0.05em', textTransform: 'uppercase',
+                            }}>
+                              Snapshot
+                            </span>
+                          )}
+                          <span style={{ fontWeight: 600, fontSize: '0.8rem', color: 'var(--fg)', wordBreak: 'break-word' }}>
+                            {item.versionName || 'Penyimpanan Otomatis'}
+                          </span>
+                        </div>
+                        <span style={{ fontSize: '0.68rem', color: 'var(--fg-muted)', whiteSpace: 'nowrap', marginTop: 1 }}>
+                          {new Date(item.createdAt).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}
+                        </span>
+                      </div>
+
+                      {/* Action row */}
+                      <div style={{ display: 'flex', gap: 5 }} onClick={e => e.stopPropagation()}>
+                        <button
+                          onClick={() => setPreviewVersion(item)}
+                          style={{
+                            display: 'flex', alignItems: 'center', gap: 3,
+                            padding: '2px 8px', fontSize: '0.7rem',
+                            border: '1px solid var(--border)', borderRadius: 4,
+                            background: 'var(--bg)', color: 'var(--fg-muted)',
+                            cursor: 'pointer', fontFamily: 'var(--font-body)',
+                          }}
+                          onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--primary)'; e.currentTarget.style.color = 'var(--primary)' }}
+                          onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.color = 'var(--fg-muted)' }}
+                        >
+                          <Eye size={10} />
+                          <span>Lihat</span>
+                        </button>
+                        <button
+                          onClick={() => handleRestore(item)}
+                          style={{
+                            display: 'flex', alignItems: 'center', gap: 3,
+                            padding: '2px 8px', fontSize: '0.7rem',
+                            border: 'none', borderRadius: 4,
+                            background: 'var(--primary)', color: 'var(--primary-fg)',
+                            cursor: 'pointer', fontFamily: 'var(--font-body)',
+                          }}
+                          onMouseEnter={e => (e.currentTarget.style.opacity = '0.85')}
+                          onMouseLeave={e => (e.currentTarget.style.opacity = '1')}
+                        >
+                          <RotateCcw size={10} />
+                          <span>Pulihkan</span>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )
+              })}
             </div>
           ))
-        )}
+        })()}
       </div>
 
       {/* Preview Dialog */}
