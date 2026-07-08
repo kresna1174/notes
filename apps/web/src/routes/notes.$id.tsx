@@ -5,6 +5,7 @@ import { PinLockModal } from '../components/editor/PinLockModal'
 import { useState, useEffect } from 'react'
 import { Check, Loader2, Circle, PanelLeftClose, PanelLeftOpen, Sparkles } from 'lucide-react'
 import { ChatBot } from '../components/chat/ChatBot'
+import { SearchPalette } from '../components/editor/SearchPalette'
 
 
 export const Route = createFileRoute('/notes/$id')({
@@ -83,6 +84,28 @@ function NotePageComponent() {
   const [sidebarVisible, setSidebarVisible] = useState(true)
   const [isMobile, setIsMobile] = useState(false)
   const [chatOpen, setChatOpen] = useState(false)
+  const [showSearchPalette, setShowSearchPalette] = useState(false)
+
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault()
+        setShowSearchPalette(true)
+      }
+    }
+    
+    function handleOpenPalette() {
+      setShowSearchPalette(true)
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    window.addEventListener('open-search-palette', handleOpenPalette)
+    
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown)
+      window.removeEventListener('open-search-palette', handleOpenPalette)
+    }
+  }, [])
 
   useEffect(() => {
     function checkMobile() {
@@ -230,6 +253,16 @@ function NotePageComponent() {
           mode="unlock"
           onSubmit={handleUnlock}
           onClose={() => setShowUnlockModal(false)}
+        />
+      )}
+
+      {showSearchPalette && (
+        <SearchPalette
+          onClose={() => setShowSearchPalette(false)}
+          onSelectNote={(noteId) => {
+            navigate({ to: `/notes/${noteId}` })
+            setShowSearchPalette(false)
+          }}
         />
       )}
     </div>
