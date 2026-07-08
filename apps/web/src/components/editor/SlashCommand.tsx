@@ -20,8 +20,7 @@ import {
   FileText,
   Code,
   Paperclip,
-  Sparkles,
-  Globe
+  Sparkles
 } from 'lucide-react'
 
 const COMMANDS = [
@@ -156,42 +155,6 @@ const COMMANDS = [
     command: ({ editor, range }: any) => {
       editor.chain().focus().deleteRange(range).run()
       window.dispatchEvent(new CustomEvent('open-ai-prompt-bar'))
-    }
-  },
-  {
-    category: 'Asisten AI',
-    title: 'Ringkas Catatan',
-    description: 'Buat ringkasan otomatis dari catatan ini.',
-    icon: FileText,
-    command: ({ editor, range }: any) => {
-      editor.chain().focus().deleteRange(range).run()
-      window.dispatchEvent(new CustomEvent('trigger-ai-action', { 
-        detail: { prompt: 'Tolong buat ringkasan singkat dan padat dalam bentuk poin-poin dari catatan ini.' } 
-      }))
-    }
-  },
-  {
-    category: 'Asisten AI',
-    title: 'Perbaiki Tulisan',
-    description: 'Tingkatkan tata bahasa dan perbaiki typo.',
-    icon: Sparkles,
-    command: ({ editor, range }: any) => {
-      editor.chain().focus().deleteRange(range).run()
-      window.dispatchEvent(new CustomEvent('trigger-ai-action', { 
-        detail: { prompt: 'Tolong perbaiki tata bahasa, perbaiki typo, dan rapikan format dari teks catatan ini.' } 
-      }))
-    }
-  },
-  {
-    category: 'Asisten AI',
-    title: 'Terjemahkan ke Inggris',
-    description: 'Terjemahkan seluruh catatan ini ke Bahasa Inggris.',
-    icon: Globe,
-    command: ({ editor, range }: any) => {
-      editor.chain().focus().deleteRange(range).run()
-      window.dispatchEvent(new CustomEvent('trigger-ai-action', { 
-        detail: { prompt: 'Tolong terjemahkan seluruh isi catatan ini ke Bahasa Inggris secara alami.' } 
-      }))
     }
   },
 ]

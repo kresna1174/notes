@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
-import { Bold, Italic, Underline as UnderlineIcon, Strikethrough, Highlighter, Code } from 'lucide-react'
+import { Bold, Italic, Underline as UnderlineIcon, Strikethrough, Highlighter, Code, Sparkles, FileText, Globe } from 'lucide-react'
 import type { Editor } from '@tiptap/react'
 
 interface BubbleToolbarProps {
@@ -10,6 +10,22 @@ export function BubbleToolbar({ editor }: BubbleToolbarProps) {
   const [pos, setPos] = useState<{ top: number; left: number } | null>(null)
   const [mode, setMode] = useState<'text' | 'table' | null>(null)
   const toolbarRef = useRef<HTMLDivElement>(null)
+
+  const handleAiAction = (systemPrompt: string, actionType: 'replace' | 'insert_below') => {
+    if (!editor) return
+    const { from, to } = editor.state.selection
+    const selectedText = editor.state.doc.textBetween(from, to, ' ')
+    if (!selectedText.trim()) return
+
+    window.dispatchEvent(new CustomEvent('trigger-ai-action', {
+      detail: {
+        prompt: `${systemPrompt}\n\nTeks yang dipilih/diblok:\n"""\n${selectedText}\n"""`,
+        action: actionType,
+        from,
+        to
+      }
+    }))
+  }
 
   useEffect(() => {
     if (!editor) return
@@ -102,6 +118,25 @@ export function BubbleToolbar({ editor }: BubbleToolbarProps) {
           <Btn icon={<Strikethrough size={13} />} active={editor.isActive('strike')} onClick={() => editor.chain().focus().toggleStrike().run()} title="Strikethrough" />
           <Btn icon={<Code size={13} />} active={editor.isActive('code')} onClick={() => editor.chain().focus().toggleCode().run()} title="Code" />
           <Btn icon={<Highlighter size={13} />} active={editor.isActive('highlight')} onClick={() => editor.chain().focus().toggleHighlight().run()} title="Highlight" />
+          <div style={{ width: 1, background: '#ffffff33', margin: '0 4px', height: 16 }} />
+          <Btn 
+            icon={<Sparkles size={13} style={{ color: '#c084fc' }} />} 
+            active={false} 
+            onClick={() => handleAiAction('Tolong perbaiki tata bahasa, perbaiki typo, dan tingkatkan tulisan dari teks berikut agar lebih profesional.', 'replace')} 
+            title="Perbaiki dengan AI" 
+          />
+          <Btn 
+            icon={<FileText size={13} style={{ color: '#c084fc' }} />} 
+            active={false} 
+            onClick={() => handleAiAction('Tolong buat ringkasan singkat dalam bentuk poin-poin dari teks berikut.', 'insert_below')} 
+            title="Ringkas dengan AI" 
+          />
+          <Btn 
+            icon={<Globe size={13} style={{ color: '#c084fc' }} />} 
+            active={false} 
+            onClick={() => handleAiAction('Tolong terjemahkan teks berikut ke Bahasa Inggris secara alami.', 'replace')} 
+            title="Terjemahkan ke Inggris" 
+          />
           <div style={{ width: 1, background: '#ffffff33', margin: '0 4px', height: 16 }} />
           {[1, 2, 3].map(level => (
             <Btn
