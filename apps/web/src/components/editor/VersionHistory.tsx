@@ -117,290 +117,320 @@ export function VersionHistory({ noteId, currentContent, onClose, onRestore }: V
   return (
     <div
       style={{
-        width: '350px',
-        borderLeft: '1px solid var(--border)',
+        width: '100%',
+        borderTop: '1px solid var(--border)',
         background: 'var(--card-bg)',
-        height: '100%',
+        height: '280px',
         display: 'flex',
         flexDirection: 'column',
         flexShrink: 0,
         fontFamily: 'var(--font-body)',
+        position: 'relative',
       }}
     >
-      {/* Sidebar Header */}
-      <div
-        style={{
-          padding: '16px 20px',
-          borderBottom: '1px solid var(--border)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-        }}
-      >
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontWeight: 600, fontSize: '0.9rem', color: 'var(--fg)' }}>
-          <Clock size={16} style={{ color: 'var(--primary)' }} />
-          <span>Riwayat Versi</span>
+      {/* Top bar */}
+      <div style={{
+        padding: '10px 16px',
+        borderBottom: '1px solid var(--border)',
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        flexShrink: 0,
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <Clock size={14} style={{ color: 'var(--primary)' }} />
+          <span style={{ fontWeight: 700, fontSize: '0.8rem', color: 'var(--fg)', letterSpacing: '-0.01em' }}>
+            Riwayat Versi
+          </span>
+          {history.length > 0 && (
+            <span style={{
+              fontSize: '0.68rem', fontWeight: 600, padding: '1px 7px',
+              background: 'color-mix(in srgb, var(--primary) 15%, var(--card-bg))',
+              color: 'var(--primary)', borderRadius: 20,
+              border: '1px solid color-mix(in srgb, var(--primary) 25%, var(--border))',
+            }}>
+              {history.length} versi
+            </span>
+          )}
         </div>
-        <button
-          onClick={onClose}
-          style={{
-            background: 'none',
-            border: 'none',
-            color: 'var(--fg-muted)',
-            cursor: 'pointer',
-            padding: 4,
-            borderRadius: 4,
-            display: 'flex',
-            alignItems: 'center',
-          }}
-          onMouseEnter={e => (e.currentTarget.style.background = 'var(--accent)')}
-          onMouseLeave={e => (e.currentTarget.style.background = 'none')}
-        >
-          <X size={16} />
-        </button>
-      </div>
-
-      {/* Action Area */}
-      <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--border)' }}>
-        {showSaveDialog ? (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            <input
-              autoFocus
-              value={snapshotName}
-              onChange={e => setSnapshotName(e.target.value)}
-              placeholder="Nama versi (e.g. Versi Draf Awal)"
-              style={{
-                width: '100%',
-                padding: '6px 10px',
-                fontSize: '0.8rem',
-                borderRadius: 6,
-                border: '1px solid var(--border)',
-                background: 'var(--bg)',
-                color: 'var(--fg)',
-                outline: 'none',
-              }}
-              onKeyDown={e => {
-                if (e.key === 'Enter') handleSaveSnapshot()
-                if (e.key === 'Escape') setShowSaveDialog(false)
-              }}
-            />
-            <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
-              <button
-                onClick={() => setShowSaveDialog(false)}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          {/* Snapshot save */}
+          {showSaveDialog ? (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <input
+                autoFocus
+                value={snapshotName}
+                onChange={e => setSnapshotName(e.target.value)}
+                placeholder="Nama snapshot..."
                 style={{
-                  padding: '4px 10px', fontSize: '0.75rem', borderRadius: 4,
-                  border: '1px solid var(--border)', background: 'transparent',
-                  color: 'var(--fg-muted)', cursor: 'pointer'
+                  padding: '4px 8px', fontSize: '0.75rem', borderRadius: 6,
+                  border: '1px solid var(--primary)', background: 'var(--bg)',
+                  color: 'var(--fg)', outline: 'none', width: 160,
                 }}
-              >
-                Batal
-              </button>
-              <button
-                onClick={handleSaveSnapshot}
-                disabled={savingSnapshot}
-                style={{
-                  padding: '4px 12px', fontSize: '0.75rem', borderRadius: 4,
-                  border: 'none', background: 'var(--primary)',
-                  color: 'var(--primary-fg)', cursor: 'pointer', fontWeight: 600
+                onKeyDown={e => {
+                  if (e.key === 'Enter') handleSaveSnapshot()
+                  if (e.key === 'Escape') setShowSaveDialog(false)
                 }}
-              >
-                {savingSnapshot ? 'Menyimpan...' : 'Simpan'}
+              />
+              <button onClick={handleSaveSnapshot} disabled={savingSnapshot} style={{
+                padding: '4px 10px', fontSize: '0.72rem', fontWeight: 600,
+                border: 'none', borderRadius: 6, background: 'var(--primary)',
+                color: 'var(--primary-fg)', cursor: 'pointer',
+              }}>
+                {savingSnapshot ? '...' : 'Simpan'}
               </button>
+              <button onClick={() => setShowSaveDialog(false)} style={{
+                padding: '4px 8px', fontSize: '0.72rem',
+                border: '1px solid var(--border)', borderRadius: 6,
+                background: 'transparent', color: 'var(--fg-muted)', cursor: 'pointer',
+              }}>Batal</button>
             </div>
-          </div>
-        ) : (
+          ) : (
+            <button
+              onClick={() => setShowSaveDialog(true)}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 5,
+                padding: '5px 10px', fontSize: '0.75rem', fontWeight: 600,
+                border: '1px solid var(--primary)', borderRadius: 6,
+                background: 'var(--accent)', color: 'var(--primary)', cursor: 'pointer',
+              }}
+              onMouseEnter={e => (e.currentTarget.style.opacity = '0.85')}
+              onMouseLeave={e => (e.currentTarget.style.opacity = '1')}
+            >
+              <Plus size={12} />
+              Snapshot
+            </button>
+          )}
           <button
-            onClick={() => setShowSaveDialog(true)}
+            onClick={onClose}
             style={{
-              width: '100%',
-              padding: '8px 12px',
-              fontSize: '0.8125rem',
-              fontWeight: 600,
-              color: 'var(--primary)',
-              background: 'var(--accent)',
-              border: '1px solid var(--primary)',
-              borderRadius: 8,
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: 6,
-              transition: 'all 0.15s',
+              background: 'none', border: 'none', color: 'var(--fg-muted)',
+              cursor: 'pointer', padding: 4, borderRadius: 4,
+              display: 'flex', alignItems: 'center',
             }}
-            onMouseEnter={e => (e.currentTarget.style.opacity = '0.9')}
-            onMouseLeave={e => (e.currentTarget.style.opacity = '1')}
+            onMouseEnter={e => (e.currentTarget.style.background = 'var(--accent)')}
+            onMouseLeave={e => (e.currentTarget.style.background = 'none')}
           >
-            <Plus size={14} />
-            <span>Simpan Snapshot Baru</span>
+            <X size={14} />
           </button>
-        )}
+        </div>
       </div>
 
-      {/* Git Tree History */}
-      <div style={{ flex: 1, overflowY: 'auto', padding: '16px 12px' }}>
+      {/* Horizontal Timeline Body */}
+      <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
         {loading ? (
-          <div style={{ textAlign: 'center', color: 'var(--fg-muted)', padding: '24px 0', fontSize: '0.8rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', gap: 10, color: 'var(--fg-muted)', fontSize: '0.8rem' }}>
             <div style={{
-              width: 28, height: 28, border: '2px solid var(--primary)',
+              width: 18, height: 18, border: '2px solid var(--primary)',
               borderTopColor: 'transparent', borderRadius: '50%',
-              animation: 'spin 0.8s linear infinite', margin: '0 auto 10px',
+              animation: 'spin 0.8s linear infinite',
             }} />
             Memuat riwayat...
           </div>
         ) : history.length === 0 ? (
-          <div style={{ textAlign: 'center', color: 'var(--fg-muted)', padding: '32px 16px', fontSize: '0.8rem' }}>
-            <Clock size={24} style={{ margin: '0 auto 12px', opacity: 0.3, display: 'block' }} />
-            Belum ada riwayat versi.<br />Versi otomatis disimpan setiap 10 menit.
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--fg-muted)', fontSize: '0.8rem', gap: 8 }}>
+            <Clock size={20} style={{ opacity: 0.3 }} />
+            <span>Belum ada riwayat versi</span>
           </div>
-        ) : (() => {
-          // Group by day label
-          const groups: { label: string; items: typeof history }[] = []
-          history.forEach(item => {
-            const d = new Date(item.createdAt)
-            const today = new Date()
-            const yesterday = new Date(); yesterday.setDate(today.getDate() - 1)
-            let label: string
-            if (d.toDateString() === today.toDateString()) label = 'Hari ini'
-            else if (d.toDateString() === yesterday.toDateString()) label = 'Kemarin'
-            else label = d.toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })
-            const existing = groups.find(g => g.label === label)
-            if (existing) existing.items.push(item)
-            else groups.push({ label, items: [item] })
-          })
-
-          return groups.map((group, gi) => (
-            <div key={gi} style={{ marginBottom: 8 }}>
-              {/* Day label */}
-              <div style={{
-                fontSize: '0.7rem', fontWeight: 700, color: 'var(--fg-muted)',
-                textTransform: 'uppercase', letterSpacing: '0.08em',
-                padding: '0 0 8px 34px', marginBottom: 0,
-              }}>
-                {group.label}
+        ) : (
+          /* Horizontal scroll track */
+          <div style={{
+            height: '100%',
+            overflowX: 'auto',
+            overflowY: 'hidden',
+            display: 'flex',
+            flexDirection: 'column',
+            padding: '0 24px',
+            scrollbarWidth: 'thin',
+            scrollbarColor: 'var(--border) transparent',
+          }}>
+            {/* Cards row — top half */}
+            <div style={{ display: 'flex', alignItems: 'flex-end', gap: 0, height: '50%', paddingBottom: 0 }}>
+              {/* "Saat ini" anchor */}
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: 110, flexShrink: 0 }}>
+                <div style={{
+                  padding: '6px 10px', borderRadius: 8,
+                  background: 'color-mix(in srgb, var(--primary) 15%, var(--card-bg))',
+                  border: '1px solid color-mix(in srgb, var(--primary) 35%, var(--border))',
+                  fontSize: '0.72rem', fontWeight: 700, color: 'var(--primary)',
+                  whiteSpace: 'nowrap', marginBottom: 12,
+                }}>
+                  ● Saat ini
+                </div>
               </div>
 
-              {/* Items in this group */}
-              {group.items.map((item, idx) => {
-                const isLast = gi === groups.length - 1 && idx === group.items.length - 1
+              {history.map((item) => {
                 const isSnapshot = !!item.versionName
                 return (
-                  <div key={item.id} style={{ display: 'flex', gap: 0, position: 'relative' }}>
-                    {/* Git line + dot column */}
-                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: 32, flexShrink: 0 }}>
-                      {/* Vertical line above dot */}
-                      <div style={{
-                        width: 2,
-                        height: 14,
-                        background: isSnapshot ? 'var(--primary)' : 'var(--border)',
-                        flexShrink: 0,
-                      }} />
-                      {/* Commit dot */}
-                      <div style={{
-                        width: isSnapshot ? 14 : 10,
-                        height: isSnapshot ? 14 : 10,
-                        borderRadius: '50%',
-                        background: isSnapshot ? 'var(--primary)' : 'var(--card-bg)',
-                        border: `2px solid ${isSnapshot ? 'var(--primary)' : 'var(--border)'}`,
-                        boxShadow: isSnapshot ? '0 0 0 3px color-mix(in srgb, var(--primary) 20%, transparent)' : 'none',
-                        flexShrink: 0,
-                        zIndex: 1,
-                        transition: 'all 0.15s',
-                      }} />
-                      {/* Vertical line below dot */}
-                      {!isLast && (
-                        <div style={{
-                          width: 2,
-                          flex: 1,
-                          minHeight: 20,
-                          background: 'var(--border)',
-                        }} />
-                      )}
-                    </div>
-
-                    {/* Content card */}
+                  <div
+                    key={item.id}
+                    style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: 130, flexShrink: 0 }}
+                  >
+                    {/* Card floats above the line */}
                     <div
+                      onClick={() => setPreviewVersion(item)}
                       style={{
-                        flex: 1,
-                        marginLeft: 8,
-                        marginBottom: 6,
-                        padding: '9px 12px',
+                        width: 112,
+                        padding: '8px 10px',
                         borderRadius: 9,
-                        border: `1px solid ${isSnapshot ? 'color-mix(in srgb, var(--primary) 35%, var(--border))' : 'var(--border)'}`,
-                        background: isSnapshot ? 'color-mix(in srgb, var(--primary) 6%, var(--card-bg))' : 'var(--card-bg)',
+                        border: `1px solid ${isSnapshot ? 'color-mix(in srgb, var(--primary) 40%, var(--border))' : 'var(--border)'}`,
+                        background: isSnapshot
+                          ? 'color-mix(in srgb, var(--primary) 8%, var(--card-bg))'
+                          : 'var(--bg)',
                         cursor: 'pointer',
                         transition: 'all 0.15s',
+                        boxShadow: isSnapshot ? '0 2px 12px color-mix(in srgb, var(--primary) 15%, transparent)' : '0 1px 4px rgba(0,0,0,0.06)',
+                        marginBottom: 8,
                       }}
                       onMouseEnter={e => {
-                        (e.currentTarget as HTMLDivElement).style.borderColor = 'var(--primary)'
-                        ;(e.currentTarget as HTMLDivElement).style.background = 'color-mix(in srgb, var(--primary) 10%, var(--card-bg))'
+                        const el = e.currentTarget as HTMLDivElement
+                        el.style.borderColor = 'var(--primary)'
+                        el.style.transform = 'translateY(-2px)'
+                        el.style.boxShadow = '0 6px 20px color-mix(in srgb, var(--primary) 20%, transparent)'
                       }}
                       onMouseLeave={e => {
-                        ;(e.currentTarget as HTMLDivElement).style.borderColor = isSnapshot ? 'color-mix(in srgb, var(--primary) 35%, var(--border))' : 'var(--border)'
-                        ;(e.currentTarget as HTMLDivElement).style.background = isSnapshot ? 'color-mix(in srgb, var(--primary) 6%, var(--card-bg))' : 'var(--card-bg)'
+                        const el = e.currentTarget as HTMLDivElement
+                        el.style.borderColor = isSnapshot ? 'color-mix(in srgb, var(--primary) 40%, var(--border))' : 'var(--border)'
+                        el.style.transform = 'translateY(0)'
+                        el.style.boxShadow = isSnapshot ? '0 2px 12px color-mix(in srgb, var(--primary) 15%, transparent)' : '0 1px 4px rgba(0,0,0,0.06)'
                       }}
-                      onClick={() => setPreviewVersion(item)}
                     >
-                      {/* Top row: name + time */}
-                      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 6, marginBottom: 5 }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 5, flexWrap: 'wrap' }}>
-                          {isSnapshot && (
-                            <span style={{
-                              fontSize: '0.6rem', fontWeight: 700, padding: '1px 6px',
-                              background: 'var(--primary)', color: 'var(--primary-fg)',
-                              borderRadius: 4, letterSpacing: '0.05em', textTransform: 'uppercase',
-                            }}>
-                              Snapshot
-                            </span>
-                          )}
-                          <span style={{ fontWeight: 600, fontSize: '0.8rem', color: 'var(--fg)', wordBreak: 'break-word' }}>
-                            {item.versionName || 'Penyimpanan Otomatis'}
-                          </span>
+                      {isSnapshot && (
+                        <div style={{
+                          fontSize: '0.58rem', fontWeight: 800, letterSpacing: '0.06em',
+                          textTransform: 'uppercase', color: 'var(--primary)',
+                          marginBottom: 3,
+                        }}>
+                          📌 Snapshot
                         </div>
-                        <span style={{ fontSize: '0.68rem', color: 'var(--fg-muted)', whiteSpace: 'nowrap', marginTop: 1 }}>
-                          {new Date(item.createdAt).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}
-                        </span>
+                      )}
+                      <div style={{
+                        fontSize: '0.73rem', fontWeight: 600, color: 'var(--fg)',
+                        overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                        marginBottom: 3,
+                      }}>
+                        {item.versionName || 'Auto-save'}
                       </div>
-
-                      {/* Action row */}
-                      <div style={{ display: 'flex', gap: 5 }} onClick={e => e.stopPropagation()}>
-                        <button
-                          onClick={() => setPreviewVersion(item)}
-                          style={{
-                            display: 'flex', alignItems: 'center', gap: 3,
-                            padding: '2px 8px', fontSize: '0.7rem',
-                            border: '1px solid var(--border)', borderRadius: 4,
-                            background: 'var(--bg)', color: 'var(--fg-muted)',
-                            cursor: 'pointer', fontFamily: 'var(--font-body)',
-                          }}
-                          onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--primary)'; e.currentTarget.style.color = 'var(--primary)' }}
-                          onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.color = 'var(--fg-muted)' }}
-                        >
-                          <Eye size={10} />
-                          <span>Lihat</span>
-                        </button>
-                        <button
-                          onClick={() => setConfirmRestore(item)}
-                          style={{
-                            display: 'flex', alignItems: 'center', gap: 3,
-                            padding: '2px 8px', fontSize: '0.7rem',
-                            border: 'none', borderRadius: 4,
-                            background: 'var(--primary)', color: 'var(--primary-fg)',
-                            cursor: 'pointer', fontFamily: 'var(--font-body)',
-                          }}
-                          onMouseEnter={e => (e.currentTarget.style.opacity = '0.85')}
-                          onMouseLeave={e => (e.currentTarget.style.opacity = '1')}
-                        >
-                          <RotateCcw size={10} />
-                          <span>Pulihkan</span>
-                        </button>
+                      <div style={{ fontSize: '0.65rem', color: 'var(--fg-muted)' }}>
+                        {new Date(item.createdAt).toLocaleDateString('id-ID', { day: 'numeric', month: 'short' })}
+                        {' '}
+                        {new Date(item.createdAt).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}
                       </div>
                     </div>
                   </div>
                 )
               })}
             </div>
-          ))
-        })()}
+
+            {/* Timeline rail — middle */}
+            <div style={{ display: 'flex', alignItems: 'center', flexShrink: 0, height: 24 }}>
+              {/* "Now" cap */}
+              <div style={{
+                width: 110, flexShrink: 0,
+                display: 'flex', alignItems: 'center', justifyContent: 'flex-end',
+              }}>
+                <div style={{
+                  width: 14, height: 14, borderRadius: '50%',
+                  background: 'var(--primary)',
+                  boxShadow: '0 0 0 4px color-mix(in srgb, var(--primary) 25%, transparent)',
+                  flexShrink: 0,
+                }} />
+              </div>
+
+              {/* Rail line */}
+              <div style={{
+                height: 2,
+                width: `${history.length * 130}px`,
+                background: `linear-gradient(to right, var(--primary) 0%, var(--border) 40%)`,
+                flexShrink: 0,
+                position: 'relative',
+                display: 'flex', alignItems: 'center',
+              }}>
+                {history.map((item, i) => {
+                  const isSnapshot = !!item.versionName
+                  return (
+                    <div
+                      key={item.id}
+                      onClick={() => setPreviewVersion(item)}
+                      title={item.versionName || 'Auto-save'}
+                      style={{
+                        position: 'absolute',
+                        left: `${i * 130 + 54}px`,
+                        width: isSnapshot ? 14 : 10,
+                        height: isSnapshot ? 14 : 10,
+                        borderRadius: '50%',
+                        background: isSnapshot ? 'var(--primary)' : 'var(--card-bg)',
+                        border: `2px solid ${isSnapshot ? 'var(--primary)' : 'var(--border)'}`,
+                        boxShadow: isSnapshot ? '0 0 0 3px color-mix(in srgb, var(--primary) 20%, transparent)' : 'none',
+                        transform: 'translateY(-50%)',
+                        top: '50%',
+                        cursor: 'pointer',
+                        transition: 'all 0.15s',
+                        zIndex: 2,
+                      }}
+                      onMouseEnter={e => {
+                        const el = e.currentTarget as HTMLDivElement
+                        el.style.transform = 'translateY(-50%) scale(1.4)'
+                        el.style.boxShadow = '0 0 0 4px color-mix(in srgb, var(--primary) 30%, transparent)'
+                      }}
+                      onMouseLeave={e => {
+                        const el = e.currentTarget as HTMLDivElement
+                        el.style.transform = 'translateY(-50%) scale(1)'
+                        el.style.boxShadow = isSnapshot ? '0 0 0 3px color-mix(in srgb, var(--primary) 20%, transparent)' : 'none'
+                      }}
+                    />
+                  )
+                })}
+              </div>
+            </div>
+
+            {/* Action row — bottom half */}
+            <div style={{ display: 'flex', alignItems: 'flex-start', gap: 0, height: '50%', paddingTop: 8 }}>
+              {/* spacer for "now" cap */}
+              <div style={{ width: 110, flexShrink: 0 }} />
+
+              {history.map((item) => (
+                <div
+                  key={item.id}
+                  style={{ width: 130, flexShrink: 0, display: 'flex', justifyContent: 'center' }}
+                >
+                  <div style={{ display: 'flex', gap: 4 }} onClick={e => e.stopPropagation()}>
+                    <button
+                      onClick={() => setPreviewVersion(item)}
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: 3,
+                        padding: '3px 7px', fontSize: '0.68rem',
+                        border: '1px solid var(--border)', borderRadius: 5,
+                        background: 'var(--card-bg)', color: 'var(--fg-muted)',
+                        cursor: 'pointer', fontFamily: 'var(--font-body)',
+                        whiteSpace: 'nowrap',
+                      }}
+                      onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--primary)'; e.currentTarget.style.color = 'var(--primary)' }}
+                      onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.color = 'var(--fg-muted)' }}
+                    >
+                      <Eye size={9} />
+                      Lihat
+                    </button>
+                    <button
+                      onClick={() => setConfirmRestore(item)}
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: 3,
+                        padding: '3px 7px', fontSize: '0.68rem',
+                        border: 'none', borderRadius: 5,
+                        background: 'var(--primary)', color: 'var(--primary-fg)',
+                        cursor: 'pointer', fontFamily: 'var(--font-body)',
+                        whiteSpace: 'nowrap',
+                      }}
+                      onMouseEnter={e => (e.currentTarget.style.opacity = '0.8')}
+                      onMouseLeave={e => (e.currentTarget.style.opacity = '1')}
+                    >
+                      <RotateCcw size={9} />
+                      Pulihkan
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Restore Confirmation Modal */}

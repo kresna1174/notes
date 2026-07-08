@@ -208,36 +208,40 @@ function NotePageComponent() {
             <p className="text-sm" style={{ color: '#6c757d' }}>Note not found.</p>
           </div>
         ) : isContentVisible ? (
-          <div style={{ flex: 1, overflow: 'hidden', display: 'flex' }}>
-            <Editor
-              key={note.id}
-              note={note}
-              onUpdate={handleUpdate}
-              onSaveStatusChange={setSaveStatus}
-              onLockChange={locked => {
-                setNote(prev => prev ? { ...prev, isLocked: locked } : prev)
-                if (locked) setUnlocked(false)
-              }}
-              shareTrigger={shareTrigger}
-              chatOpen={chatOpen}
-              onToggleChat={() => {
-                setChatOpen(v => !v)
-                setHistoryOpen(false)
-              }}
-              historyOpen={historyOpen}
-              onToggleHistory={() => {
-                setHistoryOpen(v => !v)
-                setChatOpen(false)
-              }}
-            />
-            {chatOpen && (
-              <ChatBot
-                noteId={id}
-                noteContent={note.content}
-                noteTitle={note.title}
-                onClose={() => setChatOpen(false)}
+          <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+            {/* Editor row (with optional ChatBot sidebar) */}
+            <div style={{ flex: 1, overflow: 'hidden', display: 'flex', minHeight: 0 }}>
+              <Editor
+                key={note.id}
+                note={note}
+                onUpdate={handleUpdate}
+                onSaveStatusChange={setSaveStatus}
+                onLockChange={locked => {
+                  setNote(prev => prev ? { ...prev, isLocked: locked } : prev)
+                  if (locked) setUnlocked(false)
+                }}
+                shareTrigger={shareTrigger}
+                chatOpen={chatOpen}
+                onToggleChat={() => {
+                  setChatOpen(v => !v)
+                  setHistoryOpen(false)
+                }}
+                historyOpen={historyOpen}
+                onToggleHistory={() => {
+                  setHistoryOpen(v => !v)
+                  setChatOpen(false)
+                }}
               />
-            )}
+              {chatOpen && (
+                <ChatBot
+                  noteId={id}
+                  noteContent={note.content}
+                  noteTitle={note.title}
+                  onClose={() => setChatOpen(false)}
+                />
+              )}
+            </div>
+            {/* History panel — horizontal timeline at bottom */}
             {historyOpen && (
               <VersionHistory
                 noteId={id}
