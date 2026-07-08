@@ -513,21 +513,19 @@ export function EditDiagramDialog({
         {showAiInput && (
           <div style={{
             position: 'absolute',
-            inset: 0,
-            background: 'rgba(0, 0, 0, 0.45)',
-            backdropFilter: 'blur(4px)',
+            bottom: '80px',
+            left: '50%',
+            transform: 'translateX(-50%)',
             zIndex: 1000,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
+            pointerEvents: 'auto',
           }}>
             <div style={{
               background: 'var(--card-bg)',
               border: '1px solid var(--border)',
               borderRadius: '12px',
-              boxShadow: '0 20px 25px -5px rgba(0,0,0,0.3), 0 10px 10px -5px rgba(0,0,0,0.2)',
+              boxShadow: '0 20px 25px -5px rgba(0,0,0,0.5), 0 10px 10px -5px rgba(0,0,0,0.4)',
               width: '450px',
-              maxWidth: '90%',
+              maxWidth: '90vw',
               padding: '20px',
               display: 'flex',
               flexDirection: 'column',
