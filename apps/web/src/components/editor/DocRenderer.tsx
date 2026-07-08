@@ -1,10 +1,11 @@
 import React, { useState } from 'react'
 import { marked } from 'marked'
-import { FileText, ImageIcon, FileCode, Download, ChevronDown, ChevronUp } from 'lucide-react'
+import { FileText, ImageIcon, FileCode, Download, ChevronDown, ChevronUp, Maximize2 } from 'lucide-react'
 import { AttachmentPreviewModal, isPreviewable } from './AttachmentPreviewModal'
 import ReactFlow, { Background, ReactFlowProvider, type Node, type Edge } from 'reactflow'
 import { Handle, Position } from 'reactflow'
 import 'reactflow/dist/style.css'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../ui/dialog'
 
 // ── helpers ──────────────────────────────────────────────────
 
@@ -78,6 +79,7 @@ function computeBBox(nodes: Node[]) {
 
 function DiagramPreview({ data }: { data: string }) {
   const [expanded, setExpanded] = useState(false)
+  const [fullscreen, setFullscreen] = useState(false)
   const parsed = (() => { try { return JSON.parse(data || '{}') } catch { return { nodes: [], edges: [] } } })()
   const nodes: Node[] = parsed.nodes || []
   const edges: Edge[] = parsed.edges || []
@@ -178,13 +180,33 @@ function DiagramPreview({ data }: { data: string }) {
         }}>
           <div style={{
             position: 'absolute', top: 8, right: 8, zIndex: 10,
-            fontSize: '0.68rem', color: 'var(--fg-muted,#6c757d)',
-            background: 'var(--bg,#fff)', border: '1px solid var(--border,#e9ecef)',
-            borderRadius: 6, padding: '2px 8px', pointerEvents: 'none',
-            fontFamily: 'var(--font-body,sans-serif)',
-            boxShadow: '0 1px 4px rgba(0,0,0,0.05)'
+            display: 'flex', alignItems: 'center', gap: 6
           }}>
-            Drag untuk geser {isWide && '· Cubit untuk zoom'}
+            <div style={{
+              fontSize: '0.68rem', color: 'var(--fg-muted,#6c757d)',
+              background: 'var(--bg,#fff)', border: '1px solid var(--border,#e9ecef)',
+              borderRadius: 6, padding: '2px 8px', pointerEvents: 'none',
+              fontFamily: 'var(--font-body,sans-serif)',
+              boxShadow: '0 1px 4px rgba(0,0,0,0.05)'
+            }}>
+              Drag untuk geser {isWide && '· Cubit untuk zoom'}
+            </div>
+            
+            <button
+              onClick={() => setFullscreen(true)}
+              title="Perbesar Layar Penuh"
+              style={{
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                width: 24, height: 24,
+                border: '1px solid var(--border,#e9ecef)', borderRadius: 6,
+                background: 'var(--bg,#fff)', color: 'var(--fg-muted,#6c757d)',
+                cursor: 'pointer', transition: 'all 0.15s',
+              }}
+              onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--primary,#3b5bdb)'; e.currentTarget.style.color = 'var(--primary)' }}
+              onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border,#e9ecef)'; e.currentTarget.style.color = 'var(--fg-muted)' }}
+            >
+              <Maximize2 size={12} />
+            </button>
           </div>
           <ReactFlowProvider>
             <ReactFlow
@@ -208,6 +230,74 @@ function DiagramPreview({ data }: { data: string }) {
             </ReactFlow>
           </ReactFlowProvider>
         </div>
+      )}
+
+      {fullscreen && (
+        <Dialog open={true} onOpenChange={(v) => { if (!v) setFullscreen(false) }}>
+          <DialogContent
+            aria-describedby={undefined}
+            style={{
+              maxWidth: '96vw', width: '96vw', height: '92vh',
+              display: 'flex', flexDirection: 'column',
+              padding: 0, gap: 0, overflow: 'hidden',
+              background: 'var(--card-bg,#fff)', color: 'var(--fg,#1a1a2e)',
+              borderRadius: 16, border: '1px solid var(--border,#e9ecef)',
+              boxShadow: '0 24px 64px rgba(0,0,0,0.25)',
+            }}
+          >
+            <DialogHeader style={{ padding: '16px 20px 12px', borderBottom: '1px solid var(--border,#e9ecef)', flexShrink: 0 }}>
+              <DialogTitle style={{ fontSize: '0.9375rem', color: 'var(--fg,#1a1a2e)', fontFamily: 'var(--font-heading,sans-serif)', display: 'flex', alignItems: 'center', gap: 8 }}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--primary,#3b5bdb)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="3" y="3" width="7" height="7" rx="1" />
+                  <rect x="14" y="14" width="7" height="7" rx="1" />
+                  <path d="M10 6.5h4c1 0 2 1 2 2v5.5" />
+                </svg>
+                <span>Pratinjau Diagram</span>
+              </DialogTitle>
+            </DialogHeader>
+
+            <div style={{ flex: 1, minHeight: 0, background: 'var(--muted,#f8f9fa)', position: 'relative' }}>
+              <div style={{ position: 'absolute', top: 8, right: 8, zIndex: 10, fontSize: '0.68rem', color: 'var(--fg-muted,#6c757d)', background: 'var(--bg,#fff)', border: '1px solid var(--border,#e9ecef)', borderRadius: 6, padding: '2px 8px', pointerEvents: 'none', fontFamily: 'var(--font-body,sans-serif)', boxShadow: '0 1px 4px rgba(0,0,0,0.05)' }}>
+                Drag untuk geser · Scroll/Cubit untuk zoom
+              </div>
+              <ReactFlowProvider>
+                <ReactFlow
+                  nodes={nodes}
+                  edges={edges}
+                  nodeTypes={RO_NODE_TYPES}
+                  fitView
+                  fitViewOptions={{ padding: 0.18 }}
+                  nodesDraggable={false}
+                  nodesConnectable={false}
+                  elementsSelectable={false}
+                  panOnDrag={true}
+                  panOnScroll={false}
+                  zoomOnScroll={true}
+                  zoomOnPinch={true}
+                  zoomOnDoubleClick={true}
+                  preventScrolling={false}
+                  proOptions={{ hideAttribution: true }}
+                >
+                  <Background gap={16} size={1} color="var(--border,#e9ecef)" />
+                </ReactFlow>
+              </ReactFlowProvider>
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, padding: '12px 20px', borderTop: '1px solid var(--border,#e9ecef)', flexShrink: 0, background: 'var(--card-bg,#fff)' }}>
+              <button
+                onClick={() => setFullscreen(false)}
+                style={{
+                  padding: '6px 16px', fontSize: '0.875rem',
+                  fontFamily: 'var(--font-body,sans-serif)',
+                  border: '1px solid var(--border,#e9ecef)', borderRadius: 6,
+                  background: 'var(--bg,#fff)', cursor: 'pointer', color: 'var(--fg-muted,#6c757d)',
+                }}
+              >
+                Tutup
+              </button>
+            </div>
+          </DialogContent>
+        </Dialog>
       )}
     </div>
   )
