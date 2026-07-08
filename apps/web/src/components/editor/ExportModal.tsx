@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../ui/dialog'
 import { Download, FileText, Settings, Type, AlignLeft, Palette, CheckSquare, X, Eye } from 'lucide-react'
 import { docToSegments, DocContent } from './DocRenderer'
@@ -24,6 +24,7 @@ type PdfMargin = 'narrow' | 'standard' | 'wide'
 
 export function ExportModal({ note, onClose }: ExportModalProps) {
   const [format, setFormat] = useState<ExportFormat>('pdf')
+  const previewRef = useRef<HTMLDivElement>(null)
   
   // PDF configurations
   const [pdfTheme, setPdfTheme] = useState<PdfTheme>('light')
@@ -138,72 +139,34 @@ export function ExportModal({ note, onClose }: ExportModalProps) {
 
   // PDF Export Logic using html2pdf.js library via script download
   const exportPdf = () => {
+    if (!previewRef.current) return
     const printStyles = getThemeStyles(pdfTheme)
-    const fontFam = getFontFamily(pdfFont)
-    const marginSize = getMarginSize(pdfMargin)
 
-    // Create a temporary element for capturing without scroll-clipping
-    const tempDiv = document.createElement('div')
-    tempDiv.style.position = 'absolute'
-    tempDiv.style.left = '-9999px'
-    tempDiv.style.top = '-9999px'
-    tempDiv.style.width = '794px' // Standard A4 width (~210mm at 96 dpi)
-    tempDiv.style.background = printStyles.bg
-    tempDiv.style.color = printStyles.fg
-    tempDiv.style.fontFamily = fontFam
+    // Clone the sheet paper mockup element to render full content heights
+    const clone = previewRef.current.cloneNode(true) as HTMLDivElement
     
-    // Inject the theme variables to allow Cascade to Tiptap nodes
-    tempDiv.style.setProperty('--fg', printStyles.fg)
-    tempDiv.style.setProperty('--bg', printStyles.bg)
-    tempDiv.style.setProperty('--border', printStyles.border)
-    tempDiv.style.setProperty('--card-bg', printStyles.bg)
-    tempDiv.style.setProperty('--fg-muted', printStyles.muted)
+    // Set custom styles for A4 dimensions
+    clone.style.width = '794px' // Standard A4 width in pixels (~210mm at 96 dpi)
+    clone.style.height = 'auto'
+    clone.style.maxHeight = 'none'
+    clone.style.overflow = 'visible'
+    clone.style.boxShadow = 'none'
+    clone.style.border = 'none'
+    clone.style.borderRadius = '0'
 
-    tempDiv.innerHTML = `
-      <div style="
-        padding: ${marginSize};
-        box-sizing: border-box;
-      ">
-        ${includeCover && note.coverImage ? `
-          <div style="
-            width: 100%;
-            height: 150px;
-            background-image: ${note.coverImage.startsWith('linear-gradient') ? note.coverImage : `url(${note.coverImage})`};
-            background-size: cover;
-            background-position: center;
-            border-radius: 8px;
-            margin-bottom: 24px;
-          "></div>
-        ` : ''}
+    // Create wrapper that is inside positive viewport bounds but hidden under the layout
+    const wrapper = document.createElement('div')
+    wrapper.style.position = 'fixed'
+    wrapper.style.left = '0'
+    wrapper.style.top = '0'
+    wrapper.style.width = '794px'
+    wrapper.style.zIndex = '-9999' // Render behind body/app backgrounds
+    wrapper.style.opacity = '1' // Keep at 1 opacity so html2canvas renders full text contrast
+    wrapper.style.pointerEvents = 'none'
+    wrapper.style.background = printStyles.bg
 
-        <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 12px;">
-          ${note.icon ? `<span style="font-size: 3rem; line-height: 1;">${note.icon}</span>` : ''}
-          <h1 style="margin: 0; font-size: 2.2rem; font-weight: 800; letter-spacing: -0.02em;">${note.title}</h1>
-        </div>
-
-        ${includeMetadata ? `
-          <div style="
-            display: flex;
-            gap: 16px;
-            font-size: 0.8rem;
-            color: ${printStyles.muted};
-            border-bottom: 1px solid ${printStyles.border};
-            padding-bottom: 12px;
-            margin-bottom: 24px;
-          ">
-            <span>Dibuat: ${new Date(note.createdAt).toLocaleDateString('id-ID')}</span>
-            <span>Diperbarui: ${new Date(note.updatedAt).toLocaleDateString('id-ID')}</span>
-            ${note.createdByUsername ? `<span>Penulis: ${note.createdByUsername}</span>` : ''}
-          </div>
-        ` : ''}
-
-        <div class="editor-preview-doc-content" style="font-size: 1.05rem; line-height: 1.6;">
-          ${document.querySelector('.editor-preview-doc-content')?.innerHTML || ''}
-        </div>
-      </div>
-    `
-
-    document.body.appendChild(tempDiv)
+    wrapper.appendChild(clone)
+    document.body.appendChild(wrapper)
 
     const opt = {
       margin:       0,
@@ -221,17 +184,17 @@ export function ExportModal({ note, onClose }: ExportModalProps) {
     // @ts-ignore
     import('html2pdf.js').then((html2pdfModule) => {
       const html2pdf = html2pdfModule.default;
-      html2pdf().from(tempDiv).set(opt).save().then(() => {
-        document.body.removeChild(tempDiv)
+      html2pdf().from(clone).set(opt).save().then(() => {
+        document.body.removeChild(wrapper)
         onClose()
       }).catch((err: any) => {
         console.error('PDF generation error:', err)
-        document.body.removeChild(tempDiv)
+        document.body.removeChild(wrapper)
         alert('Gagal membuat PDF: ' + String(err))
       })
     }).catch(err => {
       console.error('Failed to load html2pdf.js module:', err)
-      document.body.removeChild(tempDiv)
+      document.body.removeChild(wrapper)
       alert('Gagal mengunduh modul PDF: ' + String(err))
     })
   }
@@ -548,6 +511,7 @@ export function ExportModal({ note, onClose }: ExportModalProps) {
 
             {/* Simulated Sheet Paper */}
             <div
+              ref={previewRef}
               className="export-pdf-mockup-sheet"
               style={{
                 width: '100%',
