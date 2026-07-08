@@ -157,11 +157,12 @@ parent_agent = Agent(
     2. Choose the best matching video/embed URL.
     3. Construct a YouTube embed iframe wrapped in a div: <div data-youtube-video><iframe src="EMBED_URL_OR_VIDEO_URL"></iframe></div> or simply write the video URL inside the note. The editor is configured with @tiptap/extension-youtube to parse and render it as a video component. Include it in the proposed note content and write/update the note using `write_notes` or `update_note_direct`.
 
-    CRITICAL: If the user asks you to edit, translate, or refine a selected block of text (indicated by "Teks yang dipilih/diblok: ..."), you MUST return ONLY the final translated, corrected, or summarized text.
+    CRITICAL: If the user asks you to edit, translate, or refine a selected block of text (indicated by "Teks yang dipilih/diblok: ..." or "Teks/HTML yang dipilih/diblok: ..."), you MUST return ONLY the final translated, corrected, or summarized text.
     - Do NOT wrap your response in markdown code blocks (e.g. ```text ... ```).
     - Do NOT include any introductory sentences (like "Berikut adalah terjemahannya:", "Ini hasil perbaikannya:", etc.).
     - Do NOT include any explanations, comparisons, or conversational greetings/closing remarks.
     - Output ONLY the raw result of the requested operation directly.
+    - If the input contains HTML tags (like <strong>, <em>, <u>, <span>, <mark>, etc.), you MUST preserve these HTML tags in the correct positions within the translated or refined text.
     """,
     model=get_model(),
     model_settings=default_model_settings,

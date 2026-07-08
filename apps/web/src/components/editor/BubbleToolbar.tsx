@@ -11,15 +11,26 @@ export function BubbleToolbar({ editor }: BubbleToolbarProps) {
   const [mode, setMode] = useState<'text' | 'table' | null>(null)
   const toolbarRef = useRef<HTMLDivElement>(null)
 
-  const handleAiAction = (systemPrompt: string, actionType: 'replace' | 'insert_below') => {
+  const handleAiAction = (systemPrompt: string, actionType: 'replace' | 'insert_below' | 'append_to_end', useHtml: boolean = false) => {
     if (!editor) return
     const { from, to } = editor.state.selection
-    const selectedText = editor.state.doc.textBetween(from, to, ' ')
-    if (!selectedText.trim()) return
+    
+    let contentToSend = ''
+    if (useHtml) {
+      const fragment = editor.state.doc.slice(from, to).content
+      const dom = editor.view.domSerializer.serializeFragment(fragment)
+      const temp = document.createElement('div')
+      temp.appendChild(dom)
+      contentToSend = temp.innerHTML
+    } else {
+      contentToSend = editor.state.doc.textBetween(from, to, ' ')
+    }
+
+    if (!contentToSend.trim()) return
 
     window.dispatchEvent(new CustomEvent('trigger-ai-action', {
       detail: {
-        prompt: `${systemPrompt}\n\nTeks yang dipilih/diblok:\n"""\n${selectedText}\n"""`,
+        prompt: `${systemPrompt}\n\nTeks/HTML yang dipilih/diblok:\n"""\n${contentToSend}\n"""`,
         action: actionType,
         from,
         to
@@ -122,7 +133,7 @@ export function BubbleToolbar({ editor }: BubbleToolbarProps) {
           <Btn 
             icon={<Sparkles size={13} style={{ color: '#c084fc' }} />} 
             active={false} 
-            onClick={() => handleAiAction('Tolong perbaiki tata bahasa, perbaiki typo, dan tingkatkan tulisan dari teks berikut agar lebih profesional.', 'replace')} 
+            onClick={() => handleAiAction('Tolong perbaiki tata bahasa, perbaiki typo, dan tingkatkan tulisan dari teks/HTML berikut agar lebih profesional. Anda HARUS mempertahankan semua tag HTML (seperti <strong>, <em>, <u>, <span>, <mark>, dll.) pada posisi kata yang tepat agar format/style tulisan tetap terjaga.', 'replace', true)} 
             title="Perbaiki dengan AI" 
           />
           <Btn 
@@ -134,7 +145,7 @@ export function BubbleToolbar({ editor }: BubbleToolbarProps) {
           <Btn 
             icon={<Globe size={13} style={{ color: '#c084fc' }} />} 
             active={false} 
-            onClick={() => handleAiAction('Tolong terjemahkan teks berikut ke Bahasa Inggris secara alami.', 'replace')} 
+            onClick={() => handleAiAction('Tolong terjemahkan teks/HTML berikut ke Bahasa Inggris secara alami. Anda HARUS mempertahankan semua tag HTML (seperti <strong>, <em>, <u>, <span>, <mark>, dll.) pada posisi kata yang tepat agar format/style tulisan tetap terjaga.', 'replace', true)} 
             title="Terjemahkan ke Inggris" 
           />
           <div style={{ width: 1, background: '#ffffff33', margin: '0 4px', height: 16 }} />
