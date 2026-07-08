@@ -35,7 +35,8 @@ import { ToggleBlock } from './ToggleBlock'
 import { DragHandle } from './DragHandle'
 import { NoteIcon } from '../ui/NoteIcon'
 import { useEffect, useRef, useState, useMemo } from 'react'
-import { Eye, EyeOff, Lock, LockOpen, Share2, FileUp, Paperclip, Sparkles, Smile, Image as ImageIcon } from 'lucide-react'
+import { Eye, EyeOff, Lock, LockOpen, Share2, FileUp, Paperclip, Sparkles, Smile, Image as ImageIcon, Clock, Download } from 'lucide-react'
+import { ExportModal } from './ExportModal'
 import { marked } from 'marked'
 import mammoth from 'mammoth'
 import * as XLSX from 'xlsx'
@@ -242,6 +243,8 @@ interface EditorProps {
   shareTrigger?: number
   chatOpen?: boolean
   onToggleChat?: () => void
+  historyOpen?: boolean
+  onToggleHistory?: () => void
 }
 
 function fmt(ts: number) {
@@ -484,7 +487,7 @@ function CoverSelector({ onSelect }: { onSelect: (gradient: string) => void }) {
   )
 }
 
-export function Editor({ note, onUpdate, onSaveStatusChange, onLockChange, shareTrigger, chatOpen, onToggleChat }: EditorProps) {
+export function Editor({ note, onUpdate, onSaveStatusChange, onLockChange, shareTrigger, chatOpen, onToggleChat, historyOpen, onToggleHistory }: EditorProps) {
   const [title, setTitle] = useState(note.title)
   const titleValRef = useRef(title)
   titleValRef.current = title
@@ -526,6 +529,7 @@ export function Editor({ note, onUpdate, onSaveStatusChange, onLockChange, share
   const [shareToken, setShareToken] = useState<string | null>(note.shareToken ?? null)
   const [hasPinProtection, setHasPinProtection] = useState(note.hasPinProtection ?? false)
   const [showShare, setShowShare] = useState(false)
+  const [showExport, setShowExport] = useState(false)
   function setStatus(s: SaveStatus) { onSaveStatusChange?.(s) }
   const titleRef = useRef<HTMLInputElement>(null)
   const saveTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
@@ -793,6 +797,7 @@ export function Editor({ note, onUpdate, onSaveStatusChange, onLockChange, share
 
     let fullText = ''
     let promptBarClosed = false
+    let streamError: string | null = null
 
     const cursorChar = ' ▋'
     let hasCursor = false
@@ -858,7 +863,9 @@ export function Editor({ note, onUpdate, onSaveStatusChange, onLockChange, share
           
           try {
             const data = JSON.parse(jsonStr)
-            if (data.type === 'text-delta' && data.delta) {
+            if (data.type === 'error' && data.errorText) {
+              streamError = data.errorText
+            } else if (data.type === 'text-delta' && data.delta) {
               const delta = data.delta
               fullText += delta
               insertDeltaWithCursor(delta)
@@ -875,7 +882,9 @@ export function Editor({ note, onUpdate, onSaveStatusChange, onLockChange, share
           const jsonStr = buffer.trim().substring(6)
           if (jsonStr !== '[DONE]') {
             const data = JSON.parse(jsonStr)
-            if (data.type === 'text-delta' && data.delta) {
+            if (data.type === 'error' && data.errorText) {
+              streamError = data.errorText
+            } else if (data.type === 'text-delta' && data.delta) {
               const delta = data.delta
               fullText += delta
               insertDeltaWithCursor(delta)
@@ -886,6 +895,11 @@ export function Editor({ note, onUpdate, onSaveStatusChange, onLockChange, share
 
       // Remove the inline cursor before final compilation
       removeCursor()
+
+      // If stream error occurred and no text was generated, show error
+      if (streamError && !fullText) {
+        throw new Error(streamError)
+      }
 
       // Replace the entire streamed raw text with compiled markdown HTML
       if (fullText) {
@@ -1235,7 +1249,7 @@ export function Editor({ note, onUpdate, onSaveStatusChange, onLockChange, share
               justifyContent: 'flex-end', 
               alignItems: 'center', 
               gap: isMobile ? 6 : 8,
-              zIndex: 100,
+              zIndex: 30,
               background: 'var(--bg)',
               padding: isMobile ? '12px 16px' : '16px 60px',
               margin: isMobile ? '-64px -16px 24px' : '-40px -60px 32px',
@@ -1351,6 +1365,23 @@ export function Editor({ note, onUpdate, onSaveStatusChange, onLockChange, share
                 <FileUp size={14} />
               </button>
 
+              <button
+                onClick={() => setShowExport(true)}
+                title="Ekspor Catatan (PDF/Markdown)"
+                style={{
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  width: 32, height: 32,
+                  border: '1px solid var(--border)', borderRadius: '50%',
+                  background: 'var(--bg)',
+                  color: 'var(--fg-muted)',
+                  cursor: 'pointer', transition: 'all 0.15s',
+                }}
+                onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--primary)'; e.currentTarget.style.color = 'var(--primary)' }}
+                onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.color = 'var(--fg-muted)' }}
+              >
+                <Download size={14} />
+              </button>
+
               <input
                 ref={attachInputRef}
                 type="file"
@@ -1442,6 +1473,25 @@ export function Editor({ note, onUpdate, onSaveStatusChange, onLockChange, share
                   onMouseLeave={e => { if (!chatOpen) { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.color = 'var(--fg-muted)' } }}
                 >
                   <Sparkles size={14} />
+                </button>
+              )}
+
+              {onToggleHistory && (
+                <button
+                  onClick={onToggleHistory}
+                  title={historyOpen ? 'Sembunyikan Riwayat Versi' : 'Tampilkan Riwayat Versi'}
+                  style={{
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    width: 32, height: 32,
+                    border: `1px solid ${historyOpen ? 'var(--primary)' : 'var(--border)'}`, borderRadius: '50%',
+                    background: historyOpen ? 'var(--accent)' : 'var(--bg)',
+                    color: historyOpen ? 'var(--primary)' : 'var(--fg-muted)',
+                    cursor: 'pointer', transition: 'all 0.15s',
+                  }}
+                  onMouseEnter={e => { if (!historyOpen) { e.currentTarget.style.borderColor = 'var(--primary)'; e.currentTarget.style.color = 'var(--primary)' } }}
+                  onMouseLeave={e => { if (!historyOpen) { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.color = 'var(--fg-muted)' } }}
+                >
+                  <Clock size={14} />
                 </button>
               )}
             </div>
@@ -1564,6 +1614,22 @@ export function Editor({ note, onUpdate, onSaveStatusChange, onLockChange, share
           editor={editor}
           data={editDiagramData}
           onClose={() => setEditDiagramData(null)}
+        />
+      )}
+
+      {showExport && (
+        <ExportModal
+          note={{
+            id: note.id,
+            title: title || 'Untitled',
+            content: note.content,
+            createdAt: note.createdAt,
+            updatedAt: note.updatedAt,
+            createdByUsername: note.createdByUsername,
+            coverImage: coverImage,
+            icon: icon,
+          }}
+          onClose={() => setShowExport(false)}
         />
       )}
 

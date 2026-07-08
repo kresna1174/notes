@@ -4,6 +4,7 @@ import random
 import re
 import uuid
 import logging
+from datetime import datetime, timezone
 from contextlib import asynccontextmanager
 
 from dotenv import load_dotenv
@@ -45,7 +46,7 @@ from openai.types.responses import (
 
 # Import SQLAlchemy config dan models
 from core.database import engine, Base, get_db
-from core.models import SubAgentTask
+from core.models import SubAgentTask, SessionTokenUsage
 
 # Import OpenAI Agents SDK
 from agents import Agent, Runner, ToolCallItem, ToolCallOutputItem
@@ -361,6 +362,29 @@ async def chat_event_generator(message: str, session_id: str, user_id: str | Non
                             "promptTokens": input_toks,
                             "completionTokens": output_toks,
                         })
+
+                        # Save token usage to database
+                        try:
+                            model_name = getattr(resp, "model", None) or os.getenv("OPENROUTER_MODEL", "unknown")
+                            token_record = SessionTokenUsage(
+                                session_id=session_id,
+                                prompt_tokens=input_toks,
+                                completion_tokens=output_toks,
+                                model=model_name,
+                            )
+                            async with engine.begin() as conn:
+                                await conn.run_sync(lambda sync_conn: sync_conn.execute(
+                                    SessionTokenUsage.__table__.insert().values(
+                                        id=str(uuid.uuid4()),
+                                        session_id=session_id,
+                                        prompt_tokens=input_toks,
+                                        completion_tokens=output_toks,
+                                        model=model_name,
+                                        created_at=datetime.now(timezone.utc),
+                                    )
+                                ))
+                        except Exception as token_err:
+                            logger.error(f"Failed to save token usage: {token_err}")
 
                 if hasattr(data, "delta") and data.delta:
                     delta_clean = data.delta.replace("\n", "\\n")
@@ -977,6 +1001,251 @@ async def get_chat_history(session_id: str):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to fetch history: {str(e)}")
 
+
+# ── Admin: AI Sessions History & Monitoring ──────────────────────────────────
+
+@app.get("/api/admin/sessions")
+async def admin_list_sessions(user_id: str | None = None, page: int = 1, page_size: int = 30):
+    """List all AI sessions with message counts, token usage, and stats."""
+    db_url = os.getenv("DATABASE_URL", "sqlite+aiosqlite:///sessions.db").replace("+aiosqlite", "")
+    import sqlite3 as _sqlite3
+    try:
+        conn = _sqlite3.connect(db_url.replace("sqlite:///", ""))
+        conn.row_factory = _sqlite3.Row
+
+        total = conn.execute("SELECT COUNT(*) FROM agent_sessions").fetchone()[0]
+
+        offset = (page - 1) * page_size
+        sessions = conn.execute("""
+            SELECT 
+                s.session_id,
+                s.created_at,
+                s.updated_at,
+                (SELECT COUNT(*) FROM agent_messages WHERE session_id = s.session_id) as message_count,
+                (SELECT COUNT(*) FROM agent_messages WHERE session_id = s.session_id AND message_data LIKE '%"role":"user"%') as user_message_count,
+                (SELECT COUNT(*) FROM agent_messages WHERE session_id = s.session_id AND message_data LIKE '%"type":"function_call"%') as tool_call_count
+            FROM agent_sessions s
+            ORDER BY s.updated_at DESC
+            LIMIT ? OFFSET ?
+        """, (page_size, offset)).fetchall()
+
+        # Get token usage per session (aggregate)
+        token_rows = conn.execute("""
+            SELECT session_id, SUM(prompt_tokens) as prompt_tokens, SUM(completion_tokens) as completion_tokens
+            FROM session_token_usage
+            GROUP BY session_id
+        """).fetchall()
+        token_map = {r["session_id"]: {"prompt_tokens": r["prompt_tokens"], "completion_tokens": r["completion_tokens"]} for r in token_rows}
+
+        result = []
+        for sess in sessions:
+            sid = sess["session_id"]
+
+            # Extract user_id and note_title from first user message context
+            first_user_msg = conn.execute("""
+                SELECT message_data FROM agent_messages 
+                WHERE session_id = ? AND message_data LIKE '%"role":"user"%'
+                ORDER BY created_at ASC LIMIT 1
+            """, (sid,)).fetchone()
+            
+            extracted_user_id = None
+            note_title = None
+            prompt_preview = ""
+            if first_user_msg:
+                try:
+                    msg = json.loads(first_user_msg["message_data"])
+                    content = msg.get("content", "")
+                    if isinstance(content, list):
+                        content = " ".join(p.get("text", "") for p in content if isinstance(p, dict))
+                    prompt_preview = (content or "")[:300]
+                    # Extract user_id and note_title from context
+                    ctx = msg.get("context", {})
+                    if isinstance(ctx, dict):
+                        extracted_user_id = ctx.get("user_id")
+                        note_title = ctx.get("note_title")
+                    # Also try to extract from message text patterns
+                    if not note_title:
+                        m = re.search(r'Konteks Catatan.*?Judul:\s*"([^"]+)"', prompt_preview)
+                        if m:
+                            note_title = m.group(1)
+                except Exception:
+                    pass
+
+            # Check for errors
+            has_error = False
+            error_msg = None
+            error_row = conn.execute("""
+                SELECT message_data FROM agent_messages 
+                WHERE session_id = ? AND (message_data LIKE '%"error"%' OR message_data LIKE '%failed%')
+                ORDER BY created_at DESC LIMIT 1
+            """, (sid,)).fetchone()
+            if error_row:
+                try:
+                    err_data = json.loads(error_row["message_data"])
+                    if err_data.get("type") == "error" or err_data.get("status") == "failed":
+                        has_error = True
+                        error_msg = (err_data.get("error") or err_data.get("output", ""))[:300]
+                except Exception:
+                    pass
+
+            # Get last 10 messages as formatted JSON for preview
+            recent_msgs = conn.execute("""
+                SELECT message_data FROM agent_messages 
+                WHERE session_id = ?
+                ORDER BY created_at DESC LIMIT 10
+            """, (sid,)).fetchall()
+            formatted_messages = []
+            for m in reversed(recent_msgs):
+                try:
+                    parsed = json.loads(m["message_data"])
+                    role = parsed.get("role", "unknown")
+                    msg_type = parsed.get("type", "message")
+                    content = parsed.get("content", "")
+                    if isinstance(content, list):
+                        content = " ".join(p.get("text", "") for p in content if isinstance(p, dict))
+                    formatted_messages.append({
+                        "role": role,
+                        "type": msg_type,
+                        "content": (content or "")[:500],
+                        "name": parsed.get("name"),
+                        "tool_call_id": parsed.get("call_id"),
+                    })
+                except Exception:
+                    pass
+
+            tokens = token_map.get(sid, {"prompt_tokens": 0, "completion_tokens": 0})
+
+            result.append({
+                "session_id": sid,
+                "user_id": extracted_user_id,
+                "note_title": note_title,
+                "created_at": sess["created_at"],
+                "updated_at": sess["updated_at"],
+                "message_count": sess["message_count"],
+                "user_message_count": sess["user_message_count"],
+                "tool_call_count": sess["tool_call_count"],
+                "prompt_preview": prompt_preview,
+                "has_error": has_error,
+                "error_message": error_msg,
+                "prompt_tokens": tokens["prompt_tokens"],
+                "completion_tokens": tokens["completion_tokens"],
+                "messages": formatted_messages,
+            })
+
+        # Filter by user_id if provided
+        if user_id:
+            result = [s for s in result if s["user_id"] == user_id]
+
+        # Stats
+        stats = conn.execute("""
+            SELECT 
+                COUNT(*) as total_sessions,
+                (SELECT COUNT(*) FROM agent_messages) as total_messages,
+                (SELECT COUNT(*) FROM agent_messages WHERE message_data LIKE '%"role":"user"%') as total_user_messages,
+                (SELECT COUNT(*) FROM agent_messages WHERE message_data LIKE '%"type":"function_call"%') as total_tool_calls
+            FROM agent_sessions
+        """).fetchone()
+
+        token_stats = conn.execute("""
+            SELECT COALESCE(SUM(prompt_tokens), 0) as total_prompt, COALESCE(SUM(completion_tokens), 0) as total_completion
+            FROM session_token_usage
+        """).fetchone()
+
+        conn.close()
+
+        return {
+            "sessions": result,
+            "total": total,
+            "page": page,
+            "page_size": page_size,
+            "stats": {
+                "total_sessions": stats["total_sessions"],
+                "total_messages": stats["total_messages"],
+                "total_user_messages": stats["total_user_messages"],
+                "total_tool_calls": stats["total_tool_calls"],
+                "total_prompt_tokens": token_stats["total_prompt"],
+                "total_completion_tokens": token_stats["total_completion"],
+            }
+        }
+    except Exception as e:
+        logger.error(f"Failed to list sessions: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to list sessions: {str(e)}")
+
 @app.get("/agent")
 async def run_agent():
     return {"status": "running", "database_url": os.getenv("DATABASE_URL")}
+
+class DiagramRequest(BaseModel):
+    prompt: str
+    note_content: str | None = None
+    note_title: str | None = None
+
+@app.post("/api/diagram")
+async def generate_diagram(request: DiagramRequest):
+    try:
+        from openai import AsyncOpenAI
+        client = AsyncOpenAI(
+            api_key=os.getenv("OPENROUTER_API_KEY"),
+            base_url=os.getenv("OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1"),
+        )
+        model = os.getenv("OPENROUTER_MODEL", "google/gemini-2.5-flash")
+        if model.startswith("openrouter/"):
+            model = model.replace("openrouter/", "", 1)
+        if "gemini-3.5" in model:
+            model = model.replace("gemini-3.5", "gemini-2.5")
+
+        system_instruction = (
+            "You are an expert flowchart and diagram generator.\n"
+            "Your task is to generate a structured JSON object representing a ReactFlow diagram based on the user's prompt.\n"
+            "The JSON object MUST follow this exact structure:\n"
+            "{\n"
+            '  "nodes": [\n'
+            '    {\n'
+            '      "id": "unique-string-id",\n'
+            '      "type": "rectangle" | "circle" | "diamond",\n'
+            '      "position": { "x": number, "y": number },\n'
+            '      "data": { "label": "Node Label Text" }\n'
+            '    }\n'
+            '  ],\n'
+            '  "edges": [\n'
+            '    {\n'
+            '      "id": "edge-id-string",\n'
+            '      "source": "source-node-id",\n'
+            '      "target": "target-node-id"\n'
+            '    }\n'
+            '  ]\n'
+            "}\n\n"
+            "Rules for layout and styling:\n"
+            "1. Node Types:\n"
+            "   - 'circle': Use for start, end, or simple terminators.\n"
+            "   - 'rectangle': Use for standard process steps.\n"
+            "   - 'diamond': Use for decision points (e.g., 'Is authenticated?', 'Yes/No').\n"
+            "2. Coordinates and Spacing:\n"
+            "   - Plan the coordinates (x, y) carefully so that there is no overlap and the flow is clear.\n"
+            "   - Flow direction: Top-to-Bottom. Standard vertical spacing between levels should be 100-150px (e.g., y=50, y=180, y=310).\n"
+            "   - Horizontal spacing: Nodes on the same horizontal level should be spaced 150-200px apart (e.g., x=100, x=300, x=500).\n"
+            "   - Align nodes centered around x=300 for a symmetrical vertical flow.\n"
+            "3. Return ONLY a valid JSON object. Do not include markdown codeblock wrappers, backticks, or extra text."
+        )
+
+        user_message = f"Prompt: {request.prompt}"
+        if request.note_title or request.note_content:
+            user_message += f"\n\nContext Note Title: {request.note_title or ''}\nContext Note Content:\n{request.note_content or ''}"
+
+        response = await client.chat.completions.create(
+            model=model,
+            messages=[
+                {"role": "system", "content": system_instruction},
+                {"role": "user", "content": user_message}
+            ],
+            response_format={"type": "json_object"},
+            temperature=0.2,
+        )
+
+        result_str = response.choices[0].message.content.strip()
+        data = json.loads(result_str)
+        return data
+
+    except Exception as e:
+        logger.error(f"[diagram generation error] {e}")
+        raise HTTPException(status_code=500, detail=str(e))

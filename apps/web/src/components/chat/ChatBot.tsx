@@ -423,7 +423,7 @@ export function ChatBot({ noteId, noteContent, noteTitle, onClose }: ChatBotProp
   const attachmentsRef = useRef(attachments)
   attachmentsRef.current = attachments
 
-  const { messages, setMessages, sendMessage, status } = useChat({
+  const { messages, setMessages, sendMessage, status, error } = useChat({
     transport: new DefaultChatTransport({
       api: '/api/ai/chat/stream',
       body: () => ({
@@ -433,9 +433,58 @@ export function ChatBot({ noteId, noteContent, noteTitle, onClose }: ChatBotProp
         attachments: attachmentsRef.current,
       }),
     }),
+    onError: (err) => {
+      console.error('[ChatBot stream error]', err)
+      const errorMsg = err?.message || String(err) || 'Terjadi kesalahan saat menghubungi AI'
+      setMessages(prev => {
+        const last = prev[prev.length - 1]
+        if (last?.role === 'assistant') {
+          const textParts = last.parts?.filter((p: any) => p.type === 'text') || []
+          const hasText = textParts.length > 0
+          if (!hasText) {
+            return [...prev.slice(0, -1), {
+              ...last,
+              parts: [{ type: 'text', text: `⚠️ **Error:** ${errorMsg}` }]
+            }]
+          }
+        }
+        return [...prev, {
+          id: `error_${Date.now()}`,
+          role: 'assistant',
+          parts: [{ type: 'text', text: `⚠️ **Error:** ${errorMsg}` }]
+        }]
+      })
+    },
   })
 
   const isLoading = status === 'submitted' || status === 'streaming'
+
+  // Show error banner if useChat reports an error
+  useEffect(() => {
+    if (error && !isLoading) {
+      const errText = error?.message || String(error) || 'Terjadi kesalahan'
+      setMessages(prev => {
+        const last = prev[prev.length - 1]
+        if (last?.role === 'assistant') {
+          const textParts = last.parts?.filter((p: any) => p.type === 'text') || []
+          const hasText = textParts.length > 0
+          if (!hasText && textParts.length === 0) {
+            return [...prev.slice(0, -1), {
+              ...last,
+              parts: [{ type: 'text', text: `⚠️ **Error:** ${errText}` }]
+            }]
+          }
+          const lastText = textParts.map((p: any) => p.text || '').join('')
+          if (lastText.includes('Error:')) return prev
+        }
+        return [...prev, {
+          id: `error_${Date.now()}`,
+          role: 'assistant',
+          parts: [{ type: 'text', text: `⚠️ **Error:** ${errText}` }]
+        }]
+      })
+    }
+  }, [error, isLoading])
 
   useEffect(() => {
     setFetchingHistory(true)

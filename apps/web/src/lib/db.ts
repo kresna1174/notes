@@ -138,6 +138,19 @@ sqlite.exec(`CREATE TABLE IF NOT EXISTS user_organizations (
   FOREIGN KEY (organization_id) REFERENCES organizations(id) ON DELETE CASCADE
 )`)
 
+sqlite.exec(`CREATE TABLE IF NOT EXISTS note_history (
+  id TEXT PRIMARY KEY NOT NULL,
+  note_id TEXT NOT NULL,
+  title TEXT DEFAULT '' NOT NULL,
+  content TEXT DEFAULT '' NOT NULL,
+  cover_image TEXT,
+  icon TEXT,
+  created_by_id TEXT,
+  created_at INTEGER NOT NULL,
+  version_name TEXT,
+  FOREIGN KEY (note_id) REFERENCES notes(id) ON DELETE CASCADE
+)`)
+
 // Data Migrations: Migrate from team to organization if teams table and old team data exist
 try {
   const hasTeamsTable = sqlite.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='teams'").get() !== undefined
