@@ -157,6 +157,24 @@ export function ExportModal({ note, onClose }: ExportModalProps) {
     clone.style.borderRadius = '0'
     clone.style.margin = '0'
 
+    // Add page break helper styles to prevent elements from getting cut off across page boundaries
+    const styleSheet = document.createElement('style')
+    styleSheet.innerHTML = `
+      p, li, h1, h2, h3, h4, h5, h6, pre, table, tr, blockquote, img, .react-flow-wrapper {
+        page-break-inside: avoid !important;
+        break-inside: avoid-page !important;
+      }
+      .editor-preview-doc-content > * {
+        page-break-inside: avoid !important;
+        break-inside: avoid-page !important;
+      }
+      h1, h2, h3, h4, h5, h6 {
+        page-break-after: avoid !important;
+        break-after: avoid-page !important;
+      }
+    `
+    clone.appendChild(styleSheet)
+
     // Create wrapper that is inside positive viewport bounds but hidden under the layout
     const wrapper = document.createElement('div')
     wrapper.style.position = 'fixed'
@@ -172,7 +190,7 @@ export function ExportModal({ note, onClose }: ExportModalProps) {
     document.body.appendChild(wrapper)
 
     const opt = {
-      margin:       0,
+      margin:       [30, 30, 30, 30],
       filename:     `${note.title.toLowerCase().replace(/[^a-z0-9]+/g, '_') || 'untitled'}.pdf`,
       image:        { type: 'jpeg', quality: 0.98 },
       html2canvas:  { 
@@ -181,7 +199,8 @@ export function ExportModal({ note, onClose }: ExportModalProps) {
         backgroundColor: printStyles.bg,
         logging: false
       },
-      jsPDF:        { unit: 'px', format: 'a4', orientation: 'portrait', hotfixes: ['px_scaling'] }
+      jsPDF:        { unit: 'px', format: 'a4', orientation: 'portrait', hotfixes: ['px_scaling'] },
+      pagebreak:    { mode: ['css', 'legacy'] }
     };
 
     // @ts-ignore
