@@ -35,7 +35,8 @@ import { ToggleBlock } from './ToggleBlock'
 import { DragHandle } from './DragHandle'
 import { NoteIcon } from '../ui/NoteIcon'
 import { useEffect, useRef, useState, useMemo } from 'react'
-import { Eye, EyeOff, Lock, LockOpen, Share2, FileUp, Paperclip, Sparkles, Smile, Image as ImageIcon, Clock } from 'lucide-react'
+import { Eye, EyeOff, Lock, LockOpen, Share2, FileUp, Paperclip, Sparkles, Smile, Image as ImageIcon, Clock, Download } from 'lucide-react'
+import { ExportModal } from './ExportModal'
 import { marked } from 'marked'
 import mammoth from 'mammoth'
 import * as XLSX from 'xlsx'
@@ -528,6 +529,7 @@ export function Editor({ note, onUpdate, onSaveStatusChange, onLockChange, share
   const [shareToken, setShareToken] = useState<string | null>(note.shareToken ?? null)
   const [hasPinProtection, setHasPinProtection] = useState(note.hasPinProtection ?? false)
   const [showShare, setShowShare] = useState(false)
+  const [showExport, setShowExport] = useState(false)
   function setStatus(s: SaveStatus) { onSaveStatusChange?.(s) }
   const titleRef = useRef<HTMLInputElement>(null)
   const saveTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
@@ -1353,6 +1355,23 @@ export function Editor({ note, onUpdate, onSaveStatusChange, onLockChange, share
                 <FileUp size={14} />
               </button>
 
+              <button
+                onClick={() => setShowExport(true)}
+                title="Ekspor Catatan (PDF/Markdown)"
+                style={{
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  width: 32, height: 32,
+                  border: '1px solid var(--border)', borderRadius: '50%',
+                  background: 'var(--bg)',
+                  color: 'var(--fg-muted)',
+                  cursor: 'pointer', transition: 'all 0.15s',
+                }}
+                onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--primary)'; e.currentTarget.style.color = 'var(--primary)' }}
+                onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.color = 'var(--fg-muted)' }}
+              >
+                <Download size={14} />
+              </button>
+
               <input
                 ref={attachInputRef}
                 type="file"
@@ -1585,6 +1604,22 @@ export function Editor({ note, onUpdate, onSaveStatusChange, onLockChange, share
           editor={editor}
           data={editDiagramData}
           onClose={() => setEditDiagramData(null)}
+        />
+      )}
+
+      {showExport && (
+        <ExportModal
+          note={{
+            id: note.id,
+            title: title || 'Untitled',
+            content: note.content,
+            createdAt: note.createdAt,
+            updatedAt: note.updatedAt,
+            createdByUsername: note.createdByUsername,
+            coverImage: coverImage,
+            icon: icon,
+          }}
+          onClose={() => setShowExport(false)}
         />
       )}
 
