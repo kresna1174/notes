@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Clock, RotateCcw, Eye, X, Plus, AlertTriangle } from 'lucide-react'
+import { Clock, RotateCcw, Eye, X, Plus, AlertTriangle, GitCommit, Bookmark, GitDiff, FileText } from 'lucide-react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../ui/dialog'
 import { useEditor, EditorContent } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
@@ -247,13 +247,15 @@ export function VersionHistory({ noteId, currentContent, onClose, onRestore }: V
               {/* "Saat ini" anchor */}
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: 110, flexShrink: 0 }}>
                 <div style={{
-                  padding: '6px 10px', borderRadius: 8,
+                  padding: '5px 10px', borderRadius: 8,
                   background: 'color-mix(in srgb, var(--primary) 15%, var(--card-bg))',
                   border: '1px solid color-mix(in srgb, var(--primary) 35%, var(--border))',
                   fontSize: '0.72rem', fontWeight: 700, color: 'var(--primary)',
                   whiteSpace: 'nowrap', marginBottom: 12,
+                  display: 'flex', alignItems: 'center', gap: 5,
                 }}>
-                  ● Saat ini
+                  <GitCommit size={12} />
+                  Saat ini
                 </div>
               </div>
 
@@ -298,8 +300,10 @@ export function VersionHistory({ noteId, currentContent, onClose, onRestore }: V
                           fontSize: '0.58rem', fontWeight: 800, letterSpacing: '0.06em',
                           textTransform: 'uppercase', color: 'var(--primary)',
                           marginBottom: 3,
+                          display: 'flex', alignItems: 'center', gap: 3,
                         }}>
-                          📌 Snapshot
+                          <Bookmark size={9} style={{ flexShrink: 0 }} />
+                          Snapshot
                         </div>
                       )}
                       <div style={{
@@ -497,10 +501,13 @@ export function VersionHistory({ noteId, currentContent, onClose, onRestore }: V
               display: 'flex',
               gap: 16,
             }}>
-              <span>🕐 {new Date(confirmRestore.createdAt).toLocaleString('id-ID', {
-                day: '2-digit', month: 'short', year: 'numeric',
-                hour: '2-digit', minute: '2-digit'
-              })}</span>
+              <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                <Clock size={12} />
+                {new Date(confirmRestore.createdAt).toLocaleString('id-ID', {
+                  day: '2-digit', month: 'short', year: 'numeric',
+                  hour: '2-digit', minute: '2-digit'
+                })}
+              </span>
             </div>
 
             {/* Action buttons */}
@@ -758,7 +765,10 @@ function VersionPreviewDialog({ version, currentContent, onClose, onRestore }: {
                 transition: 'all 0.15s',
               }}
             >
-              {tab === 'diff' ? '📊 Perubahan' : '👁 Pratinjau'}
+              <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                {tab === 'diff' ? <GitDiff size={13} /> : <FileText size={13} />}
+                {tab === 'diff' ? 'Perubahan' : 'Pratinjau'}
+              </span>
             </button>
           ))}
         </div>
