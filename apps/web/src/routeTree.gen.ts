@@ -9,26 +9,23 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as UsersRouteImport } from './routes/users'
-import { Route as OrganizationsRouteImport } from './routes/organizations'
-import { Route as LoginRouteImport } from './routes/login'
+import { Route as DocumentsRouteImport } from './routes/documents'
 import { Route as IndexRouteImport } from './routes/index'
-import { Route as ShareTokenRouteImport } from './routes/share.$token'
-import { Route as NotesIdRouteImport } from './routes/notes.$id'
+import { Route as UsersIndexRouteImport } from './routes/users/index'
+import { Route as SearchIndexRouteImport } from './routes/search/index'
+import { Route as OrganizationsIndexRouteImport } from './routes/organizations/index'
+import { Route as LoginIndexRouteImport } from './routes/login/index'
+import { Route as DocumentsIndexRouteImport } from './routes/documents/index'
+import { Route as AskAgentIndexRouteImport } from './routes/ask-agent/index'
+import { Route as ShareTokenRouteImport } from './routes/share/$token'
+import { Route as PagesPageIdRouteImport } from './routes/pages/$pageId'
+import { Route as NotesIdRouteImport } from './routes/notes/$id'
+import { Route as DocumentsPagesRouteImport } from './routes/documents/pages'
+import { Route as DocumentsDocumentIdRouteImport } from './routes/documents/$documentId'
 
-const UsersRoute = UsersRouteImport.update({
-  id: '/users',
-  path: '/users',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const OrganizationsRoute = OrganizationsRouteImport.update({
-  id: '/organizations',
-  path: '/organizations',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const LoginRoute = LoginRouteImport.update({
-  id: '/login',
-  path: '/login',
+const DocumentsRoute = DocumentsRouteImport.update({
+  id: '/documents',
+  path: '/documents',
   getParentRoute: () => rootRouteImport,
 } as any)
 const IndexRoute = IndexRouteImport.update({
@@ -36,9 +33,44 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const UsersIndexRoute = UsersIndexRouteImport.update({
+  id: '/users/',
+  path: '/users/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SearchIndexRoute = SearchIndexRouteImport.update({
+  id: '/search/',
+  path: '/search/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const OrganizationsIndexRoute = OrganizationsIndexRouteImport.update({
+  id: '/organizations/',
+  path: '/organizations/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LoginIndexRoute = LoginIndexRouteImport.update({
+  id: '/login/',
+  path: '/login/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DocumentsIndexRoute = DocumentsIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => DocumentsRoute,
+} as any)
+const AskAgentIndexRoute = AskAgentIndexRouteImport.update({
+  id: '/ask-agent/',
+  path: '/ask-agent/',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ShareTokenRoute = ShareTokenRouteImport.update({
   id: '/share/$token',
   path: '/share/$token',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PagesPageIdRoute = PagesPageIdRouteImport.update({
+  id: '/pages/$pageId',
+  path: '/pages/$pageId',
   getParentRoute: () => rootRouteImport,
 } as any)
 const NotesIdRoute = NotesIdRouteImport.update({
@@ -46,89 +78,129 @@ const NotesIdRoute = NotesIdRouteImport.update({
   path: '/notes/$id',
   getParentRoute: () => rootRouteImport,
 } as any)
+const DocumentsPagesRoute = DocumentsPagesRouteImport.update({
+  id: '/pages',
+  path: '/pages',
+  getParentRoute: () => DocumentsRoute,
+} as any)
+const DocumentsDocumentIdRoute = DocumentsDocumentIdRouteImport.update({
+  id: '/$documentId',
+  path: '/$documentId',
+  getParentRoute: () => DocumentsRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
-  '/login': typeof LoginRoute
-  '/organizations': typeof OrganizationsRoute
-  '/users': typeof UsersRoute
+  '/documents': typeof DocumentsRouteWithChildren
+  '/documents/$documentId': typeof DocumentsDocumentIdRoute
+  '/documents/pages': typeof DocumentsPagesRoute
   '/notes/$id': typeof NotesIdRoute
+  '/pages/$pageId': typeof PagesPageIdRoute
   '/share/$token': typeof ShareTokenRoute
+  '/ask-agent/': typeof AskAgentIndexRoute
+  '/documents/': typeof DocumentsIndexRoute
+  '/login/': typeof LoginIndexRoute
+  '/organizations/': typeof OrganizationsIndexRoute
+  '/search/': typeof SearchIndexRoute
+  '/users/': typeof UsersIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
-  '/login': typeof LoginRoute
-  '/organizations': typeof OrganizationsRoute
-  '/users': typeof UsersRoute
+  '/documents/$documentId': typeof DocumentsDocumentIdRoute
+  '/documents/pages': typeof DocumentsPagesRoute
   '/notes/$id': typeof NotesIdRoute
+  '/pages/$pageId': typeof PagesPageIdRoute
   '/share/$token': typeof ShareTokenRoute
+  '/ask-agent': typeof AskAgentIndexRoute
+  '/documents': typeof DocumentsIndexRoute
+  '/login': typeof LoginIndexRoute
+  '/organizations': typeof OrganizationsIndexRoute
+  '/search': typeof SearchIndexRoute
+  '/users': typeof UsersIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
-  '/login': typeof LoginRoute
-  '/organizations': typeof OrganizationsRoute
-  '/users': typeof UsersRoute
+  '/documents': typeof DocumentsRouteWithChildren
+  '/documents/$documentId': typeof DocumentsDocumentIdRoute
+  '/documents/pages': typeof DocumentsPagesRoute
   '/notes/$id': typeof NotesIdRoute
+  '/pages/$pageId': typeof PagesPageIdRoute
   '/share/$token': typeof ShareTokenRoute
+  '/ask-agent/': typeof AskAgentIndexRoute
+  '/documents/': typeof DocumentsIndexRoute
+  '/login/': typeof LoginIndexRoute
+  '/organizations/': typeof OrganizationsIndexRoute
+  '/search/': typeof SearchIndexRoute
+  '/users/': typeof UsersIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
-    | '/login'
-    | '/organizations'
-    | '/users'
+    | '/documents'
+    | '/documents/$documentId'
+    | '/documents/pages'
     | '/notes/$id'
+    | '/pages/$pageId'
     | '/share/$token'
+    | '/ask-agent/'
+    | '/documents/'
+    | '/login/'
+    | '/organizations/'
+    | '/search/'
+    | '/users/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/documents/$documentId'
+    | '/documents/pages'
+    | '/notes/$id'
+    | '/pages/$pageId'
+    | '/share/$token'
+    | '/ask-agent'
+    | '/documents'
     | '/login'
     | '/organizations'
+    | '/search'
     | '/users'
-    | '/notes/$id'
-    | '/share/$token'
   id:
     | '__root__'
     | '/'
-    | '/login'
-    | '/organizations'
-    | '/users'
+    | '/documents'
+    | '/documents/$documentId'
+    | '/documents/pages'
     | '/notes/$id'
+    | '/pages/$pageId'
     | '/share/$token'
+    | '/ask-agent/'
+    | '/documents/'
+    | '/login/'
+    | '/organizations/'
+    | '/search/'
+    | '/users/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
-  LoginRoute: typeof LoginRoute
-  OrganizationsRoute: typeof OrganizationsRoute
-  UsersRoute: typeof UsersRoute
+  DocumentsRoute: typeof DocumentsRouteWithChildren
   NotesIdRoute: typeof NotesIdRoute
+  PagesPageIdRoute: typeof PagesPageIdRoute
   ShareTokenRoute: typeof ShareTokenRoute
+  AskAgentIndexRoute: typeof AskAgentIndexRoute
+  LoginIndexRoute: typeof LoginIndexRoute
+  OrganizationsIndexRoute: typeof OrganizationsIndexRoute
+  SearchIndexRoute: typeof SearchIndexRoute
+  UsersIndexRoute: typeof UsersIndexRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/users': {
-      id: '/users'
-      path: '/users'
-      fullPath: '/users'
-      preLoaderRoute: typeof UsersRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/organizations': {
-      id: '/organizations'
-      path: '/organizations'
-      fullPath: '/organizations'
-      preLoaderRoute: typeof OrganizationsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/login': {
-      id: '/login'
-      path: '/login'
-      fullPath: '/login'
-      preLoaderRoute: typeof LoginRouteImport
+    '/documents': {
+      id: '/documents'
+      path: '/documents'
+      fullPath: '/documents'
+      preLoaderRoute: typeof DocumentsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/': {
@@ -138,11 +210,60 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/users/': {
+      id: '/users/'
+      path: '/users'
+      fullPath: '/users/'
+      preLoaderRoute: typeof UsersIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/search/': {
+      id: '/search/'
+      path: '/search'
+      fullPath: '/search/'
+      preLoaderRoute: typeof SearchIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/organizations/': {
+      id: '/organizations/'
+      path: '/organizations'
+      fullPath: '/organizations/'
+      preLoaderRoute: typeof OrganizationsIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/login/': {
+      id: '/login/'
+      path: '/login'
+      fullPath: '/login/'
+      preLoaderRoute: typeof LoginIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/documents/': {
+      id: '/documents/'
+      path: '/'
+      fullPath: '/documents/'
+      preLoaderRoute: typeof DocumentsIndexRouteImport
+      parentRoute: typeof DocumentsRoute
+    }
+    '/ask-agent/': {
+      id: '/ask-agent/'
+      path: '/ask-agent'
+      fullPath: '/ask-agent/'
+      preLoaderRoute: typeof AskAgentIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/share/$token': {
       id: '/share/$token'
       path: '/share/$token'
       fullPath: '/share/$token'
       preLoaderRoute: typeof ShareTokenRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/pages/$pageId': {
+      id: '/pages/$pageId'
+      path: '/pages/$pageId'
+      fullPath: '/pages/$pageId'
+      preLoaderRoute: typeof PagesPageIdRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/notes/$id': {
@@ -152,16 +273,50 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof NotesIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/documents/pages': {
+      id: '/documents/pages'
+      path: '/pages'
+      fullPath: '/documents/pages'
+      preLoaderRoute: typeof DocumentsPagesRouteImport
+      parentRoute: typeof DocumentsRoute
+    }
+    '/documents/$documentId': {
+      id: '/documents/$documentId'
+      path: '/$documentId'
+      fullPath: '/documents/$documentId'
+      preLoaderRoute: typeof DocumentsDocumentIdRouteImport
+      parentRoute: typeof DocumentsRoute
+    }
   }
 }
 
+interface DocumentsRouteChildren {
+  DocumentsDocumentIdRoute: typeof DocumentsDocumentIdRoute
+  DocumentsPagesRoute: typeof DocumentsPagesRoute
+  DocumentsIndexRoute: typeof DocumentsIndexRoute
+}
+
+const DocumentsRouteChildren: DocumentsRouteChildren = {
+  DocumentsDocumentIdRoute: DocumentsDocumentIdRoute,
+  DocumentsPagesRoute: DocumentsPagesRoute,
+  DocumentsIndexRoute: DocumentsIndexRoute,
+}
+
+const DocumentsRouteWithChildren = DocumentsRoute._addFileChildren(
+  DocumentsRouteChildren,
+)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
-  LoginRoute: LoginRoute,
-  OrganizationsRoute: OrganizationsRoute,
-  UsersRoute: UsersRoute,
+  DocumentsRoute: DocumentsRouteWithChildren,
   NotesIdRoute: NotesIdRoute,
+  PagesPageIdRoute: PagesPageIdRoute,
   ShareTokenRoute: ShareTokenRoute,
+  AskAgentIndexRoute: AskAgentIndexRoute,
+  LoginIndexRoute: LoginIndexRoute,
+  OrganizationsIndexRoute: OrganizationsIndexRoute,
+  SearchIndexRoute: SearchIndexRoute,
+  UsersIndexRoute: UsersIndexRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

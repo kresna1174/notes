@@ -2,10 +2,10 @@ import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { useState, useEffect, useRef } from 'react'
 import { useAuth } from '#/modules/shared/auth'
 import { useTheme } from '#/modules/shared/theme'
-import { Eye, EyeOff, Sun, Moon, Brain, Zap } from 'lucide-react'
+import { Eye, EyeOff, Sun, Moon, Brain } from 'lucide-react'
 import { AboutModal } from '#/modules/auth'
 
-export const Route = createFileRoute('/login')({
+export const Route = createFileRoute('/login/')({
   component: LoginPage,
 })
 
@@ -351,7 +351,6 @@ function LoginPage() {
 
   const isDark = theme === 'dark'
   
-  // Custom theme colors for high professional layout matching screenshot, integrated with app theme variables
   const textTitle = 'var(--fg)'
   const textMuted = 'var(--fg-muted)'
   const bgInput = isDark ? '#18181b' : '#ffffff'

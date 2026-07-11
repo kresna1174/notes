@@ -52,7 +52,6 @@ def write_notes(
         note_id: Optional ID of the note to update. Defaults to the current note.
     """
     formatted_content = format_as_tiptap(content)
-    # note_id defaults to the current note's session_id (which equals the noteId in the app)
     target_id = note_id or (ctx.context.get("session_id") if ctx.context else None)
 
     return json.dumps({
@@ -289,7 +288,7 @@ def is_code_safe(code: str) -> tuple[bool, str]:
     blocked_keywords = [
         "docker", "docker-compose", "rm -rf", "rmdir", "chmod", "chown",
         ".env", "sessions.db", "config.json", "/etc/", ".ssh", "id_rsa",
-        "authorized_keys", "eval(", "exec(", "shutil.rmtree", "os.system",
+        "authorized_keys", "known_hosts", "eval(", "exec(", "shutil.rmtree", "os.system",
         "os.remove", "os.unlink", "os.rmdir", "os.popen", "subprocess.run"
     ]
     code_lower = code.lower()
@@ -435,3 +434,68 @@ def execute_python_code(code: str) -> str:
         return f"Execution Error: {str(e)}"
     finally:
         pass
+
+
+@function_tool
+def list_rag_documents() -> str:
+    """
+    List all uploaded PDF reference documents available in the RAG library.
+    Use this to see what document references are available when the user asks about uploaded files, PDFs, recipes, or reference materials.
+    """
+    try:
+        from models.engine import engine
+        from sqlmodel import Session
+        from modules.documents import methods as doc_methods
+        
+        with Session(engine) as session:
+            docs = doc_methods.list_documents(session)
+            
+        return json.dumps([
+            {
+                "id": doc.id,
+                "name": doc.name,
+                "status": doc.status,
+                "total_pages": doc.total_pages,
+                "uploaded_at": doc.uploaded_at
+            }
+            for doc in docs
+        ], default=str)
+    except Exception as e:
+        return f"Error listing RAG documents: {str(e)}"
+
+
+@function_tool
+def search_rag_documents(query: str, document_id: str | None = None, n_results: int = 5) -> str:
+    """
+    Search the RAG database for relevant paragraphs/context chunks matching a query.
+    You can optionally filter by a specific document_id if the user mentioned a specific document.
+    Use this when the user asks a question about the contents of a PDF, document, or recipes.
+
+    Args:
+        query: The search term or question to query.
+        document_id: Optional ID of the document to limit search to.
+        n_results: Maximum number of relevant paragraphs to retrieve (default is 5).
+    """
+    try:
+        from modules.queries import methods as query_methods
+        from modules.queries.schema import QueryRequest
+        
+        req = QueryRequest(query=query, document_id=document_id, n_results=n_results)
+        res = query_methods.search_chunks(req)
+        
+        output = []
+        for hit in res.hits:
+            output.append(
+                f"Document: {hit.document_name} (ID: {hit.document_id})\n"
+                f"Page: {hit.page_number + 1}\n"
+                f"Similarity Distance: {hit.distance:.4f}\n"
+                f"Content:\n{hit.text}\n"
+            )
+            
+        if not output:
+            return "No relevant paragraphs found in RAG database."
+            
+        return "\n---\n".join(output)
+    except Exception as e:
+        return f"Error searching RAG documents: {str(e)}"
+

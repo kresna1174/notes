@@ -48,7 +48,7 @@ os.environ["OPENAI_AGENTS_DISABLE_TRACING"] = "1"
 
 # Initialize AnyLLMModel for OpenRouter
 openrouter_model = AnyLLMModel(
-    model=os.getenv("OPENROUTER_MODEL", "google/gemini-2.5-flash:free"),
+    model=os.getenv("OPENROUTER_MODEL", "mistralai/mistral-7b-instruct:free"),
     base_url=os.getenv("OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1"),
     api_key=os.getenv("OPENROUTER_API_KEY"),
 )

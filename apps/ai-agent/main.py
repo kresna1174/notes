@@ -28,13 +28,21 @@ from fastapi import FastAPI
 from scalar_fastapi import get_scalar_api_reference
 
 from core.database import engine, Base
-from modules.api import _register_routes
+from sqlmodel import SQLModel
+from models.engine import engine as rag_engine
+import models.database
+from modules.chat.api import _register_routes
+from modules.documents.router import router as documents_router
+from modules.pages.router import router as pages_router
+from modules.queries.router import router as queries_router
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+    # Create RAG database tables
+    SQLModel.metadata.create_all(rag_engine)
     yield
     await engine.dispose()
 
@@ -46,6 +54,9 @@ app = FastAPI(
 )
 
 _register_routes(app)
+app.include_router(documents_router)
+app.include_router(pages_router)
+app.include_router(queries_router)
 
 
 @app.get("/docs", include_in_schema=False)

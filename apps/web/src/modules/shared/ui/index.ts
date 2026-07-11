@@ -8,3 +8,8 @@ export { Collapsible, CollapsibleContent, CollapsibleTrigger } from './collapsib
 export { NoteIcon } from './NoteIcon';
 export { AboutModal } from './AboutModal';
 export { ChangePasswordModal } from './ChangePasswordModal';
+export { EmptyState, DocumentsTable, PageList, formatDate, StatusBadge } from './DocumentViews';
+export { UploadMenu } from './UploadMenu';
+export { RagLayout } from './RagLayout';
+
+

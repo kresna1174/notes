@@ -21,7 +21,7 @@ async def run_summarize_agent_async(task_id: str, content: str, user_id: str | N
         await db.commit()
 
         try:
-            from modules.tools import write_notes, search_web, extract_web, crawl_web
+            from modules.chat.tools import write_notes, search_web, extract_web, crawl_web
             summarizer_agent = Agent(
                 name="SummarizerSubAgent",
                 instructions="You are a specialized sub-agent that summarizes note content. Provide a concise, bullet-pointed summary.",
@@ -53,7 +53,7 @@ async def run_tags_agent_async(task_id: str, content: str, user_id: str | None =
         await db.commit()
 
         try:
-            from modules.tools import write_notes, search_web, extract_web, crawl_web
+            from modules.chat.tools import write_notes, search_web, extract_web, crawl_web
             tagger_agent = Agent(
                 name="TaggerSubAgent",
                 instructions="You are a specialized sub-agent that extracts 3 to 5 relevant tags from the content. Return ONLY a comma-separated list of tags.",
@@ -83,3 +83,8 @@ def summarize_task(task_id: str, content: str, user_id: str | None = None):
 @celery_app.task(name="tasks.tags_task")
 def tags_task(task_id: str, content: str, user_id: str | None = None):
     asyncio.run(run_tags_agent_async(task_id, content, user_id))
+
+
+# Explicitly import RAG tasks to register them with the Celery worker
+import modules.documents.tasks
+

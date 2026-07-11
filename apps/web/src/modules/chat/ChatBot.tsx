@@ -1,8 +1,9 @@
 import { useState, useEffect, useRef } from 'react'
-import { Loader2, Trash2, ChevronRight, X, ArrowUp, Paperclip } from 'lucide-react'
+import { Loader2, Trash2, ChevronRight, X, ArrowUp, Paperclip, BookOpen, FileText } from 'lucide-react'
 import { useChat } from '@ai-sdk/react'
 import { DefaultChatTransport } from 'ai'
 import { marked } from 'marked'
+import { listDocuments } from '#/modules/shared/ragApi'
 
 interface ChatBotProps {
   noteId: string
@@ -232,6 +233,14 @@ function ToolCallBlock({ item, noteId, lastUserPrompt }: { item: any; noteId: st
       label: 'Running code',
       icon: <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>,
     },
+    list_rag_documents: {
+      label: 'Listing reference documents',
+      icon: <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>,
+    },
+    search_rag_documents: {
+      label: 'Searching document library',
+      icon: <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><circle cx="11.5" cy="13.5" r="2.5"/><line x1="16" y1="18" x2="13.3" y2="15.3"/></svg>,
+    },
   }
 
   const fallbackMeta = {
@@ -403,6 +412,35 @@ export function ChatBot({ noteId, noteContent, noteTitle, onClose }: ChatBotProp
   const [isUploadingFile, setIsUploadingFile] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
+  const [ragDocs, setRagDocs] = useState<any[]>([])
+  const [referencedDocs, setReferencedDocs] = useState<any[]>([])
+  const [isRagMenuOpen, setIsRagMenuOpen] = useState(false)
+
+  const [mentionQuery, setMentionQuery] = useState<string | null>(null)
+  const [mentionIndex, setMentionIndex] = useState<number>(0)
+  const [mentionTriggerIndex, setMentionTriggerIndex] = useState<number>(-1)
+
+  useEffect(() => {
+    const fetchDocs = () => {
+      listDocuments()
+        .then(docs => setRagDocs(docs.filter(d => d.status === 'ready')))
+        .catch(console.error)
+    }
+    fetchDocs()
+    const intervalId = setInterval(fetchDocs, 5000)
+    return () => clearInterval(intervalId)
+  }, [noteId])
+
+  useEffect(() => {
+    function handleOutsideClick() {
+      setIsRagMenuOpen(false)
+      setMentionQuery(null)
+      setMentionTriggerIndex(-1)
+    }
+    window.addEventListener('click', handleOutsideClick)
+    return () => window.removeEventListener('click', handleOutsideClick)
+  }, [])
+
   const attachmentsRef = useRef(attachments)
   attachmentsRef.current = attachments
 
@@ -498,20 +536,73 @@ export function ChatBot({ noteId, noteContent, noteTitle, onClose }: ChatBotProp
   useEffect(() => { adjustHeight() }, [inputValue])
 
   const handleSend = () => {
-    if ((!inputValue.trim() && attachments.length === 0) || isLoading) return
+    if ((!inputValue.trim() && attachments.length === 0 && referencedDocs.length === 0) || isLoading) return
     
     let textToSend = inputValue
     if (attachments.length > 0) {
       const attachmentsPrefix = attachments.map(att => 
         `[Attached Document Content: "${att.filename}" filePath="${att.filePath}" mimeType="${att.mimeType}"]`
       ).join('\n')
-      textToSend = `${attachmentsPrefix}\n\n${inputValue}`
+      textToSend = `${attachmentsPrefix}\n\n${textToSend}`
+    }
+    
+    if (referencedDocs.length > 0) {
+      const ragPrefix = referencedDocs.map(doc => 
+        `[Referenced Document: "${doc.name}" (ID: "${doc.id}")]`
+      ).join('\n')
+      textToSend = `${ragPrefix}\n\n${textToSend}`
     }
     
     sendMessage({ text: textToSend })
     setInputValue('')
     setAttachments([])
+    setReferencedDocs([])
     if (textareaRef.current) textareaRef.current.style.height = 'auto'
+  }
+
+  const handleSelectMention = (doc: any) => {
+    let newCursorPos = textareaRef.current?.selectionStart || 0
+    if (mentionTriggerIndex !== -1) {
+      const beforeMention = inputValue.slice(0, mentionTriggerIndex)
+      const afterCaret = inputValue.slice(textareaRef.current?.selectionStart || 0)
+      setInputValue(beforeMention + afterCaret)
+      newCursorPos = beforeMention.length
+    }
+    
+    if (!referencedDocs.some(rd => rd.id === doc.id)) {
+      setReferencedDocs(prev => [...prev, doc])
+    }
+    
+    setMentionQuery(null)
+    setMentionTriggerIndex(-1)
+    setMentionIndex(0)
+    
+    setTimeout(() => {
+      if (textareaRef.current) {
+        textareaRef.current.focus()
+        textareaRef.current.setSelectionRange(newCursorPos, newCursorPos)
+      }
+    }, 10)
+  }
+
+  const handleTextareaChange = (value: string, caretPos: number) => {
+    setInputValue(value)
+    
+    const textBeforeCaret = value.slice(0, caretPos)
+    const lastAtIdx = textBeforeCaret.lastIndexOf('@')
+    
+    if (lastAtIdx !== -1) {
+      const textAfterAt = textBeforeCaret.slice(lastAtIdx + 1)
+      if (!/\s/.test(textAfterAt)) {
+        setMentionQuery(textAfterAt)
+        setMentionTriggerIndex(lastAtIdx)
+        setMentionIndex(0)
+        return
+      }
+    }
+    
+    setMentionQuery(null)
+    setMentionTriggerIndex(-1)
   }
 
   const handleUploadFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -540,6 +631,18 @@ export function ChatBot({ noteId, noteContent, noteTitle, onClose }: ChatBotProp
           filePath: `uploads/${data.storedAs}`
         }
       ])
+
+      // If it is a PDF file, upload it to RAG database as well in the background
+      if (file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')) {
+        const ragForm = new FormData()
+        ragForm.append('file', file)
+        fetch('/api/documents', {
+          method: 'POST',
+          body: ragForm
+        }).catch(err => {
+          console.error('Failed to upload to RAG database:', err)
+        })
+      }
     } catch (err) {
       console.error(err)
       alert(err instanceof Error ? err.message : 'An error occurred while uploading the file')
@@ -650,9 +753,17 @@ export function ChatBot({ noteId, noteContent, noteTitle, onClose }: ChatBotProp
               while ((match = tagRegex.exec(text)) !== null) {
                 extractedFiles.push({ filename: match[1], filePath: match[2] })
               }
+
+              // Extract referenced RAG documents
+              const extractedRefs: string[] = []
+              const refRegex = /\[Referenced Document:\s*\"([^\"]+)\"\s+\(ID:\s*\"([^\"]+)\"\)\]/g
+              let refMatch
+              while ((refMatch = refRegex.exec(text)) !== null) {
+                extractedRefs.push(refMatch[1])
+              }
               
               // Clean up the text: remove all tag blocks
-              let cleanText = text.replace(tagRegex, '').trim()
+              let cleanText = text.replace(tagRegex, '').replace(refRegex, '').trim()
               
               // Clean context prefix added by backend
               cleanText = cleanText.replace(/^\[Konteks Catatan:[\s\S]*?\]\n*/g, '').trim()
@@ -667,6 +778,35 @@ export function ChatBot({ noteId, noteContent, noteTitle, onClose }: ChatBotProp
 
               return (
                 <div key={index} style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', marginBottom: 16 }}>
+                  {/* Extracted RAG references */}
+                  {extractedRefs.length > 0 && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 6, maxWidth: '80%' }}>
+                      {extractedRefs.map((refDocName, i) => (
+                        <div
+                          key={i}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 8,
+                            padding: '8px 12px',
+                            borderRadius: 8,
+                            background: 'rgba(59, 130, 246, 0.08)',
+                            border: '1px solid rgba(59, 130, 246, 0.2)',
+                            fontSize: '0.74rem',
+                            color: 'var(--primary)',
+                            alignSelf: 'flex-end',
+                            boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
+                          }}
+                        >
+                          <span style={{ fontSize: '1rem' }}>📖</span>
+                          <span style={{ fontWeight: 500, maxWidth: '180px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {refDocName}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
                   {/* Extracted file attachments */}
                   {extractedFiles.length > 0 && (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 6, maxWidth: '80%' }}>
@@ -880,8 +1020,105 @@ export function ChatBot({ noteId, noteContent, noteTitle, onClose }: ChatBotProp
           padding: '10px 14px 14px',
           borderTop: '1px solid var(--border)',
           flexShrink: 0,
+          position: 'relative',
         }}
       >
+        {(mentionQuery !== null || isRagMenuOpen) && (() => {
+          const query = mentionQuery || ''
+          const filtered = ragDocs.filter(doc => doc.name.toLowerCase().includes(query.toLowerCase()))
+          if (filtered.length === 0) {
+            if (isRagMenuOpen) {
+              return (
+                <div
+                  onClick={e => e.stopPropagation()}
+                  style={{
+                    position: 'absolute',
+                    bottom: 'calc(100% - 6px)',
+                    left: '14px',
+                    right: '14px',
+                    background: 'var(--card-bg)',
+                    border: '1px solid var(--border)',
+                    borderRadius: 8,
+                    boxShadow: '0 -4px 16px rgba(0,0,0,0.08), 0 4px 16px rgba(0,0,0,0.08)',
+                    zIndex: 101,
+                    padding: '12px',
+                    fontSize: '0.74rem',
+                    color: 'var(--fg-subtle)',
+                    textAlign: 'center',
+                  }}
+                >
+                  No documents ready in RAG. Upload PDF first!
+                </div>
+              )
+            }
+            return null
+          }
+          return (
+            <div
+              onClick={e => e.stopPropagation()}
+              style={{
+                position: 'absolute',
+                bottom: 'calc(100% - 6px)',
+                left: '14px',
+                right: '14px',
+                maxHeight: '160px',
+                overflowY: 'auto',
+                background: 'var(--card-bg)',
+                border: '1px solid var(--border)',
+                borderRadius: 8,
+                boxShadow: '0 -4px 16px rgba(0,0,0,0.08), 0 4px 16px rgba(0,0,0,0.08)',
+                zIndex: 101,
+                padding: '4px',
+              }}
+            >
+              <div style={{ padding: '6px 8px', fontSize: '0.65rem', fontWeight: 600, color: 'var(--fg-subtle)', borderBottom: '1px solid var(--border)', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.03em' }}>
+                Mention Document reference
+              </div>
+              {filtered.map((doc, idx) => {
+                const isSelected = idx === mentionIndex
+                const isReferenced = referencedDocs.some(rd => rd.id === doc.id)
+                return (
+                  <button
+                    key={doc.id}
+                    disabled={isReferenced}
+                    onClick={() => {
+                      if (!isReferenced) {
+                        handleSelectMention(doc)
+                        setIsRagMenuOpen(false)
+                      }
+                    }}
+                    onMouseEnter={() => setMentionIndex(idx)}
+                    style={{
+                      width: '100%',
+                      textAlign: 'left',
+                      padding: '6px 8px',
+                      fontSize: '0.74rem',
+                      color: isReferenced ? 'var(--fg-subtle)' : 'var(--fg)',
+                      background: isSelected ? 'rgba(59, 130, 246, 0.08)' : 'none',
+                      border: 'none',
+                      borderRadius: 4,
+                      cursor: isReferenced ? 'default' : 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 6,
+                    }}
+                  >
+                    <FileText size={14} style={{ color: isReferenced ? 'var(--fg-subtle)' : isSelected ? 'var(--primary)' : 'var(--fg-muted)', flexShrink: 0 }} />
+                    <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: isSelected ? 500 : 400 }}>
+                      {doc.name}
+                    </span>
+                    {isReferenced ? (
+                      <span style={{ fontSize: '0.62rem', color: 'var(--fg-subtle)' }}>Attached</span>
+                    ) : isSelected ? (
+                      <span style={{ fontSize: '0.62rem', color: 'var(--primary)', fontWeight: 500 }}>Enter to select</span>
+                    ) : null}
+                  </button>
+                )
+              })}
+            </div>
+          )
+        })()}
+
         {attachments.length > 0 && (
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 8, padding: '0 4px' }}>
             {attachments.map((file, i) => (
@@ -920,6 +1157,44 @@ export function ChatBot({ noteId, noteContent, noteTitle, onClose }: ChatBotProp
           </div>
         )}
 
+        {referencedDocs.length > 0 && (
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 8, padding: '0 4px' }}>
+            {referencedDocs.map((doc, i) => (
+              <div
+                key={i}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 4,
+                  padding: '4px 8px',
+                  borderRadius: 6,
+                  background: 'rgba(59, 130, 246, 0.08)',
+                  border: '1px solid rgba(59, 130, 246, 0.2)',
+                  fontSize: '0.72rem',
+                  color: 'var(--primary)',
+                }}
+              >
+                <span>📖 {doc.name.length > 30 ? doc.name.slice(0, 30) + '…' : doc.name}</span>
+                <button
+                  onClick={() => setReferencedDocs(prev => prev.filter((_, idx) => idx !== i))}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    color: 'var(--primary)',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    padding: 0,
+                  }}
+                  title="Remove reference"
+                >
+                  <X size={12} />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+
         <div
           style={{
             border: '1px solid var(--border)',
@@ -933,9 +1208,32 @@ export function ChatBot({ noteId, noteContent, noteTitle, onClose }: ChatBotProp
           <textarea
             ref={textareaRef}
             value={inputValue}
-            onChange={e => setInputValue(e.target.value)}
-            onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend() } }}
-            placeholder="Ask something…"
+            onChange={e => handleTextareaChange(e.target.value, e.target.selectionStart)}
+            onKeyDown={e => {
+              const filtered = ragDocs.filter(doc => doc.name.toLowerCase().includes((mentionQuery || '').toLowerCase()))
+              if (mentionQuery !== null && filtered.length > 0) {
+                if (e.key === 'ArrowDown') {
+                  e.preventDefault()
+                  setMentionIndex(prev => (prev + 1) % filtered.length)
+                } else if (e.key === 'ArrowUp') {
+                  e.preventDefault()
+                  setMentionIndex(prev => (prev - 1 + filtered.length) % filtered.length)
+                } else if (e.key === 'Enter') {
+                  e.preventDefault()
+                  handleSelectMention(filtered[mentionIndex])
+                } else if (e.key === 'Escape') {
+                  e.preventDefault()
+                  setMentionQuery(null)
+                  setMentionTriggerIndex(-1)
+                }
+              } else {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault()
+                  handleSend()
+                }
+              }
+            }}
+            placeholder="Ask something (type @ to mention PDF)…"
             disabled={isLoading || fetchingHistory}
             rows={1}
             style={{
@@ -962,7 +1260,7 @@ export function ChatBot({ noteId, noteContent, noteTitle, onClose }: ChatBotProp
               padding: '4px 8px 6px',
             }}
           >
-            <div style={{ display: 'flex', alignItems: 'center' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
               <input
                 type="file"
                 ref={fileInputRef}
@@ -995,22 +1293,47 @@ export function ChatBot({ noteId, noteContent, noteTitle, onClose }: ChatBotProp
                   <Paperclip size={13} />
                 )}
               </button>
+
+              <div>
+                <button
+                  onClick={(e) => { e.stopPropagation(); setIsRagMenuOpen(!isRagMenuOpen) }}
+                  disabled={isLoading}
+                  title="Mention reference document from library"
+                  style={{
+                    width: 28,
+                    height: 28,
+                    borderRadius: 6,
+                    background: isRagMenuOpen ? 'var(--muted)' : 'none',
+                    border: 'none',
+                    color: 'var(--fg-muted)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    cursor: 'pointer',
+                    transition: 'background 0.15s',
+                  }}
+                  onMouseEnter={e => { if (!isLoading) e.currentTarget.style.background = 'var(--muted)' }}
+                  onMouseLeave={e => { if (!isRagMenuOpen) e.currentTarget.style.background = 'none' }}
+                >
+                  <BookOpen size={13} />
+                </button>
+              </div>
             </div>
 
             <button
               onClick={handleSend}
-              disabled={(!inputValue.trim() && attachments.length === 0) || isLoading}
+              disabled={(!inputValue.trim() && attachments.length === 0 && referencedDocs.length === 0) || isLoading}
               style={{
                 width: 28,
                 height: 28,
                 borderRadius: '50%',
-                background: (inputValue.trim() || attachments.length > 0) && !isLoading ? 'var(--primary)' : 'var(--border)',
-                color: (inputValue.trim() || attachments.length > 0) && !isLoading ? 'var(--primary-fg)' : 'var(--fg-subtle)',
+                background: (inputValue.trim() || attachments.length > 0 || referencedDocs.length > 0) && !isLoading ? 'var(--primary)' : 'var(--border)',
+                color: (inputValue.trim() || attachments.length > 0 || referencedDocs.length > 0) && !isLoading ? 'var(--primary-fg)' : 'var(--fg-subtle)',
                 border: 'none',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                cursor: (inputValue.trim() || attachments.length > 0) && !isLoading ? 'pointer' : 'default',
+                cursor: (inputValue.trim() || attachments.length > 0 || referencedDocs.length > 0) && !isLoading ? 'pointer' : 'default',
                 transition: 'background 0.15s',
               }}
             >

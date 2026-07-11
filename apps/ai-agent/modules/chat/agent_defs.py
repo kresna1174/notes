@@ -20,17 +20,19 @@ from core.prompt import (
     CODE_ANALYST_PROMPT,
     EDITOR_PROMPT,
 )
-from modules.tools import (
+from modules.chat.tools import (
     write_notes, update_note_direct,
     search_web, extract_web, crawl_web,
     execute_python_code, find_web_photos, find_youtube_videos,
+    list_rag_documents, search_rag_documents,
 )
 
 # ── Shared toolsets ──────────────────────────────────────────────────────────
 
 NOTE_TOOLS = [write_notes, update_note_direct]
 WEB_TOOLS = [search_web, extract_web, crawl_web, find_web_photos, find_youtube_videos]
-ALL_TOOLS = NOTE_TOOLS + WEB_TOOLS + [execute_python_code]
+RAG_TOOLS = [list_rag_documents, search_rag_documents]
+ALL_TOOLS = NOTE_TOOLS + WEB_TOOLS + RAG_TOOLS + [execute_python_code]
 
 
 # ── Sub-Agents ───────────────────────────────────────────────────────────────
@@ -56,7 +58,7 @@ writer_agent = Agent(
     instructions=WRITER_PROMPT,
     model=get_model(),
     model_settings=default_model_settings,
-    tools=NOTE_TOOLS + WEB_TOOLS,  # Writer can research and write notes.
+    tools=ALL_TOOLS,  # Writer can research, write notes, and query RAG.
 )
 
 researcher_agent = Agent(
@@ -64,7 +66,7 @@ researcher_agent = Agent(
     instructions=RESEARCHER_PROMPT,
     model=get_model(),
     model_settings=default_model_settings,
-    tools=WEB_TOOLS + NOTE_TOOLS + [execute_python_code],  # Researcher can search, save findings, and run code.
+    tools=ALL_TOOLS,  # Researcher can search, save findings, run code, and query RAG.
 )
 
 translator_agent = Agent(
@@ -80,7 +82,7 @@ code_analyst_agent = Agent(
     instructions=CODE_ANALYST_PROMPT,
     model=get_model(),
     model_settings=default_model_settings,
-    tools=[execute_python_code, write_notes, update_note_direct],  # Code analyst runs code and can save results.
+    tools=ALL_TOOLS,  # Code analyst can run code, research, write notes, and query RAG.
 )
 
 editor_agent = Agent(
@@ -91,7 +93,7 @@ editor_agent = Agent(
     # update_note_direct is included so the model doesn't error if it tries to call it
     # (session history may contain prior note-tool calls). The frontend intercepts
     # tool-input-available and inserts the content directly at cursor — no approval dialog.
-    tools=[update_note_direct, execute_python_code] + WEB_TOOLS,
+    tools=[update_note_direct, execute_python_code] + WEB_TOOLS + RAG_TOOLS,
 )
 
 
@@ -203,8 +205,6 @@ _INTENT_PATTERNS: dict[str, list[str]] = {
         "tambahin tag", "ambilin tag",
     ],
 }
-
-import re
 
 
 def detect_intent(message: str) -> str | None:

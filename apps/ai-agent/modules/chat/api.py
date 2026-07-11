@@ -19,17 +19,18 @@ from agents.extensions.memory import SQLAlchemySession
 
 from core.database import engine, get_db
 from core.models import SubAgentTask, SessionTokenUsage
-from core.llm import get_model
 
-from modules.schemas import (
+from modules.chat.schemas import (
     ChatRequest, ChatStreamRequest, ChatAttachment, SummarizeRequest,
     TagsRequest, ApproveRejectRequest, DiagramRequest,
 )
-from modules.agent_defs import parent_agent, resolve_agent, get_agent, AGENT_REGISTRY, DIRECT_SELECT_AGENTS
-from modules.helpers import normalize_content, sse, vercel_data, safe_jsonable, parse_attachment
-from modules.guard import check_input_guardrail
+from modules.chat.agent_defs import parent_agent, resolve_agent, get_agent, AGENT_REGISTRY, DIRECT_SELECT_AGENTS
+from modules.chat.helpers import normalize_content, sse, vercel_data, safe_jsonable, parse_attachment
+from modules.chat.guard import check_input_guardrail
+from modules.rag.methods import chunk_text, BM25Retriever, ChromaVectorStore
 
 logger = logging.getLogger("ai-agent")
+vector_store = ChromaVectorStore()
 
 router = APIRouter()
 
@@ -412,20 +413,85 @@ async def chat_stream(request: ChatStreamRequest):
             }
         )
 
-    # Extract file attachments and add to context
+    # Extract the user query before prepending documents to use for RAG semantic search
+    user_query = user_message
+    pattern = r'\[Isi Dokumen Terlampir:\s*"([^"]+)"\s+filePath="([^"]+)"\s+mimeType="([^"]+)"\]'
+    tag_matches = re.findall(pattern, user_query)
+    if tag_matches:
+        user_query = re.sub(pattern, '', user_query).strip()
+
     attachments_context = []
 
-    pattern = r'\[Isi Dokumen Terlampir:\s*"([^"]+)"\s+filePath="([^"]+)"\s+mimeType="([^"]+)"\]'
-    tag_matches = re.findall(pattern, user_message)
-    for filename, filePath, mimeType in tag_matches:
-        attachment = ChatAttachment(filename=filename, filePath=filePath, mimeType=mimeType)
-        file_content = parse_attachment(attachment)
-        attachments_context.append(
-            f"[Isi Dokumen Terlampir: \"{filename}\"]\n"
-            f"```{filename.split('.')[-1]}\n"
-            f"{file_content}\n"
+    async def process_attachment_rag(att: ChatAttachment, query: str) -> str:
+        content = parse_attachment(att)
+        # For small documents, inject the entire text for maximum context accuracy
+        if len(content) <= 4000:
+            return (
+                f"[Isi Dokumen Terlampir: \"{att.filename}\"]\n"
+                f"```{att.filename.split('.')[-1]}\n"
+                f"{content}\n"
+                f"```"
+            )
+        
+        search_query = query if query.strip() else "summary ringkasan"
+
+        # 1. Attempt Dense Vector Search via ChromaVectorStore (OpenRouter Embeddings)
+        logger.info(f"Attempting Dense Vector RAG for: {att.filename}")
+        try:
+            vector_results = await vector_store.search(
+                filename=att.filename,
+                file_path=att.filePath,
+                session_id=request.session_id,
+                content=content,
+                query=search_query,
+                top_k=4
+            )
+        except Exception as e:
+            logger.error(f"Dense Vector RAG search failed with error: {e}")
+            vector_results = None
+
+        # 2. If Dense Vector search succeeded, return it
+        if vector_results is not None:
+            logger.info(f"Dense Vector RAG succeeded for {att.filename}")
+            rag_parts = []
+            for idx, (chunk, score) in enumerate(vector_results, 1):
+                rag_parts.append(f"--- Bagian Relevan {idx} (Cosine Similarity: {score:.4f}) ---\n{chunk}")
+            rag_content = "\n\n".join(rag_parts)
+            return (
+                f"[Potongan Dokumen Terlampir (RAG Vektor Semantik): \"{att.filename}\"]\n"
+                f"Dokumen ini berukuran besar (> 4000 karakter). "
+                f"Berikut adalah bagian paragraf yang paling relevan dengan pertanyaan/instruksi Anda (diambil secara semantik):\n"
+                f"```\n"
+                f"{rag_content}\n"
+                f"```"
+            )
+
+        # 3. Fallback to BM25 Sparse Search if Embeddings fail
+        logger.warning(f"Dense Vector RAG failed/fallback to Sparse BM25 RAG for: {att.filename}")
+        chunks = chunk_text(content, chunk_size=800, overlap=150)
+        if not chunks:
+            return f"[Isi Dokumen Terlampir: \"{att.filename}\" (Dokumen Kosong atau Gagal Diproses)]"
+            
+        retriever = BM25Retriever(chunks)
+        results = retriever.retrieve(search_query, top_k=4)
+        
+        rag_parts = []
+        for idx, (chunk, score) in enumerate(results, 1):
+            rag_parts.append(f"--- Bagian Relevan {idx} (Relevance Score BM25: {score:.2f}) ---\n{chunk}")
+            
+        rag_content = "\n\n".join(rag_parts)
+        return (
+            f"[Potongan Dokumen Terlampir (RAG BM25 Fallback): \"{att.filename}\"]\n"
+            f"Dokumen ini berukuran besar (> 4000 karakter). "
+            f"Berikut adalah bagian paragraf yang paling relevan dengan pertanyaan/instruksi Anda (diambil secara kata kunci):\n"
+            f"```\n"
+            f"{rag_content}\n"
             f"```"
         )
+
+    for filename, filePath, mimeType in tag_matches:
+        attachment = ChatAttachment(filename=filename, filePath=filePath, mimeType=mimeType)
+        attachments_context.append(await process_attachment_rag(attachment, user_query))
 
     if tag_matches:
         user_message = re.sub(pattern, '', user_message).strip()
@@ -434,13 +500,7 @@ async def chat_stream(request: ChatStreamRequest):
         for attachment in request.attachments:
             if any(attachment.filename in ctx for ctx in attachments_context):
                 continue
-            file_content = parse_attachment(attachment)
-            attachments_context.append(
-                f"[Isi Dokumen Terlampir: \"{attachment.filename}\"]\n"
-                f"```{attachment.filename.split('.')[-1]}\n"
-                f"{file_content}\n"
-                f"```"
-            )
+            attachments_context.append(await process_attachment_rag(attachment, user_query))
 
     if attachments_context:
         attachments_str = "\n\n".join(attachments_context) + "\n\n"

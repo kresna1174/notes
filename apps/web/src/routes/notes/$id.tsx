@@ -3,8 +3,7 @@ import { Sidebar } from '#/modules/sidebar'
 import { Editor, PinLockModal, VersionHistory, SearchPalette } from '#/modules/editor'
 import { ChatBot } from '#/modules/chat'
 import { useState, useEffect } from 'react'
-import { Check, Loader2, Circle, PanelLeftClose, PanelLeftOpen, Sparkles } from 'lucide-react'
-
+import { Check, Loader2, Circle, PanelLeftClose, PanelLeftOpen } from 'lucide-react'
 
 export const Route = createFileRoute('/notes/$id')({
   loader: async ({ params }) => {
@@ -125,8 +124,6 @@ function NotePageComponent() {
     if (initialNote?.isLocked) setShowUnlockModal(true)
   }, [initialNote])
 
-
-
   async function handleUpdate(fields: { title?: string; content?: string }) {
     await fetch(`/api/notes/${id}`, {
       method: 'PUT',
@@ -208,7 +205,6 @@ function NotePageComponent() {
           </div>
         ) : isContentVisible ? (
           <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-            {/* Editor row (with optional ChatBot sidebar) */}
             <div style={{ flex: 1, overflow: 'hidden', display: 'flex', minHeight: 0 }}>
               <Editor
                 key={note.id}
@@ -240,7 +236,6 @@ function NotePageComponent() {
                 />
               )}
             </div>
-            {/* History panel — horizontal timeline at bottom */}
             {historyOpen && (
               <VersionHistory
                 noteId={id}

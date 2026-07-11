@@ -165,6 +165,18 @@ function DiagramNodeView({ node, updateAttributes, deleteNode, editor }: any) {
   const [nodes, setNodes] = useNodesState(parsed.nodes)
   const [edges, setEdges] = useEdgesState(parsed.edges)
 
+  // Self-heal diagram ID if it's missing or a function (buggy default)
+  useEffect(() => {
+    const currentId = node.attrs.id
+    const isInvalid = !currentId || typeof currentId === 'function' || String(currentId).startsWith('() =>')
+    if (isInvalid) {
+      const newId = typeof crypto !== 'undefined' && crypto.randomUUID
+        ? crypto.randomUUID()
+        : Math.random().toString(36).substring(2, 15)
+      updateAttributes({ id: newId })
+    }
+  }, [node.attrs.id, updateAttributes])
+
   // Sync state whenever node attributes change
   useEffect(() => {
     try {
@@ -184,7 +196,8 @@ function DiagramNodeView({ node, updateAttributes, deleteNode, editor }: any) {
   const handleOpenEditor = () => {
     if (editor.storage.diagram?.openEditor) {
       let nodeId = node.attrs.id
-      if (!nodeId) {
+      const isInvalid = !nodeId || typeof nodeId === 'function' || String(nodeId).startsWith('() =>')
+      if (isInvalid) {
         nodeId = typeof crypto !== 'undefined' && crypto.randomUUID
           ? crypto.randomUUID()
           : Math.random().toString(36).substring(2, 15)
@@ -1056,11 +1069,21 @@ export const DiagramBlock = Node.create({
   addAttributes() {
     return {
       id: {
-        default: () => typeof crypto !== 'undefined' && crypto.randomUUID
-          ? crypto.randomUUID()
-          : Math.random().toString(36).substring(2, 15),
+        default: null,
+        parseHTML: element => element.getAttribute('id') || element.getAttribute('data-id'),
+        renderHTML: attributes => {
+          if (!attributes.id) return {}
+          return { id: attributes.id }
+        }
       },
-      data: { default: JSON.stringify({ nodes: [], edges: [] }) }
+      data: {
+        default: JSON.stringify({ nodes: [], edges: [] }),
+        parseHTML: element => element.getAttribute('data') || element.getAttribute('data-diagram-data'),
+        renderHTML: attributes => {
+          if (!attributes.data) return {}
+          return { data: attributes.data }
+        }
+      }
     }
   },
   parseHTML() { return [{ tag: 'div[data-type="diagram"]' }] },
@@ -1069,7 +1092,7 @@ export const DiagramBlock = Node.create({
   },
   addNodeView() {
     return ReactNodeViewRenderer(DiagramNodeView, {
-      update: () => true,
+      update: () => false,
     })
   },
 })

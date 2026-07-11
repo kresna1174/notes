@@ -10,7 +10,7 @@ interface AiSession { session_id: string; user_id: string | null; username: stri
 interface AiStats { total_sessions: number; total_messages: number; total_user_messages: number; total_tool_calls: number; total_prompt_tokens: number; total_completion_tokens: number }
 interface Organization { id: string; name: string; description: string | null; createdAt: number }
 
-export const Route = createFileRoute('/users')({
+export const Route = createFileRoute('/users/')({
   beforeLoad: ({ context }) => {
     if (!context.auth.user || context.auth.user.role !== 'admin') {
       throw redirect({ to: '/' })
@@ -148,179 +148,55 @@ function ResetPinModal({ note, onClose, onSuccess }: ResetPinModalProps) {
         overflow: 'hidden',
         animation: 'modalIn 0.2s cubic-bezier(0.34, 1.56, 0.64, 1)',
       }}>
-        <style>{`
-          @keyframes modalIn {
-            from { opacity: 0; transform: scale(0.94) translateY(8px); }
-            to   { opacity: 1; transform: scale(1) translateY(0); }
-          }
-        `}</style>
-
-        {/* Header */}
-        <div style={{
-          padding: '20px 20px 16px',
-          borderBottom: '1px solid var(--border)',
-          display: 'flex', alignItems: 'flex-start', gap: 12,
-        }}>
-          <div style={{
-            width: 40, height: 40, borderRadius: 10, flexShrink: 0,
-            background: 'rgba(224,49,49,0.1)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            color: '#e03131',
-          }}>
-            <Lock size={18} />
+        <div style={{ padding: 24 }}>
+          {/* Header */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+            <h3 style={{ margin: 0, fontWeight: 700, fontSize: '1.15rem', color: 'var(--fg)', fontFamily: 'var(--font-heading)' }}>Security Manager</h3>
+            <button onClick={onClose} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--fg-muted)', display: 'flex', alignItems: 'center' }}><X size={18} /></button>
           </div>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <p style={{ margin: 0, fontWeight: 700, fontSize: '1rem', color: 'var(--fg)', fontFamily: 'var(--font-heading)' }}>
-              Reset Note PIN
-            </p>
-            <p style={{ margin: '3px 0 0', fontSize: '0.8125rem', color: 'var(--fg-muted)', fontFamily: 'var(--font-body)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-              "{note.title || 'Untitled'}" · @{note.ownerUsername}
-            </p>
-          </div>
-          <button
-            onClick={onClose}
-            style={{
-              width: 28, height: 28, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
-              background: 'none', border: 'none', cursor: 'pointer', color: 'var(--fg-muted)',
-              borderRadius: 6, transition: 'background 0.15s',
-            }}
-            onMouseEnter={e => (e.currentTarget.style.background = 'var(--muted)')}
-            onMouseLeave={e => (e.currentTarget.style.background = 'none')}
-          >
-            <X size={15} />
-          </button>
-        </div>
 
-        <div style={{ padding: '20px' }}>
-          {/* Step 1: Choose action */}
+          {/* Step 1: Choose Action */}
           {mode === 'choose' && (
-            <>
-              {/* Warning banner */}
-              <div style={{
-                display: 'flex', gap: 10, padding: '12px 14px',
-                background: 'rgba(245,159,0,0.08)', border: '1px solid rgba(245,159,0,0.25)',
-                borderRadius: 10, marginBottom: 20,
-              }}>
-                <AlertTriangle size={16} style={{ color: '#f59f00', flexShrink: 0, marginTop: 1 }} />
-                <p style={{ margin: 0, fontSize: '0.8125rem', color: 'var(--fg)', lineHeight: 1.5, fontFamily: 'var(--font-body)' }}>
-                  This action is <strong>permanent</strong> and cannot be undone. The note owner will not be notified.
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+              <div style={{ padding: '12px 14px', background: 'rgba(240,140,0,0.06)', borderRadius: 8, border: '1px solid rgba(240,140,0,0.15)', display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+                <AlertTriangle size={18} color="#f08c00" style={{ flexShrink: 0, marginTop: 1 }} />
+                <p style={{ margin: 0, fontSize: '0.8125rem', color: 'var(--fg-muted)', lineHeight: 1.4 }}>
+                  Managing PIN for note: <strong style={{ color: 'var(--fg)' }}>"{note.title || 'Untitled'}"</strong>.
+                  Removing the PIN will make the note immediately readable to all team members.
                 </p>
               </div>
 
-              <p style={{ margin: '0 0 12px', fontSize: '0.8125rem', fontWeight: 600, color: 'var(--fg-muted)', textTransform: 'uppercase', letterSpacing: '0.04em', fontFamily: 'var(--font-body)' }}>
-                Choose action
-              </p>
-
-              {/* Option: Remove PIN */}
-              <button
-                onClick={() => setMode('remove')}
-                style={{
-                  width: '100%', textAlign: 'left', display: 'flex', alignItems: 'center', gap: 14,
-                  padding: '14px 16px', marginBottom: 10,
-                  border: '1.5px solid var(--border)', borderRadius: 10,
-                  background: 'var(--card-bg)', cursor: 'pointer',
-                  transition: 'all 0.15s',
-                }}
-                onMouseEnter={e => { e.currentTarget.style.borderColor = '#e03131'; e.currentTarget.style.background = 'rgba(224,49,49,0.04)' }}
-                onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.background = 'var(--card-bg)' }}
-              >
-                <div style={{ width: 36, height: 36, borderRadius: 8, background: 'rgba(224,49,49,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#e03131', flexShrink: 0 }}>
-                  <LockOpen size={17} />
-                </div>
-                <div>
-                  <p style={{ margin: 0, fontWeight: 600, fontSize: '0.875rem', color: 'var(--fg)', fontFamily: 'var(--font-body)' }}>Remove PIN</p>
-                  <p style={{ margin: '2px 0 0', fontSize: '0.78rem', color: 'var(--fg-muted)', fontFamily: 'var(--font-body)' }}>Note can be opened without PIN after this</p>
-                </div>
-              </button>
-
-              {/* Option: Change PIN */}
-              <button
-                onClick={() => setMode('change')}
-                style={{
-                  width: '100%', textAlign: 'left', display: 'flex', alignItems: 'center', gap: 14,
-                  padding: '14px 16px',
-                  border: '1.5px solid var(--border)', borderRadius: 10,
-                  background: 'var(--card-bg)', cursor: 'pointer',
-                  transition: 'all 0.15s',
-                }}
-                onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--primary)'; e.currentTarget.style.background = 'var(--accent)' }}
-                onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.background = 'var(--card-bg)' }}
-              >
-                <div style={{ width: 36, height: 36, borderRadius: 8, background: 'var(--accent)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--primary)', flexShrink: 0 }}>
-                  <KeyRound size={17} />
-                </div>
-                <div>
-                  <p style={{ margin: 0, fontWeight: 600, fontSize: '0.875rem', color: 'var(--fg)', fontFamily: 'var(--font-body)' }}>Change PIN</p>
-                  <p style={{ margin: '2px 0 0', fontSize: '0.78rem', color: 'var(--fg-muted)', fontFamily: 'var(--font-body)' }}>Set new PIN without needing the old one</p>
-                </div>
-              </button>
-            </>
-          )}
-
-          {/* Step 2a: Confirm remove */}
-          {mode === 'remove' && (
-            <>
-              <div style={{
-                display: 'flex', gap: 10, padding: '12px 14px',
-                background: 'rgba(224,49,49,0.06)', border: '1px solid rgba(224,49,49,0.2)',
-                borderRadius: 10, marginBottom: 20,
-              }}>
-                <AlertTriangle size={16} style={{ color: '#e03131', flexShrink: 0, marginTop: 1 }} />
-                <p style={{ margin: 0, fontSize: '0.8125rem', color: 'var(--fg)', lineHeight: 1.5, fontFamily: 'var(--font-body)' }}>
-                  PIN for note <strong>"{note.title || 'Untitled'}"</strong> by <strong>@{note.ownerUsername}</strong> will be permanently removed. Anyone can open this note without a PIN.
-                </p>
-              </div>
-
-              <label style={{ display: 'flex', alignItems: 'flex-start', gap: 10, cursor: 'pointer', marginBottom: 20, userSelect: 'none' }}>
-                <input
-                  type="checkbox"
-                  checked={confirmed}
-                  onChange={e => setConfirmed(e.target.checked)}
-                  style={{ marginTop: 2, cursor: 'pointer', width: 15, height: 15, accentColor: '#e03131' }}
-                />
-                <span style={{ fontSize: '0.8125rem', color: 'var(--fg)', fontFamily: 'var(--font-body)', lineHeight: 1.5 }}>
-                  I understand and want to remove this note's PIN
-                </span>
-              </label>
-
-              {pinError && (
-                <p style={{ margin: '0 0 12px', fontSize: '0.8rem', color: '#e03131', fontFamily: 'var(--font-body)' }}>{pinError}</p>
-              )}
-
-              <div style={{ display: 'flex', gap: 8 }}>
-                <button
-                  onClick={() => { setMode('choose'); setConfirmed(false); setPinError('') }}
-                  style={{
-                    flex: 1, padding: '9px', fontSize: '0.875rem', fontFamily: 'var(--font-body)',
-                    background: 'var(--muted)', color: 'var(--fg-muted)',
-                    border: '1px solid var(--border)', borderRadius: 8, cursor: 'pointer',
-                  }}
-                >
-                  Back
-                </button>
+              <div style={{ display: 'flex', gap: 10, marginTop: 8 }}>
                 <button
                   onClick={handleRemove}
-                  disabled={!confirmed || loading}
+                  disabled={loading}
                   style={{
-                    flex: 1, padding: '9px', fontSize: '0.875rem', fontWeight: 600, fontFamily: 'var(--font-body)',
-                    background: confirmed && !loading ? '#e03131' : 'var(--border)',
-                    color: confirmed && !loading ? '#fff' : 'var(--fg-subtle)',
-                    border: 'none', borderRadius: 8,
-                    cursor: !confirmed || loading ? 'not-allowed' : 'pointer',
-                    transition: 'all 0.15s',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                    flex: 1, padding: '10px', fontSize: '0.875rem', fontWeight: 600, fontFamily: 'var(--font-body)',
+                    background: 'rgba(224,49,49,0.08)', color: '#e03131', border: '1px solid rgba(224,49,49,0.2)', borderRadius: 8,
+                    cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
                   }}
                 >
-                  {loading ? <><RefreshCw size={13} style={{ animation: 'spin 0.8s linear infinite' }} /> Deleting…</> : <><LockOpen size={13} /> Remove PIN</>}
+                  {loading ? <RefreshCw size={13} style={{ animation: 'spin 0.8s linear infinite' }} /> : <LockOpen size={13} />}
+                  Remove PIN
+                </button>
+                <button
+                  onClick={() => setMode('change')}
+                  style={{
+                    flex: 1, padding: '10px', fontSize: '0.875rem', fontWeight: 600, fontFamily: 'var(--font-body)',
+                    background: 'var(--primary)', color: 'var(--primary-fg)', border: 'none', borderRadius: 8,
+                    cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                  }}
+                >
+                  <KeyRound size={13} />
+                  Change PIN
                 </button>
               </div>
-            </>
+            </div>
           )}
 
-          {/* Step 2b: Set new PIN — kotak digit seperti PinLockModal */}
+          {/* Step 2b: Set new PIN */}
           {mode === 'change' && (
             <>
-              {/* Icon + judul centered */}
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, marginBottom: 20 }}>
                 <div style={{ width: 52, height: 52, borderRadius: '50%', background: 'var(--accent)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                   <KeyRound size={24} color="var(--primary)" />
@@ -332,7 +208,6 @@ function ResetPinModal({ note, onClose, onSuccess }: ResetPinModalProps) {
                 </p>
               </div>
 
-              {/* 4 digit boxes */}
               <div style={{
                 display: 'flex', gap: 12, justifyContent: 'center', marginBottom: 8,
                 animation: shake ? 'pin-shake 0.4s ease' : undefined,
@@ -367,7 +242,6 @@ function ResetPinModal({ note, onClose, onSuccess }: ResetPinModalProps) {
                 ))}
               </div>
 
-              {/* Error or hint */}
               <div style={{ minHeight: 22, textAlign: 'center', marginBottom: 20 }}>
                 {pinError
                   ? <p style={{ margin: 0, fontSize: '0.8rem', color: '#e03131', fontFamily: 'var(--font-body)' }}>{pinError}</p>
@@ -559,7 +433,7 @@ function UsersPage() {
   const [showOrgForm, setShowOrgForm] = useState(false)
   const [orgForm, setOrgForm] = useState({ name: '', description: '' })
   const [savingOrg, setSavingOrg] = useState(false)
-  const [editingOrg, setEditingOrg] = useState<Organization | null>(null)
+  const [editingOrg, setEditingOrg] = useState<{ org: Organization } | null>(null)
   const [editOrgForm, setEditOrgForm] = useState({ name: '', description: '' })
   const [expandedOrg, setExpandedOrg] = useState<string | null>(null)
 
@@ -670,7 +544,7 @@ function UsersPage() {
   }
   async function handleEditOrg(e: React.FormEvent) {
     e.preventDefault(); if (!editingOrg) return; setSavingOrg(true)
-    await fetch(`/api/organizations/${editingOrg.id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(editOrgForm) })
+    await fetch(`/api/organizations/${editingOrg.org.id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(editOrgForm) })
     setSavingOrg(false); setEditingOrg(null); loadOrganizations()
   }
   async function handleDeleteOrg(id: string, name: string) {
@@ -840,7 +714,7 @@ function UsersPage() {
            {/* ── Tab: Reset Note PIN ── */}
           {activeTab === 'pins' && (
             <div>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyBetween: 'space-between', marginBottom: 16 }}>
                 <div>
                   <h2 style={{ fontFamily: 'var(--font-heading)', fontWeight: 600, fontSize: '1.1rem', color: 'var(--fg)', margin: 0 }}>PIN-Locked Notes</h2>
                   <p style={{ fontSize: '0.8125rem', color: 'var(--fg-muted)', margin: '4px 0 0', fontFamily: 'var(--font-body)' }}>Delete or change any note's PIN as admin.</p>
@@ -1159,7 +1033,7 @@ function UsersPage() {
                   <button
                     onClick={() => setAiLogsPage(p => Math.max(1, p - 1))}
                     disabled={aiLogsPage === 1}
-                    style={{ padding: '5px 12px', fontSize: '0.8rem', fontFamily: 'var(--font-body)', background: 'var(--muted)', color: 'var(--fg-muted)', border: '1px solid var(--border)', borderRadius: 6, cursor: aiLogsPage === 1 ? 'not-allowed' : 'pointer', opacity: aiLogsPage === 1 ? 0.5 : 1 }}
+                    style={{ padding: '5px 12px', fontSize: '0.8,rem', fontFamily: 'var(--font-body)', background: 'var(--muted)', color: 'var(--fg-muted)', border: '1px solid var(--border)', borderRadius: 6, cursor: aiLogsPage === 1 ? 'not-allowed' : 'pointer', opacity: aiLogsPage === 1 ? 0.5 : 1 }}
                   >
                     ← Prev
                   </button>

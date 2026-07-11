@@ -1233,6 +1233,126 @@ app.post('/api/ai/diagram', authMiddleware, async (c) => {
   }
 })
 
+app.post('/api/documents', authMiddleware, async (c) => {
+  try {
+    const formData = await c.req.formData()
+    const forwardRes = await fetch(`${AI_AGENT_URL}/api/documents`, {
+      method: 'POST',
+      body: formData,
+    })
+    if (!forwardRes.ok) {
+      const errText = await forwardRes.text()
+      return c.json({ error: `AI service error: ${errText}` }, forwardRes.status as any)
+    }
+    const data = await forwardRes.json()
+    return c.json(data)
+  } catch (err) {
+    return c.json({ error: `Failed to forward document upload: ${String(err)}` }, 500)
+  }
+})
+
+app.get('/api/documents/', authMiddleware, async (c) => {
+  try {
+    const forwardRes = await fetch(`${AI_AGENT_URL}/api/documents/`)
+    if (!forwardRes.ok) {
+      const errText = await forwardRes.text()
+      return c.json({ error: `AI service error: ${errText}` }, forwardRes.status as any)
+    }
+    const data = await forwardRes.json()
+    return c.json(data)
+  } catch (err) {
+    return c.json({ error: `Failed to list documents: ${String(err)}` }, 500)
+  }
+})
+
+app.get('/api/documents/:documentId', authMiddleware, async (c) => {
+  try {
+    const documentId = c.req.param('documentId')
+    const pageNumber = c.req.query('page_number')
+    const url = pageNumber !== undefined
+      ? `${AI_AGENT_URL}/api/documents/${documentId}?page_number=${pageNumber}`
+      : `${AI_AGENT_URL}/api/documents/${documentId}`
+    const forwardRes = await fetch(url)
+    if (!forwardRes.ok) {
+      const errText = await forwardRes.text()
+      return c.json({ error: `AI service error: ${errText}` }, forwardRes.status as any)
+    }
+    const data = await forwardRes.json()
+    return c.json(data)
+  } catch (err) {
+    return c.json({ error: `Failed to retrieve document: ${String(err)}` }, 500)
+  }
+})
+
+app.delete('/api/documents/:documentId', authMiddleware, async (c) => {
+  try {
+    const documentId = c.req.param('documentId')
+    const forwardRes = await fetch(`${AI_AGENT_URL}/api/documents/${documentId}`, {
+      method: 'DELETE',
+    })
+    if (!forwardRes.ok) {
+      const errText = await forwardRes.text()
+      return c.json({ error: `AI service error: ${errText}` }, forwardRes.status as any)
+    }
+    return c.text('', 204)
+  } catch (err) {
+    return c.json({ error: `Failed to delete document: ${String(err)}` }, 500)
+  }
+})
+
+app.get('/api/pages/:pageId', authMiddleware, async (c) => {
+  try {
+    const pageId = c.req.param('pageId')
+    const forwardRes = await fetch(`${AI_AGENT_URL}/api/pages/${pageId}`)
+    if (!forwardRes.ok) {
+      const errText = await forwardRes.text()
+      return c.json({ error: `AI service error: ${errText}` }, forwardRes.status as any)
+    }
+    const data = await forwardRes.json()
+    return c.json(data)
+  } catch (err) {
+    return c.json({ error: `Failed to retrieve page: ${String(err)}` }, 500)
+  }
+})
+
+app.post('/api/queries', authMiddleware, async (c) => {
+  try {
+    const body = await c.req.json()
+    const forwardRes = await fetch(`${AI_AGENT_URL}/api/queries`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    })
+    if (!forwardRes.ok) {
+      const errText = await forwardRes.text()
+      return c.json({ error: `AI service error: ${errText}` }, forwardRes.status as any)
+    }
+    const data = await forwardRes.json()
+    return c.json(data)
+  } catch (err) {
+    return c.json({ error: `Failed to query: ${String(err)}` }, 500)
+  }
+})
+
+app.post('/api/queries/chat', authMiddleware, async (c) => {
+  try {
+    const body = await c.req.json()
+    const forwardRes = await fetch(`${AI_AGENT_URL}/api/queries/chat`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    })
+    if (!forwardRes.ok) {
+      const errText = await forwardRes.text()
+      return c.json({ error: `AI service error: ${errText}` }, forwardRes.status as any)
+    }
+    const data = await forwardRes.json()
+    return c.json(data)
+  } catch (err) {
+    return c.json({ error: `Failed to perform chat with agent: ${String(err)}` }, 500)
+  }
+})
+
 // Hono handler wrapper for backward compatibility with Vite middleware and server.ts
 const nodeHandler = getRequestListener(app.fetch)
 

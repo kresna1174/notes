@@ -1,8 +1,7 @@
 import json
 import os
-import re
 
-from modules.schemas import ChatAttachment
+from modules.chat.schemas import ChatAttachment
 
 
 def normalize_content(content) -> str:

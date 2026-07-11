@@ -1,8 +1,9 @@
 import { Node, mergeAttributes } from '@tiptap/core'
 import { ReactNodeViewRenderer, NodeViewWrapper } from '@tiptap/react'
 import { useState, useRef, useEffect } from 'react'
-import { Sparkles, Check, RefreshCw, Trash2, ArrowRight, Loader2, X } from 'lucide-react'
+import { Sparkles, Check, RefreshCw, Trash2, ArrowRight, Loader2, X, BookOpen, FileText } from 'lucide-react'
 import { marked } from 'marked'
+import { listDocuments } from '#/modules/shared/ragApi'
 
 function AiDraftNodeView({ node, updateAttributes, getPos, editor }: any) {
   const { prompt, status, result, id } = node.attrs
@@ -28,14 +29,85 @@ function AiDraftNodeView({ node, updateAttributes, getPos, editor }: any) {
     }
   }, [inputText])
 
+  const [ragDocs, setRagDocs] = useState<any[]>([])
+  const [referencedDocs, setReferencedDocs] = useState<any[]>([])
+  const [isRagMenuOpen, setIsRagMenuOpen] = useState(false)
+
+  const [mentionQuery, setMentionQuery] = useState<string | null>(null)
+  const [mentionIndex, setMentionIndex] = useState<number>(0)
+  const [mentionTriggerIndex, setMentionTriggerIndex] = useState<number>(-1)
+
+  useEffect(() => {
+    listDocuments()
+      .then(docs => setRagDocs(docs.filter(d => d.status === 'ready')))
+      .catch(console.error)
+  }, [])
+
+  useEffect(() => {
+    function handleOutsideClick() {
+      setIsRagMenuOpen(false)
+      setMentionQuery(null)
+      setMentionTriggerIndex(-1)
+    }
+    window.addEventListener('click', handleOutsideClick)
+    return () => window.removeEventListener('click', handleOutsideClick)
+  }, [])
+
+  const handleSelectMention = (doc: any) => {
+    let newCursorPos = textareaRef.current?.selectionStart || 0
+    if (mentionTriggerIndex !== -1) {
+      const beforeMention = inputText.slice(0, mentionTriggerIndex)
+      const afterCaret = inputText.slice(textareaRef.current?.selectionStart || 0)
+      setInputText(beforeMention + afterCaret)
+      newCursorPos = beforeMention.length
+    }
+    
+    if (!referencedDocs.some(rd => rd.id === doc.id)) {
+      setReferencedDocs(prev => [...prev, doc])
+    }
+    
+    setMentionQuery(null)
+    setMentionTriggerIndex(-1)
+    setMentionIndex(0)
+    
+    setTimeout(() => {
+      if (textareaRef.current) {
+        textareaRef.current.focus()
+        textareaRef.current.setSelectionRange(newCursorPos, newCursorPos)
+      }
+    }, 10)
+  }
+
+  const handleTextareaChange = (value: string, caretPos: number) => {
+    setInputText(value)
+    
+    const textBeforeCaret = value.slice(0, caretPos)
+    const lastAtIdx = textBeforeCaret.lastIndexOf('@')
+    
+    if (lastAtIdx !== -1) {
+      const textAfterAt = textBeforeCaret.slice(lastAtIdx + 1)
+      if (!/\s/.test(textAfterAt)) {
+        setMentionQuery(textAfterAt)
+        setMentionTriggerIndex(lastAtIdx)
+        setMentionIndex(0)
+        return
+      }
+    }
+    
+    setMentionQuery(null)
+    setMentionTriggerIndex(-1)
+  }
+
   async function handleGenerate(customPrompt?: string) {
     const activePrompt = customPrompt || inputText
-    if (!activePrompt.trim()) return
+    const hasActivePrompt = activePrompt.trim().length > 0
+    const hasReferences = referencedDocs.length > 0
+    if (!hasActivePrompt && !hasReferences) return
 
     setLoading(true)
     updateAttributes({
       status: 'generating',
-      prompt: activePrompt,
+      prompt: activePrompt || 'Analyze documents',
       result: ''
     })
     setStreamedText('')
@@ -43,12 +115,20 @@ function AiDraftNodeView({ node, updateAttributes, getPos, editor }: any) {
     let fullText = ''
     let streamError: string | null = null
 
+    let messageToSend = activePrompt
+    if (referencedDocs.length > 0) {
+      const ragPrefix = referencedDocs.map(doc => 
+        `[Referenced Document: "${doc.name}" (ID: "${doc.id}")]`
+      ).join('\n')
+      messageToSend = `${ragPrefix}\n\n${messageToSend}`
+    }
+
     try {
       const response = await fetch('/api/ai/chat/stream', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          message: activePrompt,
+          message: messageToSend,
           session_id: editor.options.injectNonce || 'editor-ai-draft', // Fallback key
           note_title: 'Draft Generation',
           note_content: editor.getText(),
@@ -201,18 +281,176 @@ function AiDraftNodeView({ node, updateAttributes, getPos, editor }: any) {
 
         {/* Input State (Idle) */}
         {status === 'idle' && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', position: 'relative' }}>
+            {/* Mention Suggestions Popup */}
+            {(mentionQuery !== null || isRagMenuOpen) && (() => {
+              const query = mentionQuery || ''
+              const filtered = ragDocs.filter(doc => doc.name.toLowerCase().includes(query.toLowerCase()))
+              if (filtered.length === 0) {
+                if (isRagMenuOpen) {
+                  return (
+                    <div
+                      onClick={e => e.stopPropagation()}
+                      style={{
+                        position: 'absolute',
+                        bottom: 'calc(100% - 6px)',
+                        left: 0,
+                        right: 0,
+                        background: 'var(--card-bg)',
+                        border: '1px solid var(--border)',
+                        borderRadius: 8,
+                        boxShadow: '0 -4px 16px rgba(0,0,0,0.08), 0 4px 16px rgba(0,0,0,0.08)',
+                        zIndex: 101,
+                        padding: '12px',
+                        fontSize: '0.74rem',
+                        color: 'var(--fg-subtle)',
+                        textAlign: 'center',
+                      }}
+                    >
+                      No documents ready in RAG. Upload PDF first!
+                    </div>
+                  )
+                }
+                return null
+              }
+              return (
+                <div
+                  onClick={e => e.stopPropagation()}
+                  style={{
+                    position: 'absolute',
+                    bottom: 'calc(100% - 6px)',
+                    left: 0,
+                    right: 0,
+                    maxHeight: '160px',
+                    overflowY: 'auto',
+                    background: 'var(--card-bg)',
+                    border: '1px solid var(--border)',
+                    borderRadius: 8,
+                    boxShadow: '0 -4px 16px rgba(0,0,0,0.08), 0 4px 16px rgba(0,0,0,0.08)',
+                    zIndex: 101,
+                    padding: '4px',
+                  }}
+                >
+                  <div style={{ padding: '6px 8px', fontSize: '0.65rem', fontWeight: 600, color: 'var(--fg-subtle)', borderBottom: '1px solid var(--border)', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.03em' }}>
+                    Mention Document reference
+                  </div>
+                  {filtered.map((doc, idx) => {
+                    const isSelected = idx === mentionIndex
+                    const isReferenced = referencedDocs.some(rd => rd.id === doc.id)
+                    return (
+                      <button
+                        key={doc.id}
+                        disabled={isReferenced}
+                        onClick={() => {
+                          if (!isReferenced) {
+                            handleSelectMention(doc)
+                            setIsRagMenuOpen(false)
+                          }
+                        }}
+                        onMouseEnter={() => setMentionIndex(idx)}
+                        style={{
+                          width: '100%',
+                          textAlign: 'left',
+                          padding: '6px 8px',
+                          fontSize: '0.74rem',
+                          color: isReferenced ? 'var(--fg-subtle)' : 'var(--fg)',
+                          background: isSelected ? 'rgba(59, 130, 246, 0.08)' : 'none',
+                          border: 'none',
+                          borderRadius: 4,
+                          cursor: isReferenced ? 'default' : 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 6,
+                        }}
+                      >
+                        <FileText size={14} style={{ color: isReferenced ? 'var(--fg-subtle)' : isSelected ? 'var(--primary)' : 'var(--fg-muted)', flexShrink: 0 }} />
+                        <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: isSelected ? 500 : 400 }}>
+                          {doc.name}
+                        </span>
+                        {isReferenced ? (
+                          <span style={{ fontSize: '0.62rem', color: 'var(--fg-subtle)' }}>Attached</span>
+                        ) : isSelected ? (
+                          <span style={{ fontSize: '0.62rem', color: 'var(--primary)', fontWeight: 500 }}>Enter to select</span>
+                        ) : null}
+                      </button>
+                    )
+                  })}
+                </div>
+              )
+            })()}
+
+            {/* Referenced pills */}
+            {referencedDocs.length > 0 && (
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 2, padding: '0 4px' }}>
+                {referencedDocs.map((doc, i) => (
+                  <div
+                    key={i}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 4,
+                      padding: '4px 8px',
+                      borderRadius: 6,
+                      background: 'rgba(59, 130, 246, 0.08)',
+                      border: '1px solid rgba(59, 130, 246, 0.2)',
+                      fontSize: '0.72rem',
+                      color: 'var(--primary)',
+                    }}
+                  >
+                    <span>📖 {doc.name.length > 30 ? doc.name.slice(0, 30) + '…' : doc.name}</span>
+                    <button
+                      onClick={() => setReferencedDocs(prev => prev.filter((_, idx) => idx !== i))}
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        color: 'var(--primary)',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        padding: 0,
+                      }}
+                      title="Remove reference"
+                    >
+                      <X size={12} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+
             <textarea
               ref={textareaRef}
               value={inputText}
-              onChange={e => setInputText(e.target.value)}
+              onChange={e => handleTextareaChange(e.target.value, e.target.selectionStart)}
               onKeyDown={e => {
-                if (e.key === 'Enter' && !e.shiftKey) {
-                  e.preventDefault()
-                  handleGenerate()
+                const query = mentionQuery || ''
+                const filtered = ragDocs.filter(doc => doc.name.toLowerCase().includes(query.toLowerCase()))
+                const isMenuVisible = mentionQuery !== null || isRagMenuOpen
+                if (isMenuVisible && filtered.length > 0) {
+                  if (e.key === 'ArrowDown') {
+                    e.preventDefault()
+                    setMentionIndex(prev => (prev + 1) % filtered.length)
+                  } else if (e.key === 'ArrowUp') {
+                    e.preventDefault()
+                    setMentionIndex(prev => (prev - 1 + filtered.length) % filtered.length)
+                  } else if (e.key === 'Enter') {
+                    e.preventDefault()
+                    handleSelectMention(filtered[mentionIndex])
+                    setIsRagMenuOpen(false)
+                  } else if (e.key === 'Escape') {
+                    e.preventDefault()
+                    setMentionQuery(null)
+                    setMentionTriggerIndex(-1)
+                    setIsRagMenuOpen(false)
+                  }
+                } else {
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault()
+                    handleGenerate()
+                  }
                 }
               }}
-              placeholder="What would you like me to write? (e.g. 'Draft a professional email calling in sick' or 'Summarize this topic')..."
+              placeholder="What would you like me to write? (type @ to mention PDF from RAG library)..."
               style={{
                 width: '100%',
                 background: 'var(--bg)',
@@ -228,41 +466,66 @@ function AiDraftNodeView({ node, updateAttributes, getPos, editor }: any) {
                 lineHeight: '1.45',
               }}
             />
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
-              <button
-                onClick={handleDiscard}
-                style={{
-                  padding: '5px 12px',
-                  background: 'transparent',
-                  border: '1px solid var(--border)',
-                  borderRadius: '6px',
-                  fontSize: '0.75rem',
-                  color: 'var(--fg-muted)',
-                  cursor: 'pointer',
-                }}
-              >
-                Cancel
-              </button>
-              <button
-                onClick={() => handleGenerate()}
-                disabled={!inputText.trim()}
-                style={{
-                  padding: '5px 14px',
-                  background: 'var(--primary)',
-                  color: 'var(--primary-fg)',
-                  border: 'none',
-                  borderRadius: '6px',
-                  fontSize: '0.75rem',
-                  fontWeight: 600,
-                  cursor: inputText.trim() ? 'pointer' : 'not-allowed',
-                  opacity: inputText.trim() ? 1 : 0.6,
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                }}
-              >
-                Generate <ArrowRight size={13} />
-              </button>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div style={{ display: 'flex', alignItems: 'center' }}>
+                <button
+                  onClick={(e) => { e.stopPropagation(); setIsRagMenuOpen(!isRagMenuOpen) }}
+                  title="Mention reference document from library"
+                  style={{
+                    width: 28,
+                    height: 28,
+                    borderRadius: 6,
+                    background: isRagMenuOpen ? 'var(--muted)' : 'none',
+                    border: 'none',
+                    color: 'var(--fg-muted)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    cursor: 'pointer',
+                    transition: 'background 0.15s',
+                  }}
+                  onMouseEnter={e => e.currentTarget.style.background = 'var(--muted)'}
+                  onMouseLeave={e => { if (!isRagMenuOpen) e.currentTarget.style.background = 'none' }}
+                >
+                  <BookOpen size={14} />
+                </button>
+              </div>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <button
+                  onClick={handleDiscard}
+                  style={{
+                    padding: '5px 12px',
+                    background: 'transparent',
+                    border: '1px solid var(--border)',
+                    borderRadius: '6px',
+                    fontSize: '0.75rem',
+                    color: 'var(--fg-muted)',
+                    cursor: 'pointer',
+                  }}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => handleGenerate()}
+                  disabled={(!inputText.trim() && referencedDocs.length === 0)}
+                  style={{
+                    padding: '5px 14px',
+                    background: 'var(--primary)',
+                    color: 'var(--primary-fg)',
+                    border: 'none',
+                    borderRadius: '6px',
+                    fontSize: '0.75rem',
+                    fontWeight: 600,
+                    cursor: (inputText.trim() || referencedDocs.length > 0) ? 'pointer' : 'not-allowed',
+                    opacity: (inputText.trim() || referencedDocs.length > 0) ? 1 : 0.6,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                  }}
+                >
+                  Generate <ArrowRight size={13} />
+                </button>
+              </div>
             </div>
           </div>
         )}
