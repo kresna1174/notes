@@ -158,8 +158,10 @@ const COMMANDS = [
     description: 'Generate text automatically using AI assistant.',
     icon: Sparkles,
     command: ({ editor, range }: any) => {
-      editor.chain().focus().deleteRange(range).run()
-      window.dispatchEvent(new CustomEvent('open-ai-prompt-bar'))
+      const id = typeof crypto !== 'undefined' && crypto.randomUUID
+        ? crypto.randomUUID()
+        : Math.random().toString(36).substring(2, 15)
+      editor.chain().focus().deleteRange(range).insertContent({ type: 'aiDraft', attrs: { id, status: 'idle' } }).run()
     }
   },
 ]

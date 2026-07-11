@@ -32,6 +32,7 @@ import { CalloutBlock } from './CalloutBlock'
 import { TableOfContentsBlock } from './TableOfContentsBlock'
 import { WebBookmarkBlock } from './WebBookmarkBlock'
 import { ToggleBlock } from './ToggleBlock'
+import { AiDraftBlock } from './AiDraftBlock'
 import { DragHandle } from './DragHandle'
 import { NoteIcon } from '../shared/ui'
 import { useEffect, useRef, useState, useMemo } from 'react'
@@ -639,6 +640,7 @@ export function Editor({ note, onUpdate, onSaveStatusChange, onLockChange, share
       TableOfContentsBlock,
       WebBookmarkBlock,
       ToggleBlock,
+      AiDraftBlock,
       DragDropPlugin,
     ],
     onUpdate: ({ editor, transaction }) => {
