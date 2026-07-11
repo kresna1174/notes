@@ -1,9 +1,8 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { useState, useEffect, useMemo } from 'react'
-import { PinLockModal } from '../components/editor/PinLockModal'
-import { docToSegments, DocContent } from '../components/editor/DocRenderer'
+import { PinLockModal, docToSegments, DocContent } from '#/modules/editor'
+import { useTheme } from '#/modules/shared/theme'
 import { Lock, Sun, Moon, Beer, Atom } from 'lucide-react'
-import { useTheme } from '../lib/theme'
 
 export const Route = createFileRoute('/share/$token')({
   component: ShareViewComponent,
@@ -11,8 +10,8 @@ export const Route = createFileRoute('/share/$token')({
 
 function fmt(ts: number) {
   const d = new Date(ts)
-  return d.toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }) +
-    ', ' + d.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })
+  return d.toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' }) +
+    ', ' + d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
 }
 
 function ShareViewComponent() {
@@ -89,8 +88,8 @@ function ShareViewComponent() {
   if (notFound) {
     return (
       <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg-app, #f8f9fa)', flexDirection: 'column', gap: 8 }}>
-        <p style={{ color: 'var(--fg, #1a1a2e)', fontWeight: 600, fontFamily: 'var(--font-heading, sans-serif)' }}>Link tidak ditemukan</p>
-        <p style={{ color: 'var(--fg-muted, #6c757d)', fontSize: '0.85rem', fontFamily: 'var(--font-body, sans-serif)' }}>Link ini mungkin sudah dicabut atau tidak valid.</p>
+        <p style={{ color: 'var(--fg, #1a1a2e)', fontWeight: 600, fontFamily: 'var(--font-heading, sans-serif)' }}>Link not found</p>
+        <p style={{ color: 'var(--fg-muted, #6c757d)', fontSize: '0.85rem', fontFamily: 'var(--font-body, sans-serif)' }}>This link may have been revoked or is not valid.</p>
       </div>
     )
   }
@@ -118,7 +117,7 @@ function ShareViewComponent() {
           {note?.hasPinProtection && (
             <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: '0.75rem', color: 'var(--fg-muted, #6c757d)', fontFamily: 'var(--font-body, sans-serif)' }}>
               <Lock size={12} />
-              {unlocked ? 'Dibuka' : 'Terkunci'}
+              {unlocked ? 'Unlocked' : 'Locked'}
             </div>
           )}
           <button
@@ -191,13 +190,13 @@ function ShareViewComponent() {
             </h1>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px 16px', marginBottom: 36, fontSize: '0.75rem', color: 'var(--fg-subtle, #adb5bd)', fontFamily: 'var(--font-body, sans-serif)' }}>
               <span>
-                Dibuat <span style={{ color: 'var(--fg-muted, #6c757d)' }}>{note ? fmt(note.createdAt) : ''}</span>
-                {note?.createdByUsername && <> oleh <span style={{ color: 'var(--fg-muted, #6c757d)', fontWeight: 500 }}>{note.createdByUsername}</span></>}
+                Created <span style={{ color: 'var(--fg-muted, #6c757d)' }}>{note ? fmt(note.createdAt) : ''}</span>
+                {note?.createdByUsername && <> by <span style={{ color: 'var(--fg-muted, #6c757d)', fontWeight: 500 }}>{note.createdByUsername}</span></>}
               </span>
               <span>·</span>
               <span>
-                Diperbarui <span style={{ color: 'var(--fg-muted, #6c757d)' }}>{note ? fmt(note.updatedAt) : ''}</span>
-                {note?.updatedByUsername && <> oleh <span style={{ color: 'var(--fg-muted, #6c757d)', fontWeight: 500 }}>{note.updatedByUsername}</span></>}
+                Updated <span style={{ color: 'var(--fg-muted, #6c757d)' }}>{note ? fmt(note.updatedAt) : ''}</span>
+                {note?.updatedByUsername && <> by <span style={{ color: 'var(--fg-muted, #6c757d)', fontWeight: 500 }}>{note.updatedByUsername}</span></>}
               </span>
             </div>
             <DocContent segments={segments} />
@@ -206,7 +205,7 @@ function ShareViewComponent() {
       ) : (
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 'calc(100vh - 57px)', flexDirection: 'column', gap: 12 }}>
           <Lock size={32} color="var(--fg-muted, #6c757d)" />
-          <p style={{ color: 'var(--fg-muted, #6c757d)', fontSize: '0.9rem', fontFamily: 'var(--font-body, sans-serif)' }}>Catatan ini dilindungi PIN</p>
+          <p style={{ color: 'var(--fg-muted, #6c757d)', fontSize: '0.9rem', fontFamily: 'var(--font-body, sans-serif)' }}>This note is protected by a PIN</p>
           <button
             onClick={() => setShowPin(true)}
             style={{
@@ -216,7 +215,7 @@ function ShareViewComponent() {
               cursor: 'pointer', fontFamily: 'var(--font-body, sans-serif)',
             }}
           >
-            Masukkan PIN
+            Enter PIN
           </button>
         </div>
       )}

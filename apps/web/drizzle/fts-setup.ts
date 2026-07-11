@@ -1,4 +1,4 @@
-import { sqlite } from '../src/lib/db'
+import { sqlite } from '../src/modules/shared/db'
 
 sqlite.exec(`
   CREATE VIRTUAL TABLE IF NOT EXISTS notes_fts USING fts5(

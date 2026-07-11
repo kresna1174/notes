@@ -1,9 +1,9 @@
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { useState, useEffect, useRef } from 'react'
-import { useAuth } from '../lib/auth'
-import { useTheme } from '../lib/theme'
+import { useAuth } from '#/modules/shared/auth'
+import { useTheme } from '#/modules/shared/theme'
 import { Eye, EyeOff, Sun, Moon, Brain, Zap } from 'lucide-react'
-import { AboutModal } from '../components/ui/AboutModal'
+import { AboutModal } from '#/modules/auth'
 
 export const Route = createFileRoute('/login')({
   component: LoginPage,
@@ -425,7 +425,7 @@ function LoginPage() {
       {/* Floating Theme Toggle */}
       <button
         onClick={toggle}
-        title={theme === 'dark' ? 'Ubah ke mode terang' : 'Ubah ke mode gelap'}
+        title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
         style={{
           position: 'absolute',
           top: 20,

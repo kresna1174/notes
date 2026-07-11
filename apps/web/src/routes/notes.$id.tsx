@@ -1,12 +1,9 @@
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
-import { Sidebar } from '../components/sidebar/Sidebar'
-import { Editor } from '../components/editor/Editor'
-import { PinLockModal } from '../components/editor/PinLockModal'
+import { Sidebar } from '#/modules/sidebar'
+import { Editor, PinLockModal, VersionHistory, SearchPalette } from '#/modules/editor'
+import { ChatBot } from '#/modules/chat'
 import { useState, useEffect } from 'react'
 import { Check, Loader2, Circle, PanelLeftClose, PanelLeftOpen, Sparkles } from 'lucide-react'
-import { ChatBot } from '../components/chat/ChatBot'
-import { VersionHistory } from '../components/editor/VersionHistory'
-import { SearchPalette } from '../components/editor/SearchPalette'
 
 
 export const Route = createFileRoute('/notes/$id')({
@@ -56,7 +53,7 @@ function SaveIndicator({ status, sidebarOpen, isMobile, historyOpen }: { status:
       gap: 6,
       fontSize: '0.75rem',
       fontFamily: 'var(--font-body)',
-      color: status === 'saved' ? 'var(--fg-subtle)' : status === 'saving' ? 'var(--primary)' : status === 'generating' ? '#8a2be2' : '#f08c00',
+      color: status === 'saved' ? 'var(--fg-subtle)' : status === 'saving' ? 'var(--primary)' : status === 'generating' ? 'var(--fg-subtle)' : '#f08c00',
       background: 'var(--save-bg)',
       border: '1px solid var(--border)',
       borderRadius: 20,
@@ -68,7 +65,7 @@ function SaveIndicator({ status, sidebarOpen, isMobile, historyOpen }: { status:
     }}>
       {status === 'saved' && <><Check size={12} strokeWidth={2.5} /> Saved</>}
       {status === 'saving' && <><Loader2 size={12} className="animate-spin" /> Saving…</>}
-      {status === 'generating' && <><Sparkles size={12} className="animate-pulse text-purple-500" style={{ color: '#a855f7' }} /> AI Writing…</>}
+      {status === 'generating' && <><Loader2 size={12} className="animate-spin" /> Thinking…</>}
       {status === 'unsaved' && <><Circle size={10} fill="currentColor" strokeWidth={0} /> Unsaved</>}
     </div>
   )

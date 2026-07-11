@@ -3,7 +3,7 @@ import { routeTree } from './routeTree.gen'
 
 export interface RouterContext {
   auth: {
-    user: import('./lib/auth').AuthUser | null
+    user: import('./modules/shared/auth').AuthUser | null
     loading: boolean
   }
 }

@@ -1,7 +1,7 @@
 import { createFileRoute, redirect, useRouter } from '@tanstack/react-router'
-import { useAuth } from '../lib/auth'
+import { useAuth } from '#/modules/shared/auth'
+import { Sidebar } from '#/modules/sidebar'
 import React, { useState, useEffect, useRef } from 'react'
-import { Sidebar } from '../components/sidebar/Sidebar'
 import { Trash2, UserPlus, Shield, Eye, KeyRound, Lock, LockOpen, X, AlertTriangle, Check, Users as UsersIcon, RefreshCw, Sparkles, Pencil, Plus, UsersRound, UserMinus } from 'lucide-react'
 
 interface User { id: string; username: string; role: 'admin' | 'viewer'; status: 'approved' | 'rejected' | 'pending'; createdAt: number }
@@ -91,7 +91,7 @@ function ResetPinModal({ note, onClose, onSuccess }: ResetPinModalProps) {
         onClose()
       } else {
         const data = await res.json()
-        setPinError(data.error || 'Terjadi kesalahan')
+        setPinError(data.error || 'An error occurred')
       }
     } finally {
       setLoading(false)
@@ -111,7 +111,7 @@ function ResetPinModal({ note, onClose, onSuccess }: ResetPinModalProps) {
         onClose()
       } else {
         const data = await res.json()
-        setPinError(data.error || 'Terjadi kesalahan')
+        setPinError(data.error || 'An error occurred')
         setDigits(['', '', '', ''])
         triggerShake()
         setTimeout(() => digitRefs[0].current?.focus(), 50)
@@ -171,7 +171,7 @@ function ResetPinModal({ note, onClose, onSuccess }: ResetPinModalProps) {
           </div>
           <div style={{ flex: 1, minWidth: 0 }}>
             <p style={{ margin: 0, fontWeight: 700, fontSize: '1rem', color: 'var(--fg)', fontFamily: 'var(--font-heading)' }}>
-              Reset PIN Catatan
+              Reset Note PIN
             </p>
             <p style={{ margin: '3px 0 0', fontSize: '0.8125rem', color: 'var(--fg-muted)', fontFamily: 'var(--font-body)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
               "{note.title || 'Untitled'}" · @{note.ownerUsername}
@@ -203,12 +203,12 @@ function ResetPinModal({ note, onClose, onSuccess }: ResetPinModalProps) {
               }}>
                 <AlertTriangle size={16} style={{ color: '#f59f00', flexShrink: 0, marginTop: 1 }} />
                 <p style={{ margin: 0, fontSize: '0.8125rem', color: 'var(--fg)', lineHeight: 1.5, fontFamily: 'var(--font-body)' }}>
-                  Aksi ini bersifat <strong>permanen</strong> dan tidak bisa dibatalkan. Pemilik catatan tidak akan mendapat notifikasi.
+                  This action is <strong>permanent</strong> and cannot be undone. The note owner will not be notified.
                 </p>
               </div>
 
               <p style={{ margin: '0 0 12px', fontSize: '0.8125rem', fontWeight: 600, color: 'var(--fg-muted)', textTransform: 'uppercase', letterSpacing: '0.04em', fontFamily: 'var(--font-body)' }}>
-                Pilih tindakan
+                Choose action
               </p>
 
               {/* Option: Remove PIN */}
@@ -228,8 +228,8 @@ function ResetPinModal({ note, onClose, onSuccess }: ResetPinModalProps) {
                   <LockOpen size={17} />
                 </div>
                 <div>
-                  <p style={{ margin: 0, fontWeight: 600, fontSize: '0.875rem', color: 'var(--fg)', fontFamily: 'var(--font-body)' }}>Hapus PIN</p>
-                  <p style={{ margin: '2px 0 0', fontSize: '0.78rem', color: 'var(--fg-muted)', fontFamily: 'var(--font-body)' }}>Catatan bisa dibuka tanpa PIN setelah ini</p>
+                  <p style={{ margin: 0, fontWeight: 600, fontSize: '0.875rem', color: 'var(--fg)', fontFamily: 'var(--font-body)' }}>Remove PIN</p>
+                  <p style={{ margin: '2px 0 0', fontSize: '0.78rem', color: 'var(--fg-muted)', fontFamily: 'var(--font-body)' }}>Note can be opened without PIN after this</p>
                 </div>
               </button>
 
@@ -250,8 +250,8 @@ function ResetPinModal({ note, onClose, onSuccess }: ResetPinModalProps) {
                   <KeyRound size={17} />
                 </div>
                 <div>
-                  <p style={{ margin: 0, fontWeight: 600, fontSize: '0.875rem', color: 'var(--fg)', fontFamily: 'var(--font-body)' }}>Ganti PIN</p>
-                  <p style={{ margin: '2px 0 0', fontSize: '0.78rem', color: 'var(--fg-muted)', fontFamily: 'var(--font-body)' }}>Set PIN baru tanpa perlu PIN lama</p>
+                  <p style={{ margin: 0, fontWeight: 600, fontSize: '0.875rem', color: 'var(--fg)', fontFamily: 'var(--font-body)' }}>Change PIN</p>
+                  <p style={{ margin: '2px 0 0', fontSize: '0.78rem', color: 'var(--fg-muted)', fontFamily: 'var(--font-body)' }}>Set new PIN without needing the old one</p>
                 </div>
               </button>
             </>
@@ -267,7 +267,7 @@ function ResetPinModal({ note, onClose, onSuccess }: ResetPinModalProps) {
               }}>
                 <AlertTriangle size={16} style={{ color: '#e03131', flexShrink: 0, marginTop: 1 }} />
                 <p style={{ margin: 0, fontSize: '0.8125rem', color: 'var(--fg)', lineHeight: 1.5, fontFamily: 'var(--font-body)' }}>
-                  PIN catatan <strong>"{note.title || 'Untitled'}"</strong> milik <strong>@{note.ownerUsername}</strong> akan dihapus permanen. Siapapun bisa membuka catatan ini tanpa PIN.
+                  PIN for note <strong>"{note.title || 'Untitled'}"</strong> by <strong>@{note.ownerUsername}</strong> will be permanently removed. Anyone can open this note without a PIN.
                 </p>
               </div>
 
@@ -279,7 +279,7 @@ function ResetPinModal({ note, onClose, onSuccess }: ResetPinModalProps) {
                   style={{ marginTop: 2, cursor: 'pointer', width: 15, height: 15, accentColor: '#e03131' }}
                 />
                 <span style={{ fontSize: '0.8125rem', color: 'var(--fg)', fontFamily: 'var(--font-body)', lineHeight: 1.5 }}>
-                  Saya mengerti dan ingin menghapus PIN catatan ini
+                  I understand and want to remove this note's PIN
                 </span>
               </label>
 
@@ -296,7 +296,7 @@ function ResetPinModal({ note, onClose, onSuccess }: ResetPinModalProps) {
                     border: '1px solid var(--border)', borderRadius: 8, cursor: 'pointer',
                   }}
                 >
-                  Kembali
+                  Back
                 </button>
                 <button
                   onClick={handleRemove}
@@ -311,7 +311,7 @@ function ResetPinModal({ note, onClose, onSuccess }: ResetPinModalProps) {
                     display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
                   }}
                 >
-                  {loading ? <><RefreshCw size={13} style={{ animation: 'spin 0.8s linear infinite' }} /> Menghapus…</> : <><LockOpen size={13} /> Hapus PIN</>}
+                  {loading ? <><RefreshCw size={13} style={{ animation: 'spin 0.8s linear infinite' }} /> Deleting…</> : <><LockOpen size={13} /> Remove PIN</>}
                 </button>
               </div>
             </>
@@ -325,9 +325,9 @@ function ResetPinModal({ note, onClose, onSuccess }: ResetPinModalProps) {
                 <div style={{ width: 52, height: 52, borderRadius: '50%', background: 'var(--accent)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                   <KeyRound size={24} color="var(--primary)" />
                 </div>
-                <p style={{ margin: 0, fontWeight: 700, fontSize: '1rem', color: 'var(--fg)', fontFamily: 'var(--font-heading)' }}>Buat PIN Baru</p>
+                 <p style={{ margin: 0, fontWeight: 700, fontSize: '1rem', color: 'var(--fg)', fontFamily: 'var(--font-heading)' }}>Create New PIN</p>
                 <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--fg-muted)', fontFamily: 'var(--font-body)', textAlign: 'center' }}>
-                  4 digit angka untuk catatan
+                  4 digits to lock note
                   <strong style={{ color: 'var(--fg)' }}> "{note.title || 'Untitled'}"</strong>
                 </p>
               </div>
@@ -372,8 +372,8 @@ function ResetPinModal({ note, onClose, onSuccess }: ResetPinModalProps) {
                 {pinError
                   ? <p style={{ margin: 0, fontSize: '0.8rem', color: '#e03131', fontFamily: 'var(--font-body)' }}>{pinError}</p>
                   : loading
-                    ? <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--fg-muted)', fontFamily: 'var(--font-body)' }}>Menyimpan…</p>
-                    : <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--fg-subtle)', fontFamily: 'var(--font-body)' }}>Otomatis tersimpan saat digit ke-4 diisi</p>
+                    ? <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--fg-muted)', fontFamily: 'var(--font-body)' }}>Saving…</p>
+                    : <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--fg-subtle)', fontFamily: 'var(--font-body)' }}>Automatically saved when 4th digit is filled</p>
                 }
               </div>
 
@@ -385,7 +385,7 @@ function ResetPinModal({ note, onClose, onSuccess }: ResetPinModalProps) {
                   border: '1px solid var(--border)', borderRadius: 8, cursor: 'pointer',
                 }}
               >
-                Kembali
+                Back
               </button>
 
               <style>{`
@@ -428,25 +428,25 @@ function UserActionModal({ user: target, action, onClose, onDone }: UserActionMo
       body: JSON.stringify({ username, role }),
     })
     setLoading(false)
-    if (res.ok) { onDone() } else { const d = await res.json(); setError(d.error || 'Gagal') }
+    if (res.ok) { onDone() } else { const d = await res.json(); setError(d.error || 'Failed') }
   }
 
   async function handlePassword() {
-    if (password.trim().length < 4) { setError('Minimal 4 karakter'); return }
+    if (password.trim().length < 4) { setError('Minimal 4 characters'); return }
     setLoading(true); setError('')
     const res = await fetch(`/api/auth/users/${target.id}/reset-password`, {
       method: 'PUT', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ newPassword: password.trim() }),
     })
     setLoading(false)
-    if (res.ok) { onDone() } else { const d = await res.json(); setError(d.error || 'Gagal') }
+    if (res.ok) { onDone() } else { const d = await res.json(); setError(d.error || 'Failed') }
   }
 
   async function handleDelete() {
     setLoading(true); setError('')
     const res = await fetch(`/api/auth/users/${target.id}`, { method: 'DELETE' })
     setLoading(false)
-    if (res.ok) { onDone() } else { const d = await res.json(); setError(d.error || 'Gagal') }
+    if (res.ok) { onDone() } else { const d = await res.json(); setError(d.error || 'Failed') }
   }
 
   const overlayStyle: React.CSSProperties = { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999 }
@@ -467,7 +467,7 @@ function UserActionModal({ user: target, action, onClose, onDone }: UserActionMo
             </div>
             <div>
               <p style={{ margin: 0, fontWeight: 600, fontSize: '0.95rem', color: 'var(--fg)' }}>
-                {action === 'edit' ? 'Edit User' : action === 'password' ? 'Ganti Password' : 'Hapus User'}
+                {action === 'edit' ? 'Edit User' : action === 'password' ? 'Change Password' : 'Delete User'}
               </p>
               <p style={{ margin: 0, fontSize: '0.78rem', color: 'var(--fg-muted)' }}>@{target.username}</p>
             </div>
@@ -494,8 +494,8 @@ function UserActionModal({ user: target, action, onClose, onDone }: UserActionMo
             </div>
             {error && <p style={{ margin: 0, fontSize: '0.8rem', color: '#e03131' }}>{error}</p>}
             <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
-              <button onClick={handleEdit} disabled={loading} style={{ ...btnPrimary, opacity: loading ? 0.6 : 1 }}>{loading ? 'Menyimpan…' : 'Simpan'}</button>
-              <button onClick={onClose} style={btnGhost}>Batal</button>
+              <button onClick={handleEdit} disabled={loading} style={{ ...btnPrimary, opacity: loading ? 0.6 : 1 }}>{loading ? 'Saving…' : 'Save'}</button>
+              <button onClick={onClose} style={btnGhost}>Cancel</button>
             </div>
           </div>
         )}
@@ -503,13 +503,13 @@ function UserActionModal({ user: target, action, onClose, onDone }: UserActionMo
         {action === 'password' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             <div>
-              <label style={{ fontSize: '0.8rem', fontWeight: 500, color: 'var(--fg-muted)', marginBottom: 4, display: 'block' }}>Password Baru (min 4 karakter)</label>
+              <label style={{ fontSize: '0.8rem', fontWeight: 500, color: 'var(--fg-muted)', marginBottom: 4, display: 'block' }}>New Password (min 4 characters)</label>
               <input style={inputStyle} type="password" value={password} onChange={e => { setPassword(e.target.value); setError('') }} autoFocus onKeyDown={e => e.key === 'Enter' && handlePassword()} />
             </div>
             {error && <p style={{ margin: 0, fontSize: '0.8rem', color: '#e03131' }}>{error}</p>}
             <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
-              <button onClick={handlePassword} disabled={loading} style={{ ...btnPrimary, opacity: loading ? 0.6 : 1 }}>{loading ? 'Menyimpan…' : 'Simpan'}</button>
-              <button onClick={onClose} style={btnGhost}>Batal</button>
+              <button onClick={handlePassword} disabled={loading} style={{ ...btnPrimary, opacity: loading ? 0.6 : 1 }}>{loading ? 'Saving…' : 'Save'}</button>
+              <button onClick={onClose} style={btnGhost}>Cancel</button>
             </div>
           </div>
         )}
@@ -518,12 +518,12 @@ function UserActionModal({ user: target, action, onClose, onDone }: UserActionMo
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 14px', background: 'rgba(224,49,49,0.06)', borderRadius: 8, border: '1px solid rgba(224,49,49,0.15)' }}>
               <AlertTriangle size={18} color="#e03131" />
-              <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--fg)' }}>Yakin ingin menghapus user <strong>@{target.username}</strong>? Tindakan ini tidak dapat dibatalkan.</p>
+              <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--fg)' }}>Are you sure you want to delete user <strong>@{target.username}</strong>? This action cannot be undone.</p>
             </div>
             {error && <p style={{ margin: 0, fontSize: '0.8rem', color: '#e03131' }}>{error}</p>}
             <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
-              <button onClick={handleDelete} disabled={loading} style={{ ...btnDanger, opacity: loading ? 0.6 : 1 }}>{loading ? 'Menghapus…' : 'Hapus'}</button>
-              <button onClick={onClose} style={btnGhost}>Batal</button>
+              <button onClick={handleDelete} disabled={loading} style={{ ...btnDanger, opacity: loading ? 0.6 : 1 }}>{loading ? 'Deleting…' : 'Remove'}</button>
+              <button onClick={onClose} style={btnGhost}>Cancel</button>
             </div>
           </div>
         )}
@@ -613,9 +613,9 @@ function UsersPage() {
   function handleResetSuccess(noteId: string, action: 'removed' | 'changed') {
     if (action === 'removed') {
       setLockedNotes(prev => prev.filter(n => n.id !== noteId))
-      showToast('PIN berhasil dihapus — catatan sekarang tidak terkunci')
+      showToast('PIN removed — note is now unlocked')
     } else {
-      showToast('PIN berhasil diubah ke PIN baru')
+      showToast('PIN changed to new PIN')
     }
   }
 
@@ -674,7 +674,7 @@ function UsersPage() {
     setSavingOrg(false); setEditingOrg(null); loadOrganizations()
   }
   async function handleDeleteOrg(id: string, name: string) {
-    if (!window.confirm(`Hapus organisasi "${name}"? Semua anggota akan dikeluarkan.`)) return
+    if (!window.confirm(`Delete organization "${name}"? All members will be removed.`)) return
     await fetch(`/api/organizations/${id}`, { method: 'DELETE' })
     loadOrganizations()
   }
@@ -692,10 +692,10 @@ function UsersPage() {
   }
 
   const tabs = [
-    { id: 'users' as const, label: 'Pengguna', icon: <UsersIcon size={14} /> },
-    { id: 'organizations' as const, label: 'Organisasi', icon: <UsersRound size={14} /> },
-    { id: 'pins' as const, label: 'Reset PIN Catatan', icon: <Lock size={14} />, badge: activeTab === 'pins' ? lockedNotes.length : undefined },
-    { id: 'ai-history' as const, label: 'Riwayat AI', icon: <Sparkles size={14} /> },
+    { id: 'users' as const, label: 'Users', icon: <UsersIcon size={14} /> },
+    { id: 'organizations' as const, label: 'Organization', icon: <UsersRound size={14} /> },
+    { id: 'pins' as const, label: 'Reset Note PIN', icon: <Lock size={14} />, badge: activeTab === 'pins' ? lockedNotes.length : undefined },
+    { id: 'ai-history' as const, label: 'AI History', icon: <Sparkles size={14} /> },
   ]
 
   return (
@@ -708,7 +708,7 @@ function UsersPage() {
           <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', alignItems: isMobile ? 'flex-start' : 'center', justifyContent: 'space-between', gap: isMobile ? 12 : 8, marginBottom: 24 }}>
             <div>
               <h1 style={{ fontFamily: 'var(--font-heading)', fontWeight: 700, fontSize: '1.5rem', color: 'var(--fg)', margin: 0 }}>Admin Panel</h1>
-              <p style={{ fontSize: '0.875rem', color: 'var(--fg-muted)', margin: '4px 0 0' }}>Kelola pengguna dan keamanan catatan</p>
+              <p style={{ fontSize: '0.875rem', color: 'var(--fg-muted)', margin: '4px 0 0' }}>Manage users and note security</p>
             </div>
             {activeTab === 'users' && (
               <button
@@ -717,7 +717,7 @@ function UsersPage() {
                 onMouseEnter={e => (e.currentTarget.style.opacity = '0.9')}
                 onMouseLeave={e => (e.currentTarget.style.opacity = '1')}
               >
-                <UserPlus size={15} /> Tambah User
+                <UserPlus size={15} /> Add User
               </button>
             )}
           </div>
@@ -736,12 +736,12 @@ function UsersPage() {
             ))}
           </div>
 
-          {/* ── Tab: Pengguna ── */}
+           {/* ── Tab: Users ── */}
           {activeTab === 'users' && (
             <>
               {showForm && (
                 <form onSubmit={handleAdd} style={{ background: 'var(--muted)', border: '1px solid var(--border)', borderRadius: 10, padding: '20px', marginBottom: 24, display: 'flex', flexDirection: 'column', gap: 12 }}>
-                  <p style={{ margin: 0, fontWeight: 600, fontSize: '0.875rem', color: 'var(--fg)' }}>Tambah User Baru</p>
+                  <p style={{ margin: 0, fontWeight: 600, fontSize: '0.875rem', color: 'var(--fg)' }}>Add New User</p>
                   <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 10 }}>
                     <input style={inputBase} placeholder="Username" required value={form.username} onChange={e => setForm(f => ({ ...f, username: e.target.value }))} onFocus={e => (e.currentTarget.style.borderColor = 'var(--primary)')} onBlur={e => (e.currentTarget.style.borderColor = 'var(--border)')} />
                     <input style={inputBase} placeholder="Password" type="password" required value={form.password} onChange={e => setForm(f => ({ ...f, password: e.target.value }))} onFocus={e => (e.currentTarget.style.borderColor = 'var(--primary)')} onBlur={e => (e.currentTarget.style.borderColor = 'var(--border)')} />
@@ -755,20 +755,20 @@ function UsersPage() {
                   </div>
                   {error && <p style={{ margin: 0, fontSize: '0.8125rem', color: '#e03131' }}>{error}</p>}
                   <div style={{ display: 'flex', gap: 8 }}>
-                    <button type="submit" disabled={adding} style={{ padding: '7px 18px', fontSize: '0.875rem', fontWeight: 500, fontFamily: 'var(--font-body)', background: 'var(--primary)', color: 'var(--primary-fg)', border: 'none', borderRadius: 7, cursor: 'pointer', opacity: adding ? 0.7 : 1 }}>{adding ? 'Menyimpan…' : 'Simpan'}</button>
-                    <button type="button" onClick={() => { setShowForm(false); setError(null) }} style={{ padding: '7px 18px', fontSize: '0.875rem', fontFamily: 'var(--font-body)', background: 'var(--bg)', color: 'var(--fg-muted)', border: '1px solid var(--border)', borderRadius: 7, cursor: 'pointer' }}>Batal</button>
+                    <button type="submit" disabled={adding} style={{ padding: '7px 18px', fontSize: '0.875rem', fontWeight: 500, fontFamily: 'var(--font-body)', background: 'var(--primary)', color: 'var(--primary-fg)', border: 'none', borderRadius: 7, cursor: 'pointer', opacity: adding ? 0.7 : 1 }}>{adding ? 'Saving…' : 'Save'}</button>
+                    <button type="button" onClick={() => { setShowForm(false); setError(null) }} style={{ padding: '7px 18px', fontSize: '0.875rem', fontFamily: 'var(--font-body)', background: 'var(--bg)', color: 'var(--fg-muted)', border: '1px solid var(--border)', borderRadius: 7, cursor: 'pointer' }}>Cancel</button>
                   </div>
                 </form>
               )}
 
               {users.some(u => u.status === 'pending') && (
                 <div style={{ marginBottom: 32 }}>
-                  <h2 style={{ fontFamily: 'var(--font-heading)', fontWeight: 600, fontSize: '1.1rem', color: 'var(--fg)', marginBottom: 12 }}>Permintaan Pendaftaran</h2>
+                  <h2 style={{ fontFamily: 'var(--font-heading)', fontWeight: 600, fontSize: '1.1rem', color: 'var(--fg)', marginBottom: 12 }}>Registration Requests</h2>
                   <div style={{ border: '1px solid var(--border)', borderRadius: 10, overflow: 'hidden' }}>
                     <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.875rem', fontFamily: 'var(--font-body)' }}>
                       <thead>
                         <tr style={{ background: 'var(--muted)' }}>
-                          <th style={{ padding: '10px 16px', fontWeight: 600, fontSize: '0.8125rem', color: 'var(--fg-muted)', textAlign: 'left' }}>Pengguna</th>
+                          <th style={{ padding: '10px 16px', fontWeight: 600, fontSize: '0.8125rem', color: 'var(--fg-muted)', textAlign: 'left' }}>Users</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -778,10 +778,10 @@ function UsersPage() {
                               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                                 <div style={{ width: 30, height: 30, borderRadius: 7, background: 'var(--muted)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--fg-subtle)', flexShrink: 0 }}><Eye size={14} /></div>
                                 <span style={{ fontWeight: 600, color: 'var(--fg)' }}>{u.username}</span>
-                                <span style={{ fontSize: '0.72rem', color: 'var(--fg-subtle)' }}>Mendaftar {new Date(u.createdAt).toLocaleDateString('id-ID')}</span>
+                                <span style={{ fontSize: '0.72rem', color: 'var(--fg-subtle)' }}>Registered {new Date(u.createdAt).toLocaleDateString('en-US')}</span>
                                 <span style={{ flex: 1 }} />
-                                <button onClick={() => handleApprove(u.id)} style={{ padding: '4px 10px', fontSize: '0.72rem', fontWeight: 600, background: 'var(--primary)', color: 'var(--primary-fg)', border: 'none', borderRadius: 5, cursor: 'pointer' }}>Setujui</button>
-                                <button onClick={() => handleReject(u.id)} style={{ padding: '4px 10px', fontSize: '0.72rem', fontWeight: 600, background: 'rgba(224,49,49,0.05)', color: '#e03131', border: '1px solid rgba(224,49,49,0.3)', borderRadius: 5, cursor: 'pointer' }}>Tolak</button>
+                                <button onClick={() => handleApprove(u.id)} style={{ padding: '4px 10px', fontSize: '0.72rem', fontWeight: 600, background: 'var(--primary)', color: 'var(--primary-fg)', border: 'none', borderRadius: 5, cursor: 'pointer' }}>Approve</button>
+                                <button onClick={() => handleReject(u.id)} style={{ padding: '4px 10px', fontSize: '0.72rem', fontWeight: 600, background: 'rgba(224,49,49,0.05)', color: '#e03131', border: '1px solid rgba(224,49,49,0.3)', borderRadius: 5, cursor: 'pointer' }}>Reject</button>
                               </div>
                             </td>
                           </tr>
@@ -793,12 +793,12 @@ function UsersPage() {
               )}
 
               <div>
-                <h2 style={{ fontFamily: 'var(--font-heading)', fontWeight: 600, fontSize: '1.1rem', color: 'var(--fg)', marginBottom: 12 }}>Daftar Pengguna</h2>
+                <h2 style={{ fontFamily: 'var(--font-heading)', fontWeight: 600, fontSize: '1.1rem', color: 'var(--fg)', marginBottom: 12 }}>User List</h2>
                 <div style={{ border: '1px solid var(--border)', borderRadius: 10, overflow: 'hidden' }}>
                   <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.875rem', fontFamily: 'var(--font-body)' }}>
                     <thead>
                       <tr style={{ background: 'var(--muted)' }}>
-                        <th style={{ padding: '10px 16px', fontWeight: 600, fontSize: '0.8125rem', color: 'var(--fg-muted)', textAlign: 'left' }}>Pengguna</th>
+                        <th style={{ padding: '10px 16px', fontWeight: 600, fontSize: '0.8125rem', color: 'var(--fg-muted)', textAlign: 'left' }}>Users</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -811,11 +811,11 @@ function UsersPage() {
                               </div>
                               <span style={{ fontWeight: 600, color: 'var(--fg)' }}>{u.username}</span>
                               <span style={{ fontSize: '0.72rem', textTransform: 'capitalize', color: u.role === 'admin' ? 'var(--primary)' : 'var(--fg-subtle)' }}>{u.role}</span>
-                              {u.status === 'rejected' && <span style={{ fontSize: '0.68rem', padding: '1px 6px', background: 'rgba(224,49,49,0.1)', color: '#e03131', borderRadius: 20, fontWeight: 500 }}>Ditolak</span>}
-                              {u.id === user?.userId && <span style={{ fontSize: '0.68rem', padding: '1px 6px', background: 'var(--primary)', color: 'var(--primary-fg)', borderRadius: 20, fontWeight: 500 }}>Kamu</span>}
+                              {u.status === 'rejected' && <span style={{ fontSize: '0.68rem', padding: '1px 6px', background: 'rgba(224,49,49,0.1)', color: '#e03131', borderRadius: 20, fontWeight: 500 }}>Rejected</span>}
+                              {u.id === user?.userId && <span style={{ fontSize: '0.68rem', padding: '1px 6px', background: 'var(--primary)', color: 'var(--primary-fg)', borderRadius: 20, fontWeight: 500 }}>You</span>}
                               <span style={{ flex: 1 }} />
                               {u.status === 'rejected' && (
-                                <button onClick={() => handleApprove(u.id)} style={{ padding: '3px 8px', fontSize: '0.7rem', fontWeight: 600, background: 'transparent', color: 'var(--primary)', border: '1.5px solid var(--primary)', borderRadius: 5, cursor: 'pointer' }}>Aktifkan</button>
+                                <button onClick={() => handleApprove(u.id)} style={{ padding: '3px 8px', fontSize: '0.7rem', fontWeight: 600, background: 'transparent', color: 'var(--primary)', border: '1.5px solid var(--primary)', borderRadius: 5, cursor: 'pointer' }}>Activate</button>
                               )}
                               <button onClick={() => handleEditUser(u.id, u.username, u.role)} title="Edit user" style={{ width: 26, height: 26, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: 'transparent', border: 'none', borderRadius: 5, cursor: 'pointer', color: 'var(--fg-subtle)' }} onMouseEnter={e => { e.currentTarget.style.background = 'var(--accent)'; e.currentTarget.style.color = 'var(--primary)' }} onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--fg-subtle)' }}>
                                 <Pencil size={12} />
@@ -823,7 +823,7 @@ function UsersPage() {
                               <button onClick={() => handleResetPassword(u.id, u.username)} title="Reset Password" style={{ width: 26, height: 26, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: 'transparent', border: 'none', borderRadius: 5, cursor: 'pointer', color: 'var(--fg-subtle)' }} onMouseEnter={e => { e.currentTarget.style.background = 'var(--accent)'; e.currentTarget.style.color = 'var(--primary)' }} onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--fg-subtle)' }}>
                                 <KeyRound size={12} />
                               </button>
-                              <button onClick={() => handleDelete(u.id, u.username)} title="Hapus user" style={{ width: 26, height: 26, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: 'transparent', border: 'none', borderRadius: 5, cursor: 'pointer', color: 'var(--fg-subtle)' }} onMouseEnter={e => { e.currentTarget.style.background = 'rgba(224,49,49,0.1)'; e.currentTarget.style.color = '#e03131' }} onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--fg-subtle)' }}>
+                              <button onClick={() => handleDelete(u.id, u.username)} title="Delete user" style={{ width: 26, height: 26, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: 'transparent', border: 'none', borderRadius: 5, cursor: 'pointer', color: 'var(--fg-subtle)' }} onMouseEnter={e => { e.currentTarget.style.background = 'rgba(224,49,49,0.1)'; e.currentTarget.style.color = '#e03131' }} onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--fg-subtle)' }}>
                                 <Trash2 size={12} />
                               </button>
                             </div>
@@ -837,13 +837,13 @@ function UsersPage() {
             </>
           )}
 
-          {/* ── Tab: Reset PIN Catatan ── */}
+           {/* ── Tab: Reset Note PIN ── */}
           {activeTab === 'pins' && (
             <div>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
                 <div>
-                  <h2 style={{ fontFamily: 'var(--font-heading)', fontWeight: 600, fontSize: '1.1rem', color: 'var(--fg)', margin: 0 }}>Catatan Terkunci PIN</h2>
-                  <p style={{ fontSize: '0.8125rem', color: 'var(--fg-muted)', margin: '4px 0 0', fontFamily: 'var(--font-body)' }}>Hapus atau ganti PIN catatan manapun sebagai admin.</p>
+                  <h2 style={{ fontFamily: 'var(--font-heading)', fontWeight: 600, fontSize: '1.1rem', color: 'var(--fg)', margin: 0 }}>PIN-Locked Notes</h2>
+                  <p style={{ fontSize: '0.8125rem', color: 'var(--fg-muted)', margin: '4px 0 0', fontFamily: 'var(--font-body)' }}>Delete or change any note's PIN as admin.</p>
                 </div>
                 <button onClick={loadLockedNotes} disabled={loadingLocked} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 14px', fontSize: '0.8125rem', fontWeight: 500, fontFamily: 'var(--font-body)', background: 'var(--muted)', color: 'var(--fg-muted)', border: '1px solid var(--border)', borderRadius: 7, cursor: 'pointer', opacity: loadingLocked ? 0.6 : 1 }}>
                   <RefreshCw size={13} style={loadingLocked ? { animation: 'spin 0.8s linear infinite' } : {}} />
@@ -852,15 +852,15 @@ function UsersPage() {
               </div>
 
               {loadingLocked ? (
-                <div style={{ textAlign: 'center', padding: '48px 0', color: 'var(--fg-muted)', fontSize: '0.875rem', fontFamily: 'var(--font-body)' }}>Memuat…</div>
+                <div style={{ textAlign: 'center', padding: '48px 0', color: 'var(--fg-muted)', fontSize: '0.875rem', fontFamily: 'var(--font-body)' }}>Loading…</div>
               ) : lockedNotes.length === 0 ? (
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '48px 24px', textAlign: 'center', border: '1px dashed var(--border)', borderRadius: 12, gap: 12 }}>
                   <div style={{ width: 48, height: 48, borderRadius: 12, background: 'var(--accent)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--primary)' }}>
                     <LockOpen size={22} />
                   </div>
                   <div>
-                    <p style={{ margin: 0, fontWeight: 600, color: 'var(--fg)', fontFamily: 'var(--font-body)' }}>Tidak ada catatan terkunci</p>
-                    <p style={{ margin: '4px 0 0', fontSize: '0.8125rem', color: 'var(--fg-muted)', fontFamily: 'var(--font-body)' }}>Semua catatan saat ini tidak menggunakan PIN</p>
+                    <p style={{ margin: 0, fontWeight: 600, color: 'var(--fg)', fontFamily: 'var(--font-body)' }}>No locked notes</p>
+                    <p style={{ margin: '4px 0 0', fontSize: '0.8125rem', color: 'var(--fg-muted)', fontFamily: 'var(--font-body)' }}>All notes currently do not use a PIN</p>
                   </div>
                 </div>
               ) : (
@@ -872,8 +872,8 @@ function UsersPage() {
                     </colgroup>
                     <thead>
                       <tr style={{ background: 'var(--muted)' }}>
-                        <th style={{ padding: '10px 16px', fontWeight: 600, fontSize: '0.8125rem', color: 'var(--fg-muted)', textAlign: 'left' }}>Catatan</th>
-                        <th style={{ padding: '10px 16px', fontWeight: 600, fontSize: '0.8125rem', color: 'var(--fg-muted)', textAlign: 'right' }}>Aksi</th>
+                        <th style={{ padding: '10px 16px', fontWeight: 600, fontSize: '0.8125rem', color: 'var(--fg-muted)', textAlign: 'left' }}>Notes</th>
+                        <th style={{ padding: '10px 16px', fontWeight: 600, fontSize: '0.8125rem', color: 'var(--fg-muted)', textAlign: 'right' }}>Actions</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -886,15 +886,15 @@ function UsersPage() {
                             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 3 }}>
                               <span style={{ fontSize: '0.75rem', color: 'var(--fg-muted)' }}>@{note.ownerUsername}</span>
                               <span style={{ fontSize: '0.68rem', padding: '1px 7px', borderRadius: 20, fontWeight: 500, background: note.type === 'organization' ? 'var(--accent)' : 'var(--muted)', color: note.type === 'organization' ? 'var(--primary)' : 'var(--fg-subtle)' }}>
-                                {note.type === 'organization' ? 'Organisasi' : 'Pribadi'}
+                                {note.type === 'organization' ? 'Organization' : 'Personal'}
                               </span>
                               <span style={{ fontSize: '0.72rem', color: 'var(--fg-subtle)' }}>
-                                {new Date(note.updatedAt).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' })}
+                                {new Date(note.updatedAt).toLocaleDateString('en-US', { day: '2-digit', month: 'short', year: 'numeric' })}
                               </span>
                             </div>
                           </td>
                           <td style={{ padding: '10px 16px', textAlign: 'right' }}>
-                            <button onClick={() => setResetTarget(note)} title="Kelola PIN" style={{ width: 30, height: 30, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: 'var(--muted)', color: 'var(--fg-subtle)', border: '1px solid var(--border)', borderRadius: 6, cursor: 'pointer' }} onMouseEnter={e => { e.currentTarget.style.background = 'var(--accent)'; e.currentTarget.style.color = 'var(--primary)' }} onMouseLeave={e => { e.currentTarget.style.background = 'var(--muted)'; e.currentTarget.style.color = 'var(--fg-subtle)' }}>
+                            <button onClick={() => setResetTarget(note)} title="Manage PIN" style={{ width: 30, height: 30, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: 'var(--muted)', color: 'var(--fg-subtle)', border: '1px solid var(--border)', borderRadius: 6, cursor: 'pointer' }} onMouseEnter={e => { e.currentTarget.style.background = 'var(--accent)'; e.currentTarget.style.color = 'var(--primary)' }} onMouseLeave={e => { e.currentTarget.style.background = 'var(--muted)'; e.currentTarget.style.color = 'var(--fg-subtle)' }}>
                               <KeyRound size={14} />
                             </button>
                           </td>
@@ -907,20 +907,20 @@ function UsersPage() {
             </div>
           )}
 
-          {/* ── Tab: Organisasi ── */}
+           {/* ── Tab: Organizations ── */}
           {activeTab === 'organizations' && (
             <div>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
                 <div>
-                  <h2 style={{ fontFamily: 'var(--font-heading)', fontWeight: 600, fontSize: '1.1rem', color: 'var(--fg)', margin: 0 }}>Kelola Organisasi</h2>
-                  <p style={{ fontSize: '0.8125rem', color: 'var(--fg-muted)', margin: '4px 0 0', fontFamily: 'var(--font-body)' }}>Buat dan kelola organisasi serta anggotanya</p>
+                  <h2 style={{ fontFamily: 'var(--font-heading)', fontWeight: 600, fontSize: '1.1rem', color: 'var(--fg)', margin: 0 }}>Manage Organizations</h2>
+                  <p style={{ fontSize: '0.8125rem', color: 'var(--fg-muted)', margin: '4px 0 0', fontFamily: 'var(--font-body)' }}>Create and manage organizations and their members</p>
                 </div>
                 <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                   <button onClick={loadOrganizations} disabled={loadingOrgs} style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '6px 12px', fontSize: '0.8rem', fontWeight: 500, fontFamily: 'var(--font-body)', background: 'var(--muted)', color: 'var(--fg-muted)', border: '1px solid var(--border)', borderRadius: 7, cursor: 'pointer', opacity: loadingOrgs ? 0.6 : 1 }}>
                     <RefreshCw size={12} style={loadingOrgs ? { animation: 'spin 0.8s linear infinite' } : {}} />
                   </button>
                   <button onClick={() => setShowOrgForm(v => !v)} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 14px', fontSize: '0.8125rem', fontWeight: 500, fontFamily: 'var(--font-body)', background: 'var(--primary)', color: 'var(--primary-fg)', border: 'none', borderRadius: 7, cursor: 'pointer' }}>
-                    <Plus size={14} /> Buat
+                    <Plus size={14} /> Create
                   </button>
                 </div>
               </div>
@@ -929,26 +929,26 @@ function UsersPage() {
               {showOrgForm && (
                 <form onSubmit={handleCreateOrg} style={{ background: 'var(--muted)', border: '1px solid var(--border)', borderRadius: 10, padding: '16px', marginBottom: 16, display: 'flex', flexDirection: 'column', gap: 10 }}>
                   <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 10 }}>
-                    <input style={inputBase} placeholder="Nama organisasi" required value={orgForm.name} onChange={e => setOrgForm(f => ({ ...f, name: e.target.value }))} onFocus={e => (e.currentTarget.style.borderColor = 'var(--primary)')} onBlur={e => (e.currentTarget.style.borderColor = 'var(--border)')} />
-                    <input style={inputBase} placeholder="Deskripsi (opsional)" value={orgForm.description} onChange={e => setOrgForm(f => ({ ...f, description: e.target.value }))} onFocus={e => (e.currentTarget.style.borderColor = 'var(--primary)')} onBlur={e => (e.currentTarget.style.borderColor = 'var(--border)')} />
+                    <input style={inputBase} placeholder="Organization name" required value={orgForm.name} onChange={e => setOrgForm(f => ({ ...f, name: e.target.value }))} onFocus={e => (e.currentTarget.style.borderColor = 'var(--primary)')} onBlur={e => (e.currentTarget.style.borderColor = 'var(--border)')} />
+                    <input style={inputBase} placeholder="Description (optional)" value={orgForm.description} onChange={e => setOrgForm(f => ({ ...f, description: e.target.value }))} onFocus={e => (e.currentTarget.style.borderColor = 'var(--primary)')} onBlur={e => (e.currentTarget.style.borderColor = 'var(--border)')} />
                   </div>
                   <div style={{ display: 'flex', gap: 8 }}>
-                    <button type="submit" disabled={savingOrg} style={{ padding: '7px 18px', fontSize: '0.8125rem', fontWeight: 500, fontFamily: 'var(--font-body)', background: 'var(--primary)', color: 'var(--primary-fg)', border: 'none', borderRadius: 7, cursor: 'pointer', opacity: savingOrg ? 0.7 : 1 }}>{savingOrg ? 'Menyimpan…' : 'Simpan'}</button>
-                    <button type="button" onClick={() => setShowOrgForm(false)} style={{ padding: '7px 18px', fontSize: '0.8125rem', fontFamily: 'var(--font-body)', background: 'var(--bg)', color: 'var(--fg-muted)', border: '1px solid var(--border)', borderRadius: 7, cursor: 'pointer' }}>Batal</button>
+                    <button type="submit" disabled={savingOrg} style={{ padding: '7px 18px', fontSize: '0.8125rem', fontWeight: 500, fontFamily: 'var(--font-body)', background: 'var(--primary)', color: 'var(--primary-fg)', border: 'none', borderRadius: 7, cursor: 'pointer', opacity: savingOrg ? 0.7 : 1 }}>{savingOrg ? 'Saving…' : 'Save'}</button>
+                    <button type="button" onClick={() => setShowOrgForm(false)} style={{ padding: '7px 18px', fontSize: '0.8125rem', fontFamily: 'var(--font-body)', background: 'var(--bg)', color: 'var(--fg-muted)', border: '1px solid var(--border)', borderRadius: 7, cursor: 'pointer' }}>Cancel</button>
                   </div>
                 </form>
               )}
 
               {loadingOrgs ? (
-                <div style={{ textAlign: 'center', padding: '48px 0', color: 'var(--fg-muted)', fontSize: '0.875rem', fontFamily: 'var(--font-body)' }}>Memuat…</div>
+                <div style={{ textAlign: 'center', padding: '48px 0', color: 'var(--fg-muted)', fontSize: '0.875rem', fontFamily: 'var(--font-body)' }}>Loading…</div>
               ) : organizations.length === 0 ? (
-                <div style={{ textAlign: 'center', padding: '48px 24px', border: '1px dashed var(--border)', borderRadius: 12, color: 'var(--fg-muted)', fontSize: '0.875rem', fontFamily: 'var(--font-body)' }}>Belum ada organisasi</div>
+                <div style={{ textAlign: 'center', padding: '48px 24px', border: '1px dashed var(--border)', borderRadius: 12, color: 'var(--fg-muted)', fontSize: '0.875rem', fontFamily: 'var(--font-body)' }}>No organizations yet</div>
               ) : (
                 <div style={{ border: '1px solid var(--border)', borderRadius: 10, overflow: 'hidden' }}>
                   <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.875rem', fontFamily: 'var(--font-body)' }}>
                     <thead>
                       <tr style={{ background: 'var(--muted)' }}>
-                        <th style={{ padding: '10px 16px', fontWeight: 600, fontSize: '0.8125rem', color: 'var(--fg-muted)', textAlign: 'left' }}>Organisasi</th>
+                        <th style={{ padding: '10px 16px', fontWeight: 600, fontSize: '0.8125rem', color: 'var(--fg-muted)', textAlign: 'left' }}>Organization</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -962,8 +962,8 @@ function UsersPage() {
                             <td style={{ padding: '10px 16px' }}>
                               {isEditing ? (
                                 <form onSubmit={handleEditOrg} style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                                  <input style={{ ...inputBase, flex: 1 }} placeholder="Nama" required value={editOrgForm.name} onChange={e => setEditOrgForm(f => ({ ...f, name: e.target.value }))} autoFocus />
-                                  <input style={{ ...inputBase, flex: 1 }} placeholder="Deskripsi" value={editOrgForm.description} onChange={e => setEditOrgForm(f => ({ ...f, description: e.target.value }))} />
+                                   <input style={{ ...inputBase, flex: 1 }} placeholder="Name" required value={editOrgForm.name} onChange={e => setEditOrgForm(f => ({ ...f, name: e.target.value }))} autoFocus />
+                                   <input style={{ ...inputBase, flex: 1 }} placeholder="Description" value={editOrgForm.description} onChange={e => setEditOrgForm(f => ({ ...f, description: e.target.value }))} />
                                   <button type="submit" style={{ width: 26, height: 26, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: 'transparent', border: 'none', borderRadius: 5, cursor: 'pointer', color: 'var(--primary)' }}><Check size={13} /></button>
                                   <button type="button" onClick={() => setEditingOrg(null)} style={{ width: 26, height: 26, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: 'transparent', border: 'none', borderRadius: 5, cursor: 'pointer', color: 'var(--fg-muted)' }}><X size={13} /></button>
                                 </form>
@@ -973,17 +973,17 @@ function UsersPage() {
                                     <div style={{ width: 30, height: 30, borderRadius: 7, background: 'var(--accent)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--primary)', flexShrink: 0 }}><UsersRound size={14} /></div>
                                     <span style={{ fontWeight: 600, color: 'var(--fg)' }}>{org.name}</span>
                                     {org.description && <span style={{ fontSize: '0.75rem', color: 'var(--fg-muted)' }}>{org.description}</span>}
-                                    <span style={{ fontSize: '0.72rem', color: 'var(--fg-subtle)' }}>{members.length} anggota</span>
+                                    <span style={{ fontSize: '0.72rem', color: 'var(--fg-subtle)' }}>{members.length} members</span>
                                     <span style={{ flex: 1 }} />
-                                    <button onClick={() => setExpandedOrg(isExpanded ? null : org.id)} title="Kelola Anggota" style={{ width: 26, height: 26, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: isExpanded ? 'var(--accent)' : 'transparent', color: isExpanded ? 'var(--primary)' : 'var(--fg-subtle)', border: 'none', borderRadius: 5, cursor: 'pointer' }}><UserPlus size={12} /></button>
+                                    <button onClick={() => setExpandedOrg(isExpanded ? null : org.id)} title="Manage Members" style={{ width: 26, height: 26, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: isExpanded ? 'var(--accent)' : 'transparent', color: isExpanded ? 'var(--primary)' : 'var(--fg-subtle)', border: 'none', borderRadius: 5, cursor: 'pointer' }}><UserPlus size={12} /></button>
                                     <button onClick={() => { setEditingOrg({ org }); setEditOrgForm({ name: org.name, description: org.description ?? '' }) }} title="Edit" style={{ width: 26, height: 26, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: 'transparent', border: 'none', borderRadius: 5, cursor: 'pointer', color: 'var(--fg-subtle)' }} onMouseEnter={e => { e.currentTarget.style.background = 'var(--accent)'; e.currentTarget.style.color = 'var(--primary)' }} onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--fg-subtle)' }}><Pencil size={12} /></button>
-                                    <button onClick={() => handleDeleteOrg(org.id, org.name)} title="Hapus" style={{ width: 26, height: 26, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: 'transparent', border: 'none', borderRadius: 5, cursor: 'pointer', color: 'var(--fg-subtle)' }} onMouseEnter={e => { e.currentTarget.style.background = 'rgba(224,49,49,0.1)'; e.currentTarget.style.color = '#e03131' }} onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--fg-subtle)' }}><Trash2 size={12} /></button>
+                                    <button onClick={() => handleDeleteOrg(org.id, org.name)} title="Delete" style={{ width: 26, height: 26, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: 'transparent', border: 'none', borderRadius: 5, cursor: 'pointer', color: 'var(--fg-subtle)' }} onMouseEnter={e => { e.currentTarget.style.background = 'rgba(224,49,49,0.1)'; e.currentTarget.style.color = '#e03131' }} onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--fg-subtle)' }}><Trash2 size={12} /></button>
                                   </div>
                                   {isExpanded && (
                                     <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid var(--border)', display: 'flex', gap: 20, flexWrap: 'wrap' }}>
                                       <div style={{ flex: 1, minWidth: 180 }}>
-                                        <p style={{ margin: '0 0 6px', fontSize: '0.7rem', fontWeight: 700, color: 'var(--fg-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Anggota ({members.length})</p>
-                                        {members.length === 0 && <p style={{ fontSize: '0.78rem', color: 'var(--fg-subtle)' }}>Belum ada anggota</p>}
+                                         <p style={{ margin: '0 0 6px', fontSize: '0.7rem', fontWeight: 700, color: 'var(--fg-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Members ({members.length})</p>
+                                         {members.length === 0 && <p style={{ fontSize: '0.78rem', color: 'var(--fg-subtle)' }}>No members yet</p>}
                                         {members.map(u => (
                                           <div key={u.id} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '4px 8px', background: 'var(--muted)', borderRadius: 5, marginBottom: 3 }}>
                                             <span style={{ fontSize: '0.78rem', fontWeight: 500, color: 'var(--fg)' }}>{u.username}</span>
@@ -994,7 +994,7 @@ function UsersPage() {
                                       </div>
                                       {nonMembers.length > 0 && (
                                         <div style={{ flex: 1, minWidth: 180 }}>
-                                          <p style={{ margin: '0 0 6px', fontSize: '0.7rem', fontWeight: 700, color: 'var(--fg-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Tambah Anggota</p>
+                                           <p style={{ margin: '0 0 6px', fontSize: '0.7rem', fontWeight: 700, color: 'var(--fg-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Add Members</p>
                                           {nonMembers.map(u => (
                                             <div key={u.id} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '4px 8px', background: 'var(--muted)', borderRadius: 5, marginBottom: 3 }}>
                                               <span style={{ fontSize: '0.78rem', color: 'var(--fg-muted)' }}>{u.username}</span>
@@ -1019,15 +1019,15 @@ function UsersPage() {
             </div>
           )}
 
-          {/* ── Tab: Riwayat AI ── */}
+           {/* ── Tab: AI History ── */}
           {activeTab === 'ai-history' && (
             <div>
               {/* Stats bar */}
               {aiLogsStats && (
                 <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 16, flexWrap: 'wrap' }}>
                   {[
-                    { label: 'Sesi', value: aiLogsStats.total_sessions },
-                    { label: 'Pesan', value: aiLogsStats.total_messages },
+                    { label: 'Sessions', value: aiLogsStats.total_sessions },
+                    { label: 'Messages', value: aiLogsStats.total_messages },
                     { label: 'Tools', value: aiLogsStats.total_tool_calls },
                     { label: 'Tokens', value: ((aiLogsStats.total_prompt_tokens || 0) + (aiLogsStats.total_completion_tokens || 0)).toLocaleString() },
                   ].map((s, i) => (
@@ -1042,7 +1042,7 @@ function UsersPage() {
                       onChange={e => { setAiLogFilterUser(e.target.value); setAiLogsPage(1) }}
                       style={{ padding: '6px 10px', fontSize: '0.8rem', fontFamily: 'var(--font-body)', border: '1px solid var(--border)', borderRadius: 7, background: 'var(--input-bg)', color: 'var(--fg)', outline: 'none' }}
                     >
-                      <option value="">Semua User</option>
+                      <option value="">All Users</option>
                       {users.filter(u => u.status !== 'pending').map(u => (
                         <option key={u.id} value={u.id}>{u.username}</option>
                       ))}
@@ -1057,11 +1057,11 @@ function UsersPage() {
 
               {/* Table */}
               {loadingAiLogs ? (
-                <div style={{ textAlign: 'center', padding: '60px 0', color: 'var(--fg-muted)' }}>Memuat…</div>
+                <div style={{ textAlign: 'center', padding: '60px 0', color: 'var(--fg-muted)' }}>Loading…</div>
               ) : aiLogs.length === 0 ? (
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '60px 24px', gap: 12 }}>
                   <Sparkles size={32} style={{ color: 'var(--fg-subtle)' }} />
-                  <p style={{ margin: 0, fontWeight: 600, color: 'var(--fg)' }}>Belum ada riwayat AI</p>
+                  <p style={{ margin: 0, fontWeight: 600, color: 'var(--fg)' }}>No AI history yet</p>
                 </div>
               ) : (
                 <div style={{ overflowX: 'auto', border: '1px solid var(--border)', borderRadius: 10 }}>
@@ -1076,7 +1076,7 @@ function UsersPage() {
                     </colgroup>
                     <thead>
                       <tr style={{ borderBottom: '2px solid var(--border)' }}>
-                        {['User', 'Session ID', 'Judul Catatan', 'JSON Pesan', 'Token Usage', 'Waktu'].map(h => (
+                        {['User', 'Session ID', 'Note Title', 'Message JSON', 'Token Usage', 'Time'].map(h => (
                           <th key={h} style={{ textAlign: 'left', padding: '10px 14px', fontWeight: 600, color: 'var(--fg-muted)', fontSize: '0.72rem', textTransform: 'uppercase', letterSpacing: '0.04em', whiteSpace: 'nowrap', background: 'var(--muted)' }}>{h}</th>
                         ))}
                       </tr>
@@ -1116,7 +1116,7 @@ function UsersPage() {
                                 </pre>
                               ) : (
                                 <span style={{ color: 'var(--fg-muted)', fontSize: '0.75rem' }}>
-                                  {sess.messages.length} pesan — klik untuk lihat
+                                  {sess.messages.length} messages — click to view
                                 </span>
                               )}
                               {sess.has_error && sess.error_message && (
@@ -1139,10 +1139,10 @@ function UsersPage() {
                             </td>
                             <td style={{ padding: '10px 14px', verticalAlign: 'top', whiteSpace: 'nowrap' }}>
                               <div style={{ fontSize: '0.72rem', color: 'var(--fg-muted)' }}>
-                                {createdDate.toLocaleDateString('id-ID', { day: '2-digit', month: 'short' })}
+                                {createdDate.toLocaleDateString('en-US', { day: '2-digit', month: 'short' })}
                               </div>
                               <div style={{ fontSize: '0.68rem', color: 'var(--fg-subtle)' }}>
-                                {createdDate.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}
+                                {createdDate.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
                               </div>
                             </td>
                           </tr>
@@ -1195,7 +1195,7 @@ function UsersPage() {
           user={userModal.user}
           action={userModal.action}
           onClose={() => setUserModal(null)}
-          onDone={() => { setUserModal(null); showToast(userModal.action === 'delete' ? 'User berhasil dihapus' : userModal.action === 'password' ? 'Password berhasil diubah' : 'User berhasil diupdate'); router.invalidate() }}
+          onDone={() => { setUserModal(null); showToast(userModal.action === 'delete' ? 'User deleted' : userModal.action === 'password' ? 'Password changed' : 'User updated'); router.invalidate() }}
         />
       )}
 

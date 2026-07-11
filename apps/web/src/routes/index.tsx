@@ -1,5 +1,5 @@
 import { createFileRoute, redirect, useNavigate } from '@tanstack/react-router'
-import { Sidebar } from '../components/sidebar/Sidebar'
+import { Sidebar } from '#/modules/sidebar'
 import { Plus, Brain } from 'lucide-react'
 
 export const Route = createFileRoute('/')({

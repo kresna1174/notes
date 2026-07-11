@@ -10,7 +10,7 @@ export function apiPlugin(): Plugin {
       server.middlewares.use(async (req, res, next) => {
         if (!req.url?.startsWith('/api/')) return next()
         try {
-          const { handleApiRequest } = await server.ssrLoadModule('/src/server/api.ts')
+          const { handleApiRequest } = await server.ssrLoadModule('/src/modules/server/api.ts')
           const handled = await handleApiRequest(req, res)
           if (!handled) next()
         } catch (err) {
@@ -32,7 +32,7 @@ export function apiPlugin(): Plugin {
             const noteId = match[1]
             console.log('[Dev WS] Match found for noteId:', noteId)
             try {
-              const { verifySession, handleYjsConnection } = await server.ssrLoadModule('/src/server/yjs.ts')
+              const { verifySession, handleYjsConnection } = await server.ssrLoadModule('/src/modules/server/yjs.ts')
               const cookieHeader = request.headers.cookie
               const isAuth = verifySession(cookieHeader)
               console.log('[Dev WS] verifySession result:', isAuth)
