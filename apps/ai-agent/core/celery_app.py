@@ -11,7 +11,7 @@ celery_app = Celery(
     "ai_agent_tasks",
     broker=broker_url,
     backend=result_backend,
-    include=["tasks"],
+    include=["tasks", "modules.documents.tasks"],
 )
 
 celery_app.conf.update(

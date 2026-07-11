@@ -1,7 +1,7 @@
 import ReactDOM from 'react-dom/client'
 import { RouterProvider } from '@tanstack/react-router'
 import { getRouter } from './router'
-import { AuthProvider, useAuth } from './lib/auth'
+import { AuthProvider, useAuth } from './modules/shared/auth'
 import { useEffect } from 'react'
 
 const router = getRouter()

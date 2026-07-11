@@ -1,9 +1,9 @@
 import { createServer } from 'http'
 import { existsSync, createReadStream, statSync } from 'fs'
 import { join, extname } from 'path'
-import { handleApiRequest } from './src/server/api'
+import { handleApiRequest } from './src/modules/server/api'
 import { WebSocketServer } from 'ws'
-import { verifySession, handleYjsConnection } from './src/server/yjs'
+import { verifySession, handleYjsConnection } from './src/modules/server/yjs'
 
 const PORT = process.env.PORT || 3000
 const DIST_DIR = join(process.cwd(), 'dist')

@@ -1,7 +1,7 @@
 import { Outlet, createRootRouteWithContext, redirect } from '@tanstack/react-router'
 import { TanStackRouterDevtoolsPanel } from '@tanstack/react-router-devtools'
 import { TanStackDevtools } from '@tanstack/react-devtools'
-import { ThemeProvider } from '../lib/theme'
+import { ThemeProvider } from '#/modules/shared/theme'
 import type { RouterContext } from '../router'
 import '../styles.css'
 
