@@ -663,8 +663,10 @@ export function ChatBot({
         }
       ])
 
-      // If it is a PDF file, upload it to RAG database as well in the background
-      if (file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')) {
+      // If it is a supported RAG document format, upload it to RAG database in the background
+      const ext = '.' + file.name.split('.').pop()?.toLowerCase()
+      const allowedRagExtensions = ['.pdf', '.docx', '.doc', '.pptx', '.ppt', '.xlsx', '.xls', '.txt', '.md', '.json']
+      if (allowedRagExtensions.includes(ext)) {
         const ragForm = new FormData()
         ragForm.append('file', file)
         fetch('/api/documents', {

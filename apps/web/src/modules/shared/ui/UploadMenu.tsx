@@ -22,8 +22,11 @@ export function UploadMenu() {
   const [isUploading, setIsUploading] = useState(false)
 
   async function submitFile(file: File) {
-    if (file.type !== 'application/pdf') {
-      setStatus('PDF files only')
+    const allowedExtensions = ['.pdf', '.docx', '.doc', '.pptx', '.ppt', '.xlsx', '.xls', '.txt', '.md', '.json']
+    const ext = '.' + file.name.split('.').pop()?.toLowerCase()
+    
+    if (!allowedExtensions.includes(ext)) {
+      setStatus('Unsupported file format')
       return
     }
 
@@ -51,7 +54,7 @@ export function UploadMenu() {
         disabled={isUploading}
       >
         <Upload size={14} aria-hidden="true" />
-        Upload PDF
+        Upload Doc
       </button>
 
       {isOpen ? (
@@ -60,7 +63,7 @@ export function UploadMenu() {
           style={{ backgroundColor: 'var(--card-bg)', borderColor: 'var(--border)' }}
         >
           <div className="mb-3 flex items-center justify-between">
-            <p className="text-sm font-semibold" style={{ color: 'var(--fg)' }}>Upload PDF</p>
+            <p className="text-sm font-semibold" style={{ color: 'var(--fg)' }}>Upload Document</p>
             <button
               type="button"
               className="grid size-8 place-items-center rounded-md transition hover:bg-zinc-100 dark:hover:bg-zinc-800"
@@ -104,14 +107,14 @@ export function UploadMenu() {
             disabled={isUploading}
           >
             <Upload size={20} aria-hidden="true" style={{ color: 'var(--fg-muted)' }} />
-            <span className="mt-3 text-sm font-medium" style={{ color: 'var(--fg)' }}>Drop PDF or browse</span>
-            <span className="mt-1 text-xs" style={{ color: 'var(--fg-subtle)' }}>{status || 'Queued for OCR'}</span>
+            <span className="mt-3 text-sm font-medium" style={{ color: 'var(--fg)' }}>Drop file or browse</span>
+            <span className="mt-1 text-xs" style={{ color: 'var(--fg-subtle)' }}>{status || 'Queued for parsing'}</span>
           </button>
 
           <input
             ref={inputRef}
             type="file"
-            accept="application/pdf"
+            accept=".pdf,.docx,.doc,.pptx,.ppt,.xlsx,.xls,.txt,.md,.json"
             className="hidden"
             onChange={(event) => {
               const file = event.currentTarget.files?.[0]
@@ -123,4 +126,5 @@ export function UploadMenu() {
       ) : null}
     </div>
   )
+
 }
