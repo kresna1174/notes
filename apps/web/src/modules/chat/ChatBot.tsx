@@ -6,10 +6,13 @@ import { marked } from 'marked'
 import { listDocuments } from '#/modules/shared/ragApi'
 
 interface ChatBotProps {
-  noteId: string
-  noteContent: string
-  noteTitle: string
-  onClose: () => void
+  noteId?: string
+  noteContent?: string
+  noteTitle?: string
+  onClose?: () => void
+  mode?: 'note' | 'rag'
+  pinnedDocs?: { id: string; name: string }[]
+  fullWidth?: boolean
 }
 
 
@@ -400,7 +403,17 @@ function ToolCallBlock({ item, noteId, lastUserPrompt }: { item: any; noteId: st
 }
 
 // ── Main ChatBot ─────────────────────────────────────────────
-export function ChatBot({ noteId, noteContent, noteTitle, onClose }: ChatBotProps) {
+export function ChatBot({
+  noteId,
+  noteContent = '',
+  noteTitle = '',
+  onClose,
+  mode = 'note',
+  pinnedDocs = [],
+  fullWidth = false,
+}: ChatBotProps) {
+  const isRagMode = mode === 'rag'
+  const sessionId = isRagMode ? 'rag-global' : (noteId ?? 'default')
   const [fetchingHistory, setFetchingHistory] = useState(true)
   const [inputValue, setInputValue] = useState('')
   const messagesEndRef = useRef<HTMLDivElement>(null)
@@ -429,7 +442,7 @@ export function ChatBot({ noteId, noteContent, noteTitle, onClose }: ChatBotProp
     fetchDocs()
     const intervalId = setInterval(fetchDocs, 5000)
     return () => clearInterval(intervalId)
-  }, [noteId])
+  }, [sessionId])
 
   useEffect(() => {
     function handleOutsideClick() {
@@ -449,7 +462,7 @@ export function ChatBot({ noteId, noteContent, noteTitle, onClose }: ChatBotProp
     transportRef.current = new DefaultChatTransport({
       api: '/api/ai/chat/stream',
       body: () => ({
-        session_id: noteStateRef.current.noteId,
+        session_id: isRagMode ? 'rag-global' : noteStateRef.current.noteId,
         note_title: noteStateRef.current.noteTitle,
         note_content: noteStateRef.current.noteContent,
         attachments: attachmentsRef.current,
@@ -491,7 +504,7 @@ export function ChatBot({ noteId, noteContent, noteTitle, onClose }: ChatBotProp
   useEffect(() => {
     let cancelled = false
     setFetchingHistory(true)
-    fetch(`/api/ai/chat/history/${noteId}`)
+    fetch(`/api/ai/chat/history/${isRagMode ? 'rag-global' : noteId}`)
       .then(res => { if (!res.ok) throw new Error('Failed'); return res.json() })
       .then(data => {
         if (cancelled) return
@@ -512,7 +525,16 @@ export function ChatBot({ noteId, noteContent, noteTitle, onClose }: ChatBotProp
           }
           setMessages(merged)
         } else {
-          setMessages([{ id: 'welcome', role: 'assistant', parts: [{ type: 'text', text: `Hello! I'm ready to help with the note **"${noteTitle || 'Untitled'}"**. What would you like to do?` }] }])
+          setMessages([{
+            id: 'welcome',
+            role: 'assistant',
+            parts: [{
+              type: 'text',
+              text: isRagMode
+                ? 'Hello! Ask anything from your pinned documents. Pin documents in the panel on the left.'
+                : `Hello! I'm ready to help with the note **"${noteTitle || 'Untitled'}"**. What would you like to do?`
+            }]
+          }])
         }
       })
       .catch(() => {
@@ -520,7 +542,7 @@ export function ChatBot({ noteId, noteContent, noteTitle, onClose }: ChatBotProp
       })
       .finally(() => { if (!cancelled) setFetchingHistory(false) })
     return () => { cancelled = true }
-  }, [noteId, setMessages])
+  }, [noteId, isRagMode, setMessages])
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -536,23 +558,32 @@ export function ChatBot({ noteId, noteContent, noteTitle, onClose }: ChatBotProp
   useEffect(() => { adjustHeight() }, [inputValue])
 
   const handleSend = () => {
-    if ((!inputValue.trim() && attachments.length === 0 && referencedDocs.length === 0) || isLoading) return
-    
+    if ((!inputValue.trim() && attachments.length === 0 && referencedDocs.length === 0 && pinnedDocs.length === 0) || isLoading) return
+
     let textToSend = inputValue
     if (attachments.length > 0) {
-      const attachmentsPrefix = attachments.map(att => 
+      const attachmentsPrefix = attachments.map(att =>
         `[Attached Document Content: "${att.filename}" filePath="${att.filePath}" mimeType="${att.mimeType}"]`
       ).join('\n')
       textToSend = `${attachmentsPrefix}\n\n${textToSend}`
     }
-    
+
+    // Inject pinned docs from panel (RAG mode)
+    if (pinnedDocs.length > 0) {
+      const pinnedPrefix = pinnedDocs.map(doc =>
+        `[Referenced Document: "${doc.name}" (ID: "${doc.id}")]`
+      ).join('\n')
+      textToSend = `${pinnedPrefix}\n\n${textToSend}`
+    }
+
+    // Inject manually-selected mention docs
     if (referencedDocs.length > 0) {
-      const ragPrefix = referencedDocs.map(doc => 
+      const ragPrefix = referencedDocs.map(doc =>
         `[Referenced Document: "${doc.name}" (ID: "${doc.id}")]`
       ).join('\n')
       textToSend = `${ragPrefix}\n\n${textToSend}`
     }
-    
+
     sendMessage({ text: textToSend })
     setInputValue('')
     setAttachments([])
@@ -657,7 +688,11 @@ export function ChatBot({ noteId, noteContent, noteTitle, onClose }: ChatBotProp
     setMessages([{ id: 'cleared', role: 'assistant', parts: [{ type: 'text', text: 'History cleared. What would you like to ask?' }] }])
   }
 
-  const quickPrompts = [
+  const quickPrompts = isRagMode ? [
+    { label: '✦ Summarize pinned documents', text: 'Summarize the key points from the pinned documents.' },
+    { label: '✦ Find main topics', text: 'What are the main topics covered in the pinned documents?' },
+    { label: '✦ List key facts', text: 'List the most important facts from the pinned documents.' },
+  ] : [
     { label: '✦ Summarize this note', text: 'Tolong panggil summarize_expert untuk meringkas seluruh isi catatan ini.' },
     { label: '✦ Create automatic tags', text: 'Tolong panggil tagger_expert untuk merekomendasikan tag berdasarkan isi catatan ini.' },
     { label: '✦ Find additional ideas', text: 'Berikan 3 ide tambahan yang bisa ditambahkan ke catatan ini.' },
@@ -668,15 +703,13 @@ export function ChatBot({ noteId, noteContent, noteTitle, onClose }: ChatBotProp
   return (
     <div
       style={{
-        width: '360px',
-        borderLeft: '1px solid var(--border)',
+        ...(fullWidth ? { flex: 1 } : { width: '360px', borderLeft: '1px solid var(--border)', flexShrink: 0 }),
         background: 'var(--bg)',
         display: 'flex',
         flexDirection: 'column',
         height: '100%',
         minHeight: 0,
         overflow: 'hidden',
-        flexShrink: 0,
         fontFamily: 'var(--font-body)',
       }}
     >
@@ -695,9 +728,16 @@ export function ChatBot({ noteId, noteContent, noteTitle, onClose }: ChatBotProp
           <span style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--fg)', letterSpacing: '-0.01em' }}>
             AI
           </span>
-          <span style={{ fontSize: '0.72rem', color: 'var(--fg-subtle)', fontWeight: 400 }}>
-            · {noteTitle ? `"${noteTitle.length > 22 ? noteTitle.slice(0, 22) + '…' : noteTitle}"` : 'This note'}
-          </span>
+          {!isRagMode && (
+            <span style={{ fontSize: '0.72rem', color: 'var(--fg-subtle)', fontWeight: 400 }}>
+              · {noteTitle ? `"${noteTitle.length > 22 ? noteTitle.slice(0, 22) + '…' : noteTitle}"` : 'This note'}
+            </span>
+          )}
+          {isRagMode && (
+            <span style={{ fontSize: '0.72rem', color: 'var(--fg-subtle)', fontWeight: 400 }}>
+              · RAG Chat
+            </span>
+          )}
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
           <button
@@ -709,15 +749,17 @@ export function ChatBot({ noteId, noteContent, noteTitle, onClose }: ChatBotProp
           >
             <Trash2 size={13} />
           </button>
-          <button
-            onClick={onClose}
-            title="Close"
-            style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--fg-subtle)', padding: '4px', borderRadius: 4, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-            onMouseEnter={e => { e.currentTarget.style.color = 'var(--fg-muted)'; e.currentTarget.style.background = 'var(--muted)' }}
-            onMouseLeave={e => { e.currentTarget.style.color = 'var(--fg-subtle)'; e.currentTarget.style.background = 'none' }}
-          >
-            <X size={13} />
-          </button>
+          {!isRagMode && onClose && (
+            <button
+              onClick={onClose}
+              title="Close"
+              style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--fg-subtle)', padding: '4px', borderRadius: 4, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+              onMouseEnter={e => { e.currentTarget.style.color = 'var(--fg-muted)'; e.currentTarget.style.background = 'var(--muted)' }}
+              onMouseLeave={e => { e.currentTarget.style.color = 'var(--fg-subtle)'; e.currentTarget.style.background = 'none' }}
+            >
+              <X size={13} />
+            </button>
+          )}
         </div>
       </div>
 
@@ -924,7 +966,7 @@ export function ChatBot({ noteId, noteContent, noteTitle, onClose }: ChatBotProp
                 {toolParts.length > 0 && (
                   <div style={{ marginBottom: hasText ? 8 : 0, display: 'flex', flexDirection: 'column', gap: 3 }}>
                     {toolParts.map((item, i) => (
-                      <ToolCallBlock key={i} item={item} noteId={noteId} lastUserPrompt={lastUserText} />
+                      <ToolCallBlock key={i} item={item} noteId={isRagMode ? 'rag-global' : (noteId ?? 'default')} lastUserPrompt={lastUserText} />
                     ))}
                   </div>
                 )}
