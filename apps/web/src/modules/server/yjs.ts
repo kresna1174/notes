@@ -4,7 +4,8 @@ import * as syncProtocol from 'y-protocols/sync'
 import * as awarenessProtocol from 'y-protocols/awareness'
 import * as encoding from 'lib0/encoding'
 import * as decoding from 'lib0/decoding'
-import { sqlite } from '../shared/db'
+import { db } from '../shared/db'
+import { sql } from 'drizzle-orm'
 
 const messageSync = 0
 const messageAwareness = 1
@@ -20,13 +21,13 @@ function parseCookies(cookieHeader: string | undefined): Record<string, string> 
   return list
 }
 
-export function verifySession(cookieHeader: string | undefined): boolean {
+export async function verifySession(cookieHeader: string | undefined): Promise<boolean> {
   const cookies = parseCookies(cookieHeader)
   const sessionToken = cookies['session']
   if (!sessionToken) return false
   try {
-    const row = sqlite.prepare('SELECT user_id FROM sessions WHERE token = ?').get(sessionToken)
-    return !!row
+    const result = await db.execute(sql`SELECT user_id FROM sessions WHERE token = ${sessionToken}`)
+    return result.rows.length > 0
   } catch (err) {
     console.error('[Yjs Auth error]', err)
     return false

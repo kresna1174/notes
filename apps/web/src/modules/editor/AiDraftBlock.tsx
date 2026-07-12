@@ -216,11 +216,10 @@ function AiDraftNodeView({ node, updateAttributes, getPos, editor }: any) {
     const pos = getPos()
     if (typeof pos !== 'number') return
 
-    // Replace the block with the parsed HTML
     editor.chain()
       .focus()
       .deleteRange({ from: pos, to: pos + 1 })
-      .insertContentAt(pos, streamedText || result)
+      .insertContentAt(pos, result || streamedText)
       .run()
   }
 

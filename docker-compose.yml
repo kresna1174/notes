@@ -1,4 +1,25 @@
 services:
+  # PostgreSQL database
+  postgres:
+    image: postgres:16-alpine
+    container_name: notes-postgres
+    restart: always
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-notesdb}
+      POSTGRES_USER: ${POSTGRES_USER:-notes}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-notes_secret}
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - notes-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-notes} -d ${POSTGRES_DB:-notesdb}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   # Redis service used as message broker for Celery sub-agent tasks
   redis:
     image: redis:7-alpine
@@ -22,7 +43,7 @@ services:
     volumes:
       - ./apps/ai-agent/data:/app/data
     environment:
-      - DATABASE_URL=sqlite+aiosqlite:////app/data/sessions.db
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-notes}:${POSTGRES_PASSWORD:-notes_secret}@postgres:5432/${POSTGRES_DB:-notesdb}
       - CELERY_BROKER_URL=redis://redis:6379/0
       - CELERY_RESULT_BACKEND=redis://redis:6379/0
       - OPENROUTER_MODEL=${OPENROUTER_MODEL:-google/gemini-2.5-flash:free}
@@ -30,7 +51,10 @@ services:
       - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
       - LOG_DIR=/app/data
     depends_on:
-      - redis
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
     networks:
       - notes-network
 
@@ -45,15 +69,19 @@ services:
     volumes:
       - ./apps/ai-agent/data:/app/data
     environment:
-      - DATABASE_URL=sqlite+aiosqlite:////app/data/sessions.db
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-notes}:${POSTGRES_PASSWORD:-notes_secret}@postgres:5432/${POSTGRES_DB:-notesdb}
       - CELERY_BROKER_URL=redis://redis:6379/0
       - CELERY_RESULT_BACKEND=redis://redis:6379/0
       - OPENROUTER_MODEL=${OPENROUTER_MODEL:-google/gemini-2.5-flash:free}
       - OPENROUTER_BASE_URL=${OPENROUTER_BASE_URL:-https://openrouter.ai/api/v1}
       - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
     depends_on:
-      - redis
-      - ai-agent
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+      ai-agent:
+        condition: service_started
     networks:
       - notes-network
 
@@ -73,12 +101,17 @@ services:
       - PORT=3000
       - NODE_ENV=production
       - AI_AGENT_URL=http://ai-agent:8000
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-notes}:${POSTGRES_PASSWORD:-notes_secret}@postgres:5432/${POSTGRES_DB:-notesdb}
     depends_on:
-      - ai-agent
+      postgres:
+        condition: service_healthy
+      ai-agent:
+        condition: service_started
     networks:
       - notes-network
 
 volumes:
+  postgres_data:
   redis_data:
   notes_data:
   notes_uploads:

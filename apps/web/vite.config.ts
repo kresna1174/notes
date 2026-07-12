@@ -1,5 +1,6 @@
 import { defineConfig } from 'vite'
 import { devtools } from '@tanstack/devtools-vite'
+import { resolve } from 'path'
 
 import { tanstackRouter } from '@tanstack/router-plugin/vite'
 
@@ -9,6 +10,7 @@ import { apiPlugin } from './vite-plugin-api'
 
 const config = defineConfig({
   resolve: { tsconfigPaths: true },
+  envDir: resolve(__dirname, '../..'),
   plugins: [
     devtools(),
     apiPlugin(),

@@ -1,6 +1,6 @@
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { createReadStream } from 'node:fs'
-import { db, sqlite } from '../shared/db'
+import { db } from '../shared/db'
 import { notes, attachments, users, organizations, userOrganizations, noteHistory } from '../../../drizzle/schema'
 import { desc, eq, and, sql, or, inArray } from 'drizzle-orm'
 import { randomUUID } from 'crypto'
@@ -37,27 +37,27 @@ app.onError((err, c) => {
 })
 
 // Helper to get session from Hono Context
-function getSession(c: any) {
+async function getSession(c: any) {
   const sessionToken = getCookie(c, 'session')
   if (!sessionToken) return null
-  const row = sqlite.prepare('SELECT user_id as userId, username, role FROM sessions WHERE token = ?').get(sessionToken) as { userId: string; username: string; role: string } | undefined
-  return row ?? null
+  const result = await db.execute(sql`SELECT user_id as "userId", username, role FROM sessions WHERE token = ${sessionToken}`)
+  return (result.rows[0] as { userId: string; username: string; role: string } | undefined) ?? null
 }
 
-function getUsernameById(userId: string | null | undefined): string | null {
+async function getUsernameById(userId: string | null | undefined): Promise<string | null> {
   if (!userId) return null
-  const row = sqlite.prepare('SELECT username FROM users WHERE id = ?').get(userId) as { username: string } | undefined
-  return row?.username ?? null
+  const result = await db.execute(sql`SELECT username FROM users WHERE id = ${userId}`)
+  return (result.rows[0] as { username: string } | undefined)?.username ?? null
 }
 
-function stripAndEnrich(note: Record<string, any>) {
+async function stripAndEnrich(note: Record<string, any>) {
   const { pinHash, sharePinHash, ...rest } = note
   return {
     ...rest,
     isLocked: !!pinHash,
     hasPinProtection: !!sharePinHash,
-    createdByUsername: getUsernameById(rest.userId),
-    updatedByUsername: getUsernameById(rest.updatedByUserId),
+    createdByUsername: await getUsernameById(rest.userId),
+    updatedByUsername: await getUsernameById(rest.updatedByUserId),
   }
 }
 
@@ -95,7 +95,7 @@ async function getOwnerFilter(id: string, userId: string, role: string) {
 
 // Hono Middlewares
 const authMiddleware = createMiddleware<Env>(async (c, next) => {
-  const session = getSession(c)
+  const session = await getSession(c)
   if (!session) {
     return c.json({ error: 'unauthenticated' }, 401)
   }
@@ -104,7 +104,7 @@ const authMiddleware = createMiddleware<Env>(async (c, next) => {
 })
 
 const adminMiddleware = createMiddleware<Env>(async (c, next) => {
-  const session = getSession(c)
+  const session = await getSession(c)
   if (!session) {
     return c.json({ error: 'unauthenticated' }, 401)
   }
@@ -139,7 +139,7 @@ app.post('/api/auth/login', async (c) => {
     return c.json({ error: 'Pendaftaran akun Anda ditolak oleh admin.' }, 403)
   }
   const token = randomUUID()
-  sqlite.prepare('INSERT INTO sessions (token, user_id, username, role, created_at) VALUES (?, ?, ?, ?, ?)').run(token, user.id, user.username, user.role, Date.now())
+  await db.execute(sql`INSERT INTO sessions (token, user_id, username, role, created_at) VALUES (${token}, ${user.id}, ${user.username}, ${user.role}, ${Date.now()})`)
   setCookie(c, 'session', token, { path: '/', httpOnly: true, sameSite: 'Strict' })
   const orgs = await getUserOrganizations(user.id)
   return c.json({ userId: user.id, username: user.username, role: user.role, organizations: orgs })
@@ -148,14 +148,14 @@ app.post('/api/auth/login', async (c) => {
 app.post('/api/auth/logout', async (c) => {
   const token = getCookie(c, 'session')
   if (token) {
-    sqlite.prepare('DELETE FROM sessions WHERE token = ?').run(token)
+    await db.execute(sql`DELETE FROM sessions WHERE token = ${token}`)
   }
   deleteCookie(c, 'session', { path: '/', httpOnly: true, sameSite: 'Strict' })
   return c.json({ ok: true })
 })
 
 app.get('/api/auth/me', async (c) => {
-  const session = getSession(c)
+  const session = await getSession(c)
   if (!session) {
     return c.json({ error: 'unauthenticated' }, 401)
   }
@@ -171,7 +171,7 @@ app.post('/api/auth/register', adminMiddleware, async (c) => {
   }
   const validRole = role === 'admin' ? 'admin' : 'viewer'
   const cleanUsername = username.trim()
-  const existing = sqlite.prepare('SELECT id FROM users WHERE username = ?').get(cleanUsername)
+  const [existing] = await db.select({ id: users.id }).from(users).where(eq(users.username, cleanUsername)).limit(1)
   if (existing) {
     return c.json({ error: 'username already exists' }, 409)
   }
@@ -191,7 +191,7 @@ app.post('/api/auth/public-register', async (c) => {
   if (!cleanUsername) {
     return c.json({ error: 'username cannot be empty' }, 400)
   }
-  const existing = sqlite.prepare('SELECT id FROM users WHERE username = ?').get(cleanUsername)
+  const [existing] = await db.select({ id: users.id }).from(users).where(eq(users.username, cleanUsername)).limit(1)
   if (existing) {
     return c.json({ error: 'Username sudah digunakan' }, 409)
   }
@@ -366,21 +366,25 @@ app.get('/api/search', authMiddleware, async (c) => {
   const q = c.req.query('q')?.trim()
   if (!q) return c.json([])
 
-  const rows = session.role === 'admin'
-    ? sqlite.prepare(`
-        SELECT n.id, n.title, n.created_at as createdAt,
-          snippet(notes_fts, 2, '<mark>', '</mark>', '...', 10) as snippet
-        FROM notes_fts JOIN notes n ON n.id = notes_fts.id
-        WHERE notes_fts MATCH ? ORDER BY rank LIMIT 50
-      `).all(`${q}*`)
-    : sqlite.prepare(`
-        SELECT n.id, n.title, n.created_at as createdAt,
-          snippet(notes_fts, 2, '<mark>', '</mark>', '...', 10) as snippet
-        FROM notes_fts JOIN notes n ON n.id = notes_fts.id
-        WHERE notes_fts MATCH ? AND n.user_id = ? ORDER BY rank LIMIT 50
-      `).all(`${q}*`, session.userId)
+  const pattern = `%${q}%`
+  const result = session.role === 'admin'
+    ? await db.execute(sql`
+        SELECT id, title, created_at as "createdAt",
+          SUBSTRING(content, 1, 200) as snippet
+        FROM notes
+        WHERE title ILIKE ${pattern} OR content ILIKE ${pattern}
+        ORDER BY updated_at DESC LIMIT 50
+      `)
+    : await db.execute(sql`
+        SELECT id, title, created_at as "createdAt",
+          SUBSTRING(content, 1, 200) as snippet
+        FROM notes
+        WHERE (title ILIKE ${pattern} OR content ILIKE ${pattern})
+          AND user_id = ${session.userId}
+        ORDER BY updated_at DESC LIMIT 50
+      `)
 
-  return c.json(rows)
+  return c.json(result.rows)
 })
 
 app.get('/api/notes', authMiddleware, async (c) => {
@@ -418,7 +422,7 @@ app.get('/api/notes', authMiddleware, async (c) => {
     }
   }
 
-  return c.json(allNotes.map(n => stripAndEnrich(n)))
+  return c.json(await Promise.all(allNotes.map(n => stripAndEnrich(n))))
 })
 
 app.post('/api/notes', authMiddleware, async (c) => {
@@ -430,27 +434,28 @@ app.post('/api/notes', authMiddleware, async (c) => {
   const id = randomUUID()
   const note = { id, userId: session.userId, organizationId, type, title: '', content: '{"type":"doc","content":[]}', createdAt: now, updatedAt: now }
   await db.insert(notes).values(note)
-  return c.json(stripAndEnrich(note), 201)
+  return c.json(await stripAndEnrich(note), 201)
 })
 
 // --- PUBLIC SHARE ROUTE ---
 
 app.get('/api/share/:token', async (c) => {
   const token = c.req.param('token')
-  const row = sqlite.prepare('SELECT id, title, content, user_id as userId, updated_by_user_id as updatedByUserId, created_at as createdAt, updated_at as updatedAt, share_pin_hash as sharePinHash, cover_image as coverImage, icon FROM notes WHERE share_token = ?').get(token) as { id: string; title: string; content: string; userId: string; updatedByUserId: string | null; createdAt: number; updatedAt: number; sharePinHash: string | null; coverImage: string | null; icon: string | null } | undefined
+  const [row] = await db.select().from(notes).where(eq(notes.shareToken, token))
   if (!row) return c.json({ error: 'not found' }, 404)
-  const { sharePinHash, ...rest } = row
+  const { pinHash, sharePinHash, ...rest } = row
   return c.json({
     ...rest,
+    isLocked: !!pinHash,
     hasPinProtection: !!sharePinHash,
-    createdByUsername: getUsernameById(rest.userId),
-    updatedByUsername: getUsernameById(rest.updatedByUserId),
+    createdByUsername: await getUsernameById(rest.userId),
+    updatedByUsername: await getUsernameById(rest.updatedByUserId),
   })
 })
 
 app.post('/api/share/:token/verify', async (c) => {
   const token = c.req.param('token')
-  const row = sqlite.prepare('SELECT share_pin_hash as sharePinHash FROM notes WHERE share_token = ?').get(token) as { sharePinHash: string | null } | undefined
+  const [row] = await db.select({ sharePinHash: notes.sharePinHash }).from(notes).where(eq(notes.shareToken, token))
   if (!row) return c.json({ error: 'not found' }, 404)
   if (!row.sharePinHash) return c.json({ ok: true })
   const body = await c.req.json().catch(() => ({})) as { pin?: string }
@@ -536,17 +541,17 @@ app.get('/api/admin/locked-notes', authMiddleware, async (c) => {
   const session = c.get('session')
   if (session.role !== 'admin') return c.json({ error: 'forbidden' }, 403)
 
-  const rows = sqlite.prepare(`
-    SELECT n.id, n.title, n.created_at as createdAt, n.updated_at as updatedAt,
-           u.username as ownerUsername, u.id as ownerId,
-           n.type, n.organization_id as organizationId
+  const result = await db.execute(sql`
+    SELECT n.id, n.title, n.created_at as "createdAt", n.updated_at as "updatedAt",
+           u.username as "ownerUsername", u.id as "ownerId",
+           n.type, n.organization_id as "organizationId"
     FROM notes n
     LEFT JOIN users u ON n.user_id = u.id
     WHERE n.pin_hash IS NOT NULL AND n.pin_hash != ''
     ORDER BY n.updated_at DESC
-  `).all() as { id: string; title: string; createdAt: number; updatedAt: number; ownerUsername: string; ownerId: string; type: string; organizationId: string | null }[]
+  `)
 
-  return c.json(rows)
+  return c.json(result.rows)
 })
 
 // ── Admin-only: force-reset (remove) PIN of any note ─────────────────────
@@ -825,7 +830,7 @@ app.get('/api/notes/:id', authMiddleware, async (c) => {
   const ownerFilter = await getOwnerFilter(id, session.userId, session.role)
   const [note] = await db.select().from(notes).where(ownerFilter)
   if (!note) return c.json({ error: 'not found' }, 404)
-  return c.json(stripAndEnrich(note))
+  return c.json(await stripAndEnrich(note))
 })
 
 
@@ -875,7 +880,7 @@ app.put('/api/notes/:id', authMiddleware, async (c) => {
     console.error('Failed to auto-create note history snapshot:', err)
   }
 
-  return c.json(stripAndEnrich(updated))
+  return c.json(await stripAndEnrich(updated))
 })
 
 
@@ -958,7 +963,7 @@ app.post('/api/notes/:id/history/restore/:versionId', authMiddleware, async (c) 
     .where(ownerFilter)
 
   const [updated] = await db.select().from(notes).where(ownerFilter)
-  return c.json(stripAndEnrich(updated))
+  return c.json(await stripAndEnrich(updated))
 })
 
 // --- ATTACHMENT ACTIONS ---
@@ -1054,10 +1059,9 @@ app.get('/api/admin/ai-logs', adminMiddleware, async (c) => {
 
     // Enrich sessions with usernames from web app DB
     if (data.sessions?.length > 0) {
-      const userIds = [...new Set(data.sessions.map((s: any) => s.user_id).filter(Boolean))]
+      const userIds = [...new Set(data.sessions.map((s: any) => s.user_id).filter(Boolean))] as string[]
       if (userIds.length > 0) {
-        const placeholders = userIds.map(() => '?').join(',')
-        const userRows = sqlite.prepare(`SELECT id, username FROM users WHERE id IN (${placeholders})`).all(...userIds) as { id: string; username: string }[]
+        const userRows = await db.select({ id: users.id, username: users.username }).from(users).where(inArray(users.id, userIds))
         const userMap = Object.fromEntries(userRows.map(u => [u.id, u.username]))
         for (const sess of data.sessions) {
           sess.username = sess.user_id ? (userMap[sess.user_id] || null) : null

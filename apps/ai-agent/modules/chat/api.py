@@ -762,143 +762,144 @@ async def get_chat_history(session_id: str):
 
 @router.get("/api/admin/sessions")
 async def admin_list_sessions(user_id: str | None = None, page: int = 1, page_size: int = 30):
-    db_url = os.getenv("DATABASE_URL", "sqlite+aiosqlite:///sessions.db").replace("+aiosqlite", "")
-    import sqlite3 as _sqlite3
     try:
-        conn = _sqlite3.connect(db_url.replace("sqlite:///", ""))
-        conn.row_factory = _sqlite3.Row
+        async with engine.connect() as conn:
+            total_row = await conn.execute(text("SELECT COUNT(*) FROM agent_sessions"))
+            total = total_row.scalar() or 0
 
-        total = conn.execute("SELECT COUNT(*) FROM agent_sessions").fetchone()[0]
+            offset = (page - 1) * page_size
+            sessions_rows = await conn.execute(text("""
+                SELECT
+                    s.session_id,
+                    s.created_at,
+                    s.updated_at,
+                    (SELECT COUNT(*) FROM agent_messages WHERE session_id = s.session_id) as message_count,
+                    (SELECT COUNT(*) FROM agent_messages WHERE session_id = s.session_id AND message_data ILIKE '%"role":"user"%') as user_message_count,
+                    (SELECT COUNT(*) FROM agent_messages WHERE session_id = s.session_id AND message_data ILIKE '%"type":"function_call"%') as tool_call_count
+                FROM agent_sessions s
+                ORDER BY s.updated_at DESC
+                LIMIT :limit OFFSET :offset
+            """), {"limit": page_size, "offset": offset})
+            sessions = sessions_rows.mappings().all()
 
-        offset = (page - 1) * page_size
-        sessions = conn.execute("""
-            SELECT
-                s.session_id,
-                s.created_at,
-                s.updated_at,
-                (SELECT COUNT(*) FROM agent_messages WHERE session_id = s.session_id) as message_count,
-                (SELECT COUNT(*) FROM agent_messages WHERE session_id = s.session_id AND message_data LIKE '%"role":"user"%') as user_message_count,
-                (SELECT COUNT(*) FROM agent_messages WHERE session_id = s.session_id AND message_data LIKE '%"type":"function_call"%') as tool_call_count
-            FROM agent_sessions s
-            ORDER BY s.updated_at DESC
-            LIMIT ? OFFSET ?
-        """, (page_size, offset)).fetchall()
+            token_rows = await conn.execute(text("""
+                SELECT session_id, SUM(prompt_tokens) as prompt_tokens, SUM(completion_tokens) as completion_tokens
+                FROM session_token_usage
+                GROUP BY session_id
+            """))
+            token_map = {r["session_id"]: {"prompt_tokens": r["prompt_tokens"], "completion_tokens": r["completion_tokens"]} for r in token_rows.mappings()}
 
-        token_rows = conn.execute("""
-            SELECT session_id, SUM(prompt_tokens) as prompt_tokens, SUM(completion_tokens) as completion_tokens
-            FROM session_token_usage
-            GROUP BY session_id
-        """).fetchall()
-        token_map = {r["session_id"]: {"prompt_tokens": r["prompt_tokens"], "completion_tokens": r["completion_tokens"]} for r in token_rows}
+            result = []
+            for sess in sessions:
+                sid = sess["session_id"]
 
-        result = []
-        for sess in sessions:
-            sid = sess["session_id"]
+                first_user_msg_row = await conn.execute(text("""
+                    SELECT message_data FROM agent_messages
+                    WHERE session_id = :sid AND message_data ILIKE '%"role":"user"%'
+                    ORDER BY created_at ASC LIMIT 1
+                """), {"sid": sid})
+                first_user_msg = first_user_msg_row.first()
 
-            first_user_msg = conn.execute("""
-                SELECT message_data FROM agent_messages
-                WHERE session_id = ? AND message_data LIKE '%"role":"user"%'
-                ORDER BY created_at ASC LIMIT 1
-            """, (sid,)).fetchone()
+                extracted_user_id = None
+                note_title = None
+                prompt_preview = ""
+                if first_user_msg:
+                    try:
+                        msg = json.loads(first_user_msg[0])
+                        content = msg.get("content", "")
+                        if isinstance(content, list):
+                            content = " ".join(p.get("text", "") for p in content if isinstance(p, dict))
+                        prompt_preview = (content or "")[:300]
+                        ctx = msg.get("context", {})
+                        if isinstance(ctx, dict):
+                            extracted_user_id = ctx.get("user_id")
+                            note_title = ctx.get("note_title")
+                        if not note_title:
+                            m = re.search(r'Konteks Catatan.*?Judul:\s*"([^"]+)"', prompt_preview)
+                            if m:
+                                note_title = m.group(1)
+                    except Exception:
+                        pass
 
-            extracted_user_id = None
-            note_title = None
-            prompt_preview = ""
-            if first_user_msg:
-                try:
-                    msg = json.loads(first_user_msg["message_data"])
-                    content = msg.get("content", "")
-                    if isinstance(content, list):
-                        content = " ".join(p.get("text", "") for p in content if isinstance(p, dict))
-                    prompt_preview = (content or "")[:300]
-                    ctx = msg.get("context", {})
-                    if isinstance(ctx, dict):
-                        extracted_user_id = ctx.get("user_id")
-                        note_title = ctx.get("note_title")
-                    if not note_title:
-                        m = re.search(r'Konteks Catatan.*?Judul:\s*"([^"]+)"', prompt_preview)
-                        if m:
-                            note_title = m.group(1)
-                except Exception:
-                    pass
+                has_error = False
+                error_msg = None
+                error_row_result = await conn.execute(text("""
+                    SELECT message_data FROM agent_messages
+                    WHERE session_id = :sid AND (message_data ILIKE '%"error"%' OR message_data ILIKE '%failed%')
+                    ORDER BY created_at DESC LIMIT 1
+                """), {"sid": sid})
+                error_row = error_row_result.first()
+                if error_row:
+                    try:
+                        err_data = json.loads(error_row[0])
+                        if err_data.get("type") == "error" or err_data.get("status") == "failed":
+                            has_error = True
+                            error_msg = (err_data.get("error") or err_data.get("output", ""))[:300]
+                    except Exception:
+                        pass
 
-            has_error = False
-            error_msg = None
-            error_row = conn.execute("""
-                SELECT message_data FROM agent_messages
-                WHERE session_id = ? AND (message_data LIKE '%"error"%' OR message_data LIKE '%failed%')
-                ORDER BY created_at DESC LIMIT 1
-            """, (sid,)).fetchone()
-            if error_row:
-                try:
-                    err_data = json.loads(error_row["message_data"])
-                    if err_data.get("type") == "error" or err_data.get("status") == "failed":
-                        has_error = True
-                        error_msg = (err_data.get("error") or err_data.get("output", ""))[:300]
-                except Exception:
-                    pass
+                recent_msgs_result = await conn.execute(text("""
+                    SELECT message_data FROM agent_messages
+                    WHERE session_id = :sid
+                    ORDER BY created_at DESC LIMIT 10
+                """), {"sid": sid})
+                recent_msgs = recent_msgs_result.fetchall()
+                formatted_messages = []
+                for row in reversed(recent_msgs):
+                    try:
+                        parsed = json.loads(row[0])
+                        role = parsed.get("role", "unknown")
+                        msg_type = parsed.get("type", "message")
+                        content = parsed.get("content", "")
+                        if isinstance(content, list):
+                            content = " ".join(p.get("text", "") for p in content if isinstance(p, dict))
+                        formatted_messages.append({
+                            "role": role,
+                            "type": msg_type,
+                            "content": (content or "")[:500],
+                            "name": parsed.get("name"),
+                            "tool_call_id": parsed.get("call_id"),
+                        })
+                    except Exception:
+                        pass
 
-            recent_msgs = conn.execute("""
-                SELECT message_data FROM agent_messages
-                WHERE session_id = ?
-                ORDER BY created_at DESC LIMIT 10
-            """, (sid,)).fetchall()
-            formatted_messages = []
-            for m in reversed(recent_msgs):
-                try:
-                    parsed = json.loads(m["message_data"])
-                    role = parsed.get("role", "unknown")
-                    msg_type = parsed.get("type", "message")
-                    content = parsed.get("content", "")
-                    if isinstance(content, list):
-                        content = " ".join(p.get("text", "") for p in content if isinstance(p, dict))
-                    formatted_messages.append({
-                        "role": role,
-                        "type": msg_type,
-                        "content": (content or "")[:500],
-                        "name": parsed.get("name"),
-                        "tool_call_id": parsed.get("call_id"),
-                    })
-                except Exception:
-                    pass
+                tokens = token_map.get(sid, {"prompt_tokens": 0, "completion_tokens": 0})
 
-            tokens = token_map.get(sid, {"prompt_tokens": 0, "completion_tokens": 0})
+                result.append({
+                    "session_id": sid,
+                    "user_id": extracted_user_id,
+                    "note_title": note_title,
+                    "created_at": sess["created_at"],
+                    "updated_at": sess["updated_at"],
+                    "message_count": sess["message_count"],
+                    "user_message_count": sess["user_message_count"],
+                    "tool_call_count": sess["tool_call_count"],
+                    "prompt_preview": prompt_preview,
+                    "has_error": has_error,
+                    "error_message": error_msg,
+                    "prompt_tokens": tokens["prompt_tokens"],
+                    "completion_tokens": tokens["completion_tokens"],
+                    "messages": formatted_messages,
+                })
 
-            result.append({
-                "session_id": sid,
-                "user_id": extracted_user_id,
-                "note_title": note_title,
-                "created_at": sess["created_at"],
-                "updated_at": sess["updated_at"],
-                "message_count": sess["message_count"],
-                "user_message_count": sess["user_message_count"],
-                "tool_call_count": sess["tool_call_count"],
-                "prompt_preview": prompt_preview,
-                "has_error": has_error,
-                "error_message": error_msg,
-                "prompt_tokens": tokens["prompt_tokens"],
-                "completion_tokens": tokens["completion_tokens"],
-                "messages": formatted_messages,
-            })
+            if user_id:
+                result = [s for s in result if s.get("user_id") == user_id]
 
-        if user_id:
-            result = [s for s in result if s["user_id"] == user_id]
+            stats_row = await conn.execute(text("""
+                SELECT
+                    COUNT(*) as total_sessions,
+                    (SELECT COUNT(*) FROM agent_messages) as total_messages,
+                    (SELECT COUNT(*) FROM agent_messages WHERE message_data ILIKE '%"role":"user"%') as total_user_messages,
+                    (SELECT COUNT(*) FROM agent_messages WHERE message_data ILIKE '%"type":"function_call"%') as total_tool_calls
+                FROM agent_sessions
+            """))
+            stats = stats_row.mappings().first() or {}
 
-        stats = conn.execute("""
-            SELECT
-                COUNT(*) as total_sessions,
-                (SELECT COUNT(*) FROM agent_messages) as total_messages,
-                (SELECT COUNT(*) FROM agent_messages WHERE message_data LIKE '%"role":"user"%') as total_user_messages,
-                (SELECT COUNT(*) FROM agent_messages WHERE message_data LIKE '%"type":"function_call"%') as total_tool_calls
-            FROM agent_sessions
-        """).fetchone()
-
-        token_stats = conn.execute("""
-            SELECT COALESCE(SUM(prompt_tokens), 0) as total_prompt, COALESCE(SUM(completion_tokens), 0) as total_completion
-            FROM session_token_usage
-        """).fetchone()
-
-        conn.close()
+            token_stats_row = await conn.execute(text("""
+                SELECT COALESCE(SUM(prompt_tokens), 0) as total_prompt, COALESCE(SUM(completion_tokens), 0) as total_completion
+                FROM session_token_usage
+            """))
+            token_stats = token_stats_row.first()
 
         return {
             "sessions": result,
@@ -906,12 +907,12 @@ async def admin_list_sessions(user_id: str | None = None, page: int = 1, page_si
             "page": page,
             "page_size": page_size,
             "stats": {
-                "total_sessions": stats["total_sessions"],
-                "total_messages": stats["total_messages"],
-                "total_user_messages": stats["total_user_messages"],
-                "total_tool_calls": stats["total_tool_calls"],
-                "total_prompt_tokens": token_stats["total_prompt"],
-                "total_completion_tokens": token_stats["total_completion"],
+                "total_sessions": stats.get("total_sessions", 0),
+                "total_messages": stats.get("total_messages", 0),
+                "total_user_messages": stats.get("total_user_messages", 0),
+                "total_tool_calls": stats.get("total_tool_calls", 0),
+                "total_prompt_tokens": token_stats[0] if token_stats else 0,
+                "total_completion_tokens": token_stats[1] if token_stats else 0,
             }
         }
     except Exception as e:

@@ -4,9 +4,6 @@ FROM node:20-alpine
 # Set working directory
 WORKDIR /app
 
-# Install build dependencies for better-sqlite3 native compilation
-RUN apk add --no-cache python3 make g++
-
 # Copy dependency manifests (monorepo: root + workspace)
 COPY package*.json ./
 COPY apps/web/package*.json ./apps/web/
