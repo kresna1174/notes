@@ -11,5 +11,6 @@ export { ChangePasswordModal } from './ChangePasswordModal';
 export { EmptyState, DocumentsTable, PageList, formatDate, StatusBadge } from './DocumentViews';
 export { UploadMenu } from './UploadMenu';
 export { RagLayout } from './RagLayout';
+export { RagDocPanel } from './RagDocPanel';
 
 
