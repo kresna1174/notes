@@ -4,7 +4,7 @@ import { Library, FileStack, Search, MessageSquare, Menu, PanelLeftClose, PanelL
 import { useState, useEffect } from 'react'
 import { UploadMenu } from './UploadMenu'
 
-export function RagLayout({ children }: { children: React.ReactNode }) {
+export function RagLayout({ children, noPadding }: { children: React.ReactNode; noPadding?: boolean }) {
   const [sidebarVisible, setSidebarVisible] = useState(true)
   const [isMobile, setIsMobile] = useState(false)
   const [isOpen, setIsOpen] = useState(false)
@@ -22,7 +22,7 @@ export function RagLayout({ children }: { children: React.ReactNode }) {
     { to: '/documents', label: 'Documents', icon: Library },
     { to: '/documents/pages', label: 'Pages', icon: FileStack },
     { to: '/search', label: 'Search', icon: Search },
-    { to: '/ask-agent', label: 'Ask AI', icon: MessageSquare },
+    { to: '/documents/chat', label: 'Ask AI', icon: MessageSquare },
   ] as const
 
   return (
@@ -177,14 +177,16 @@ export function RagLayout({ children }: { children: React.ReactNode }) {
         {/* Scrollable Workspace Pane */}
         <div
           className="flex-1 overflow-y-auto"
-          style={{
+          style={noPadding ? { background: 'var(--bg-app)', overflow: 'hidden', display: 'flex', flexDirection: 'column' } : {
             padding: isMobile ? '24px 16px 40px' : '40px 60px',
             background: 'var(--bg-app)',
           }}
         >
-          <div style={{ maxWidth: '800px', margin: '0 auto' }}>
-            {children}
-          </div>
+          {noPadding ? children : (
+            <div style={{ maxWidth: '800px', margin: '0 auto' }}>
+              {children}
+            </div>
+          )}
         </div>
       </main>
     </div>
