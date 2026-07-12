@@ -21,8 +21,16 @@ async def upload_document(
     file: UploadFile = File(...),
     session: Session = Depends(get_session),
 ) -> DocumentUploadResponse:
-    if file.content_type != "application/pdf":
-        raise HTTPException(status_code=400, detail="Only PDF files are accepted")
+    from pathlib import Path
+    filename = file.filename or ""
+    ext = Path(filename).suffix.lower()
+    allowed_extensions = {".pdf", ".docx", ".doc", ".pptx", ".ppt", ".xlsx", ".xls", ".txt", ".md", ".json"}
+    
+    if ext not in allowed_extensions:
+        raise HTTPException(
+            status_code=400, 
+            detail=f"Only PDF, Word, Excel, PowerPoint, Text, and Markdown files are accepted. Unrecognized format: {ext or 'none'}"
+        )
 
     file_bytes = await file.read()
     if not file_bytes:
