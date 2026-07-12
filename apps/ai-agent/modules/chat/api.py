@@ -17,7 +17,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from agents import Runner, ToolCallItem, ToolCallOutputItem
 from agents.extensions.memory import SQLAlchemySession
 
-from core.database import engine, get_db
+from core.database import engine, get_db, build_async_url
 from core.models import SubAgentTask, SessionTokenUsage
 
 from modules.chat.schemas import (
@@ -44,7 +44,7 @@ def _register_routes(app):
 
 @router.post("/api/chat")
 async def chat(request: ChatRequest):
-    db_url = os.getenv("DATABASE_URL", "sqlite+aiosqlite:///sessions.db")
+    db_url = build_async_url(os.getenv("DATABASE_URL", "sqlite+aiosqlite:///sessions.db"))
     try:
         session = SQLAlchemySession.from_url(
             session_id=request.session_id,
@@ -68,7 +68,7 @@ async def chat(request: ChatRequest):
 # ── Streaming chat ───────────────────────────────────────────────────────────
 
 async def chat_event_generator(message: str, session_id: str, user_id: str | None = None, agent_key: str | None = None):
-    db_url = os.getenv("DATABASE_URL", "sqlite+aiosqlite:///sessions.db")
+    db_url = build_async_url(os.getenv("DATABASE_URL", "sqlite+aiosqlite:///sessions.db"))
 
     # Resolve which agent to use
     agent = resolve_agent(agent_key, message)
@@ -651,7 +651,7 @@ async def approve_or_reject(request: ApproveRejectRequest):
 
 @router.get("/api/chat/history/{session_id}")
 async def get_chat_history(session_id: str):
-    db_url = os.getenv("DATABASE_URL", "sqlite+aiosqlite:///sessions.db")
+    db_url = build_async_url(os.getenv("DATABASE_URL", "sqlite+aiosqlite:///sessions.db"))
     try:
         session = SQLAlchemySession.from_url(
             session_id=session_id,
