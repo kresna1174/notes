@@ -4,6 +4,7 @@ import { useChat } from '@ai-sdk/react'
 import { DefaultChatTransport } from 'ai'
 import { marked } from 'marked'
 import { listDocuments } from '#/modules/shared/ragApi'
+import { notifyDocumentsChanged } from '#/modules/shared/ui/UploadMenu'
 
 interface ChatBotProps {
   noteId?: string
@@ -423,6 +424,7 @@ export function ChatBot({
 
   const [attachments, setAttachments] = useState<{ filename: string; mimeType: string; filePath: string }[]>([])
   const [isUploadingFile, setIsUploadingFile] = useState(false)
+  const [previewImageUrl, setPreviewImageUrl] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const [ragDocs, setRagDocs] = useState<any[]>([])
@@ -636,34 +638,38 @@ export function ChatBot({
     setMentionTriggerIndex(-1)
   }
 
-  const handleUploadFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files
-    if (!files || files.length === 0) return
-    
+  const uploadFile = async (file: File) => {
     setIsUploadingFile(true)
     try {
-      const file = files[0]
+      const activeNoteId = isRagMode ? '00000000-0000-0000-0000-000000000000' : noteId
+      if (!activeNoteId) {
+        throw new Error('No active note context found for attachment.')
+      }
+
       const form = new FormData()
       form.append('file', file)
-      form.append('noteId', noteId)
-      
+      form.append('noteId', activeNoteId)
+
       const res = await fetch('/api/attachments', {
         method: 'POST',
         body: form
       })
-      if (!res.ok) throw new Error('Failed to upload file')
-      
+      if (!res.ok) {
+        const errText = await res.text()
+        throw new Error(`Failed to upload file: ${errText}`)
+      }
+
       const data = await res.json()
       setAttachments(prev => [
         ...prev,
         {
           filename: data.filename,
           mimeType: data.mimeType,
-          filePath: `uploads/${data.storedAs}`
+          filePath: `api/attachments/${data.id}/inline`
         }
       ])
 
-      // If it is a supported RAG document format, upload it to RAG database in the background
+      // If it is a supported RAG document format, upload it to RAG database as well in the background
       const ext = '.' + file.name.split('.').pop()?.toLowerCase()
       const allowedRagExtensions = ['.pdf', '.docx', '.doc', '.pptx', '.ppt', '.xlsx', '.xls', '.txt', '.md', '.json']
       if (allowedRagExtensions.includes(ext)) {
@@ -672,9 +678,17 @@ export function ChatBot({
         fetch('/api/documents', {
           method: 'POST',
           body: ragForm
-        }).catch(err => {
-          console.error('Failed to upload to RAG database:', err)
         })
+          .then(async (ragRes) => {
+            if (ragRes.ok) {
+              notifyDocumentsChanged()
+            } else {
+              console.error('Failed to index document in RAG:', await ragRes.text())
+            }
+          })
+          .catch(err => {
+            console.error('Failed to upload to RAG database:', err)
+          })
       }
     } catch (err) {
       console.error(err)
@@ -683,6 +697,12 @@ export function ChatBot({
       setIsUploadingFile(false)
       if (fileInputRef.current) fileInputRef.current.value = ''
     }
+  }
+
+  const handleUploadFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files
+    if (!files || files.length === 0) return
+    await uploadFile(files[0])
   }
 
   const handleClearHistory = () => {
@@ -854,43 +874,88 @@ export function ChatBot({
                   {/* Extracted file attachments */}
                   {extractedFiles.length > 0 && (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 6, maxWidth: '80%' }}>
-                      {extractedFiles.map((file, i) => (
-                        <a
-                          key={i}
-                          href={`/${file.filePath}`}
-                          download={file.filename}
-                          style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: 8,
-                            padding: '8px 12px',
-                            borderRadius: 8,
-                            background: 'var(--muted)',
-                            border: '1px solid var(--border)',
-                            fontSize: '0.74rem',
-                            color: 'var(--fg)',
-                            textDecoration: 'none',
-                            cursor: 'pointer',
-                            transition: 'all 0.15s ease',
-                            alignSelf: 'flex-end',
-                            boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
-                          }}
-                          onMouseEnter={e => {
-                            e.currentTarget.style.background = 'var(--accent)'
-                            e.currentTarget.style.borderColor = 'var(--primary)'
-                          }}
-                          onMouseLeave={e => {
-                            e.currentTarget.style.background = 'var(--muted)'
-                            e.currentTarget.style.borderColor = 'var(--border)'
-                          }}
-                        >
-                          <span style={{ fontSize: '1rem' }}>📄</span>
-                          <span style={{ fontWeight: 500, maxWidth: '180px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                            {file.filename}
-                          </span>
-                          <span style={{ fontSize: '0.62rem', color: 'var(--fg-subtle)' }}>↓ Download</span>
-                        </a>
-                      ))}
+                      {extractedFiles.map((file, i) => {
+                        const isImg = /\.(png|jpe?g|webp|gif)$/i.test(file.filename)
+                        if (isImg) {
+                          return (
+                            <div
+                              key={i}
+                              style={{
+                                position: 'relative',
+                                alignSelf: 'flex-end',
+                                maxWidth: '300px',
+                                borderRadius: 8,
+                                overflow: 'hidden',
+                                border: '1px solid var(--border)',
+                                boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
+                                background: 'var(--card-bg)'
+                              }}
+                            >
+                              <img
+                                src={`/${file.filePath}`}
+                                alt={file.filename}
+                                onClick={() => setPreviewImageUrl(`/${file.filePath}`)}
+                                style={{ width: '100%', height: 'auto', display: 'block', maxHeight: '200px', objectFit: 'contain', cursor: 'zoom-in' }}
+                              />
+                              <div
+                                style={{
+                                  padding: '6px 10px',
+                                  fontSize: '0.7rem',
+                                  borderTop: '1px solid var(--border)',
+                                  background: 'var(--muted)',
+                                  display: 'flex',
+                                  justifyContent: 'space-between',
+                                  alignItems: 'center'
+                                }}
+                              >
+                                <span style={{ color: 'var(--fg)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '180px' }}>
+                                  {file.filename}
+                                </span>
+                                <a href={`/${file.filePath}`} download={file.filename} style={{ color: 'var(--primary)', textDecoration: 'none', fontWeight: 600 }}>
+                                  Download
+                                </a>
+                              </div>
+                            </div>
+                          )
+                        }
+                        return (
+                          <a
+                            key={i}
+                            href={`/${file.filePath}`}
+                            download={file.filename}
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: 8,
+                              padding: '8px 12px',
+                              borderRadius: 8,
+                              background: 'var(--muted)',
+                              border: '1px solid var(--border)',
+                              fontSize: '0.74rem',
+                              color: 'var(--fg)',
+                              textDecoration: 'none',
+                              cursor: 'pointer',
+                              transition: 'all 0.15s ease',
+                              alignSelf: 'flex-end',
+                              boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
+                            }}
+                            onMouseEnter={e => {
+                              e.currentTarget.style.background = 'var(--accent)'
+                              e.currentTarget.style.borderColor = 'var(--primary)'
+                            }}
+                            onMouseLeave={e => {
+                              e.currentTarget.style.background = 'var(--muted)'
+                              e.currentTarget.style.borderColor = 'var(--border)'
+                            }}
+                          >
+                            <span style={{ fontSize: '1rem' }}>📄</span>
+                            <span style={{ fontWeight: 500, maxWidth: '180px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                              {file.filename}
+                            </span>
+                            <span style={{ fontSize: '0.62rem', color: 'var(--fg-subtle)' }}>↓ Download</span>
+                          </a>
+                        )
+                      })}
                     </div>
                   )}
                   {cleanText && (
@@ -1164,40 +1229,97 @@ export function ChatBot({
         })()}
 
         {attachments.length > 0 && (
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 8, padding: '0 4px' }}>
-            {attachments.map((file, i) => (
-              <div
-                key={i}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 4,
-                  padding: '4px 8px',
-                  borderRadius: 6,
-                  background: 'var(--muted)',
-                  border: '1px solid var(--border)',
-                  fontSize: '0.72rem',
-                  color: 'var(--fg-muted)',
-                }}
-              >
-                <span>📁 {file.filename}</span>
-                <button
-                  onClick={() => setAttachments(prev => prev.filter((_, idx) => idx !== i))}
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, marginBottom: 12, padding: '0 8px' }}>
+            {attachments.map((file, i) => {
+              const isImg = /\.(png|jpe?g|webp|gif)$/i.test(file.filename)
+              if (isImg) {
+                return (
+                  <div
+                    key={i}
+                    style={{
+                      position: 'relative',
+                      width: '72px',
+                      height: '72px',
+                      borderRadius: '8px',
+                      border: '1px solid var(--border)',
+                      overflow: 'hidden',
+                      boxShadow: '0 2px 6px rgba(0,0,0,0.06)',
+                      background: 'var(--card-bg)',
+                    }}
+                  >
+                    <img
+                      src={`/${file.filePath}`}
+                      alt={file.filename}
+                      onClick={() => setPreviewImageUrl(`/${file.filePath}`)}
+                      style={{ width: '100%', height: '100%', objectFit: 'cover', cursor: 'zoom-in' }}
+                    />
+                    <button
+                      onClick={() => setAttachments(prev => prev.filter((_, idx) => idx !== i))}
+                      style={{
+                        position: 'absolute',
+                        top: '4px',
+                        right: '4px',
+                        width: '18px',
+                        height: '18px',
+                        borderRadius: '50%',
+                        background: 'rgba(0,0,0,0.6)',
+                        border: 'none',
+                        color: 'white',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        padding: 0,
+                        transition: 'background 0.15s ease',
+                      }}
+                      onMouseEnter={e => e.currentTarget.style.background = 'rgba(239, 68, 68, 0.9)'}
+                      onMouseLeave={e => e.currentTarget.style.background = 'rgba(0,0,0,0.6)'}
+                      title="Remove image"
+                    >
+                      <X size={10} />
+                    </button>
+                  </div>
+                )
+              }
+              return (
+                <div
+                  key={i}
                   style={{
-                    background: 'none',
-                    border: 'none',
-                    color: 'var(--fg-subtle)',
-                    cursor: 'pointer',
                     display: 'flex',
                     alignItems: 'center',
-                    padding: 0,
+                    gap: 6,
+                    padding: '6px 10px',
+                    borderRadius: 8,
+                    background: 'var(--muted)',
+                    border: '1px solid var(--border)',
+                    fontSize: '0.72rem',
+                    color: 'var(--fg-muted)',
+                    boxShadow: '0 1px 3px rgba(0,0,0,0.02)',
                   }}
-                  title="Remove file"
                 >
-                  <X size={12} />
-                </button>
-              </div>
-            ))}
+                  <span>📁</span>
+                  <span style={{ maxWidth: '120px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: 500 }}>
+                    {file.filename}
+                  </span>
+                  <button
+                    onClick={() => setAttachments(prev => prev.filter((_, idx) => idx !== i))}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      color: 'var(--fg-subtle)',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      padding: 0,
+                      marginLeft: 4,
+                    }}
+                    title="Remove file"
+                  >
+                    <X size={12} />
+                  </button>
+                </div>
+              )
+            })}
           </div>
         )}
 
@@ -1253,6 +1375,33 @@ export function ChatBot({
             ref={textareaRef}
             value={inputValue}
             onChange={e => handleTextareaChange(e.target.value, e.target.selectionStart)}
+            onPaste={async (e) => {
+              const files = e.clipboardData.files
+              if (files && files.length > 0) {
+                e.preventDefault()
+                for (const file of Array.from(files)) {
+                  await uploadFile(file)
+                }
+                return
+              }
+
+              const clipboardItems = e.clipboardData.items
+              if (clipboardItems && clipboardItems.length > 0) {
+                let hasFile = false
+                for (const item of Array.from(clipboardItems)) {
+                  if (item.kind === 'file') {
+                    const file = item.getAsFile()
+                    if (file) {
+                      hasFile = true
+                      await uploadFile(file)
+                    }
+                  }
+                }
+                if (hasFile) {
+                  e.preventDefault()
+                }
+              }
+            }}
             onKeyDown={e => {
               const filtered = ragDocs.filter(doc => doc.name.toLowerCase().includes((mentionQuery || '').toLowerCase()))
               if (mentionQuery !== null && filtered.length > 0) {
@@ -1389,6 +1538,74 @@ export function ChatBot({
           Enter to send · Shift+Enter for new line
         </p>
       </div>
+
+      {/* Premium Image Popup Preview Modal */}
+      {previewImageUrl && (
+        <div
+          onClick={() => setPreviewImageUrl(null)}
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            width: '100vw',
+            height: '100vh',
+            background: 'rgba(0, 0, 0, 0.75)',
+            backdropFilter: 'blur(8px)',
+            zIndex: 99999,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            cursor: 'zoom-out',
+          }}
+        >
+          <div
+            style={{
+              position: 'relative',
+              maxWidth: '90%',
+              maxHeight: '90%',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+            }}
+            onClick={e => e.stopPropagation()}
+          >
+            <img
+              src={previewImageUrl}
+              alt="Preview"
+              style={{
+                maxWidth: '100%',
+                maxHeight: '85vh',
+                borderRadius: '12px',
+                border: '1px solid rgba(255,255,255,0.1)',
+                boxShadow: '0 10px 30px rgba(0,0,0,0.5)',
+                objectFit: 'contain',
+              }}
+            />
+            <button
+              onClick={() => setPreviewImageUrl(null)}
+              style={{
+                position: 'absolute',
+                top: '-40px',
+                right: '0px',
+                background: 'rgba(255,255,255,0.15)',
+                border: 'none',
+                color: 'white',
+                padding: '6px 12px',
+                borderRadius: '20px',
+                cursor: 'pointer',
+                fontSize: '0.75rem',
+                fontWeight: 600,
+                backdropFilter: 'blur(4px)',
+                transition: 'background 0.2s',
+              }}
+              onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.3)'}
+              onMouseLeave={e => e.currentTarget.style.background = 'rgba(255,255,255,0.15)'}
+            >
+              Close ✕
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

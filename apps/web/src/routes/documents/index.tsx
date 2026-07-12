@@ -1,4 +1,4 @@
-import { createFileRoute } from '@tanstack/react-router'
+import { createFileRoute, Link } from '@tanstack/react-router'
 import { Library, FileStack, Search, MessageSquare, Trash2, Send, Sparkles, X, ChevronRight, FileText, ArrowLeft } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
 import ReactMarkdown from 'react-markdown'
@@ -91,6 +91,20 @@ function RAGIndexPage() {
     void loadDocuments()
     return listenForDocumentsChanged(() => void loadDocuments())
   }, [loadDocuments])
+
+  // Poll for document status updates while there are processing documents
+  useEffect(() => {
+    const hasProcessing = documents.some(doc => doc.status === 'processing')
+    if (!hasProcessing) return
+
+    const id = setInterval(() => {
+      listDocuments()
+        .then(docs => setDocuments(docs))
+        .catch(console.error)
+    }, 3000)
+
+    return () => clearInterval(id)
+  }, [documents])
 
   // Load pages when tab becomes active
   useEffect(() => {
@@ -256,55 +270,86 @@ function RAGIndexPage() {
 
           {/* Tabs Bar */}
           <div style={{ display: 'flex', gap: 4, background: 'var(--muted)', borderRadius: 10, padding: 4, marginBottom: 24 }}>
-            {tabs.map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => {
-                  setActiveTab(tab.id)
-                  setError(null)
-                }}
-                style={{
-                  flex: 1,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: 6,
-                  padding: '7px 12px',
-                  fontSize: '0.8125rem',
-                  fontWeight: activeTab === tab.id ? 600 : 400,
-                  border: 'none',
-                  borderRadius: 7,
-                  cursor: 'pointer',
-                  fontFamily: 'var(--font-body)',
-                  background: activeTab === tab.id ? 'var(--bg)' : 'transparent',
-                  color: activeTab === tab.id ? 'var(--fg)' : 'var(--fg-muted)',
-                  boxShadow: activeTab === tab.id ? '0 1px 4px rgba(0,0,0,0.08)' : 'none',
-                  transition: 'all 0.15s',
-                }}
-              >
-                {tab.icon}
-                <span className="hidden sm:inline">{tab.label}</span>
-                {tab.badge !== undefined && (
-                  <span
+            {tabs.map((tab) => {
+              if (tab.id === 'ask-agent') {
+                return (
+                  <Link
+                    key={tab.id}
+                    to="/documents/chat"
                     style={{
-                      minWidth: 18,
-                      height: 18,
-                      borderRadius: 9,
-                      padding: '0 5px',
-                      background: activeTab === tab.id ? 'var(--primary)' : 'var(--border)',
-                      color: activeTab === tab.id ? 'var(--primary-fg)' : 'var(--fg-muted)',
-                      fontSize: '0.65rem',
-                      fontWeight: 700,
+                      flex: 1,
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
+                      gap: 6,
+                      padding: '7px 12px',
+                      fontSize: '0.8125rem',
+                      fontWeight: 400,
+                      textDecoration: 'none',
+                      border: 'none',
+                      borderRadius: 7,
+                      cursor: 'pointer',
+                      fontFamily: 'var(--font-body)',
+                      background: 'transparent',
+                      color: 'var(--fg-muted)',
+                      transition: 'all 0.15s',
                     }}
                   >
-                    {tab.badge}
-                  </span>
-                )}
-              </button>
-            ))}
+                    {tab.icon}
+                    <span className="hidden sm:inline">{tab.label}</span>
+                  </Link>
+                )
+              }
+              return (
+                <button
+                  key={tab.id}
+                  onClick={() => {
+                    setActiveTab(tab.id)
+                    setError(null)
+                  }}
+                  style={{
+                    flex: 1,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: 6,
+                    padding: '7px 12px',
+                    fontSize: '0.8125rem',
+                    fontWeight: activeTab === tab.id ? 600 : 400,
+                    border: 'none',
+                    borderRadius: 7,
+                    cursor: 'pointer',
+                    fontFamily: 'var(--font-body)',
+                    background: activeTab === tab.id ? 'var(--bg)' : 'transparent',
+                    color: activeTab === tab.id ? 'var(--fg)' : 'var(--fg-muted)',
+                    boxShadow: activeTab === tab.id ? '0 1px 4px rgba(0,0,0,0.08)' : 'none',
+                    transition: 'all 0.15s',
+                  }}
+                >
+                  {tab.icon}
+                  <span className="hidden sm:inline">{tab.label}</span>
+                  {tab.badge !== undefined && (
+                    <span
+                      style={{
+                        minWidth: 18,
+                        height: 18,
+                        borderRadius: 9,
+                        padding: '0 5px',
+                        background: activeTab === tab.id ? 'var(--primary)' : 'var(--border)',
+                        color: activeTab === tab.id ? 'var(--primary-fg)' : 'var(--fg-muted)',
+                        fontSize: '0.65rem',
+                        fontWeight: 700,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                      }}
+                    >
+                      {tab.badge}
+                    </span>
+                  )}
+                </button>
+              )
+            })}
           </div>
 
           {/* Tab 1: Documents */}

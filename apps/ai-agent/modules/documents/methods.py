@@ -186,11 +186,13 @@ def _persist_pages(document_id: str, pages: list[OcrPage]) -> Path:
 
 
 def _index_pages(document_id: str, document_name: str, pages: list[OcrPage]) -> int:
-    if not pages:
+    # Filter out empty pages to prevent OpenRouter embedding API failures (e.g. blank slides)
+    valid_pages = [p for p in pages if p["markdown"] and p["markdown"].strip()]
+    if not valid_pages:
         return 0
 
-    ids = [make_page_id(document_id, page["index"]) for page in pages]
-    documents = [page["markdown"] for page in pages]
+    ids = [make_page_id(document_id, page["index"]) for page in valid_pages]
+    documents = [page["markdown"] for page in valid_pages]
     metadatas: list[Metadata] = [
         {
             "document_id": document_id,
@@ -198,13 +200,13 @@ def _index_pages(document_id: str, document_name: str, pages: list[OcrPage]) -> 
             "page_number": page["index"],
             "total_pages": len(pages),
         }
-        for page in pages
+        for page in valid_pages
     ]
     with chroma_lock:
         collection = get_collection()
         _ = collection.delete(where={"document_id": document_id})
         collection.add(ids=ids, documents=documents, metadatas=metadatas)
-    return len(pages)
+    return len(valid_pages)
 
 
 def _delete_page_rows(session: Session, document_id: str) -> None:
@@ -248,7 +250,7 @@ def create_document(
     document_id, saved_path = _save_upload(file_bytes, original_name)
     record = Document(
         id=document_id,
-        name=saved_path.name,
+        name=Path(original_name).name or "document.pdf",
         path=str(saved_path),
         uploaded_at=datetime.now(timezone.utc),
         status=DocumentStatus.PROCESSING,
@@ -307,6 +309,7 @@ def delete_document(session: Session, document_id: str) -> bool:
         _ = collection.delete(where={"document_id": document_id})
 
     _delete_page_rows(session, document_id)
+    session.flush()
 
     upload_path = Path(row.path)
     upload_path.unlink(missing_ok=True)
