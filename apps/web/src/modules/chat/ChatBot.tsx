@@ -665,7 +665,7 @@ export function ChatBot({
         {
           filename: data.filename,
           mimeType: data.mimeType,
-          filePath: `api/attachments/${data.id}/inline`
+          filePath: `uploads/${data.storedAs}`
         }
       ])
 
@@ -818,6 +818,13 @@ export function ChatBot({
                 extractedFiles.push({ filename: match[1], filePath: match[2] })
               }
 
+              // Also extract from backend-prepended image attachments
+              const isiImgRegex = /\[Isi Dokumen Terlampir:\s*\"([^\"]+)\"\]\s*```[a-zA-Z0-9]*\s*\[Image Attachment:\s*[^\n]+?\s+uploaded at\s+([^\]]+)\]\s*```/g
+              let imgMatch
+              while ((imgMatch = isiImgRegex.exec(text)) !== null) {
+                extractedFiles.push({ filename: imgMatch[1], filePath: imgMatch[2] })
+              }
+
               // Extract referenced RAG documents
               const extractedRefs: string[] = []
               const refRegex = /\[Referenced Document:\s*\"([^\"]+)\"\s+\(ID:\s*\"([^\"]+)\"\)\]/g
@@ -827,7 +834,11 @@ export function ChatBot({
               }
               
               // Clean up the text: remove all tag blocks
-              let cleanText = text.replace(tagRegex, '').replace(refRegex, '').trim()
+              let cleanText = text.replace(tagRegex, '').replace(refRegex, '').replace(isiImgRegex, '').trim()
+              
+              // Also clean up other document RAG injection blocks
+              const docRagRegex = /\[(?:Isi|Potongan) Dokumen Terlampir\s*(?:\([^)]+\))?:\s*\"[^\"]+\"\][\s\S]*?```[\s\S]*?```/g
+              cleanText = cleanText.replace(docRagRegex, '').trim()
               
               // Clean context prefix added by backend
               cleanText = cleanText.replace(/^\[Konteks Catatan:[\s\S]*?\]\n*/g, '').trim()

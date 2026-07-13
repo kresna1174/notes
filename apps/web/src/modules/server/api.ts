@@ -1,5 +1,5 @@
 import type { IncomingMessage, ServerResponse } from 'node:http'
-import { createReadStream } from 'node:fs'
+import { createReadStream, existsSync } from 'node:fs'
 import { db } from '../shared/db'
 import { notes, attachments, users, organizations, userOrganizations, noteHistory } from '../../../drizzle/schema'
 import { desc, eq, and, sql, or, inArray } from 'drizzle-orm'

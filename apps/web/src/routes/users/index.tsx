@@ -573,42 +573,93 @@ function UsersPage() {
   ]
 
   return (
-    <div className="flex h-screen overflow-hidden">
+    <div className="flex h-screen overflow-hidden" style={{ background: 'var(--bg)' }}>
       <Sidebar activeNoteId={null} />
-      <main className="flex-1 overflow-y-auto" style={{ background: 'var(--bg)' }}>
-        <div style={{ padding: isMobile ? '64px 16px 24px' : '40px 40px' }}>
 
-          {/* Header */}
-          <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', alignItems: isMobile ? 'flex-start' : 'center', justifyContent: 'space-between', gap: isMobile ? 12 : 8, marginBottom: 24 }}>
-            <div>
-              <h1 style={{ fontFamily: 'var(--font-heading)', fontWeight: 700, fontSize: '1.5rem', color: 'var(--fg)', margin: 0 }}>Admin Panel</h1>
-              <p style={{ fontSize: '0.875rem', color: 'var(--fg-muted)', margin: '4px 0 0' }}>Manage users and note security</p>
-            </div>
-            {activeTab === 'users' && (
-              <button
-                onClick={() => setShowForm(v => !v)}
-                style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 16px', fontSize: '0.875rem', fontWeight: 500, fontFamily: 'var(--font-body)', background: 'var(--primary)', color: 'var(--primary-fg)', border: 'none', borderRadius: 8, cursor: 'pointer' }}
-                onMouseEnter={e => (e.currentTarget.style.opacity = '0.9')}
-                onMouseLeave={e => (e.currentTarget.style.opacity = '1')}
-              >
-                <UserPlus size={15} /> Add User
-              </button>
-            )}
+      <main className="flex-1 overflow-hidden flex flex-col" style={{ background: 'var(--bg-app)', position: 'relative' }}>
+        {/* Sticky Action Bar */}
+        <header
+          className="sticky top-0 z-30 border-b flex items-center justify-between gap-4"
+          style={{
+            background: 'var(--bg)',
+            borderColor: 'var(--border)',
+            padding: isMobile ? '12px 16px' : '16px 60px',
+            paddingLeft: isMobile ? '64px' : '64px',
+            minHeight: '63px',
+          }}
+        >
+          {/* Header left title */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <span style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--fg)', fontFamily: 'var(--font-heading)' }}>
+              Admin Panel
+            </span>
           </div>
 
-          {/* Tabs */}
-          <div style={{ display: 'flex', gap: 4, background: 'var(--muted)', borderRadius: 10, padding: 4, marginBottom: 24 }}>
-            {tabs.map(tab => (
-              <button key={tab.id} onClick={() => setActiveTab(tab.id)} style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '7px 12px', fontSize: '0.8125rem', fontWeight: activeTab === tab.id ? 600 : 400, border: 'none', borderRadius: 7, cursor: 'pointer', fontFamily: 'var(--font-body)', background: activeTab === tab.id ? 'var(--bg)' : 'transparent', color: activeTab === tab.id ? 'var(--fg)' : 'var(--fg-muted)', boxShadow: activeTab === tab.id ? '0 1px 4px rgba(0,0,0,0.08)' : 'none', transition: 'all 0.15s' }}>
-                {tab.icon} {tab.label}
-                {tab.badge !== undefined && (
-                  <span style={{ minWidth: 18, height: 18, borderRadius: 9, padding: '0 5px', background: activeTab === tab.id ? 'var(--primary)' : 'var(--border)', color: activeTab === tab.id ? 'var(--primary-fg)' : 'var(--fg-muted)', fontSize: '0.65rem', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    {tab.badge}
-                  </span>
-                )}
-              </button>
-            ))}
-          </div>
+          {/* Navigation links (Tabs) */}
+          <nav className="flex items-center gap-1 rounded-md p-1" style={{ background: 'var(--input-bg)' }}>
+            {tabs.map((tab) => {
+              const isActive = activeTab === tab.id
+              return (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id)}
+                  className="inline-flex h-8 items-center gap-1.5 rounded px-2.5 text-xs font-medium transition hover:opacity-90"
+                  style={{
+                    background: isActive ? 'var(--bg)' : 'transparent',
+                    color: isActive ? 'var(--fg)' : 'var(--fg-muted)',
+                    boxShadow: isActive ? '0 1px 3px rgba(0,0,0,0.05)' : 'none',
+                    border: 'none',
+                    cursor: 'pointer',
+                  }}
+                >
+                  {tab.icon}
+                  <span className="hidden sm:inline" style={{ marginLeft: 6 }}>{tab.label}</span>
+                  {tab.badge !== undefined && (
+                    <span style={{ minWidth: 16, height: 16, borderRadius: 8, padding: '0 4px', background: isActive ? 'var(--primary)' : 'var(--border)', color: isActive ? 'var(--primary-fg)' : 'var(--fg-muted)', fontSize: '0.6rem', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', marginLeft: 4 }}>
+                      {tab.badge}
+                    </span>
+                  )}
+                </button>
+              )
+            })}
+          </nav>
+
+          {/* Header right action */}
+          {activeTab === 'users' ? (
+            <button
+              onClick={() => setShowForm(v => !v)}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 6,
+                padding: '6px 12px',
+                fontSize: '0.75rem',
+                fontWeight: 600,
+                fontFamily: 'var(--font-body)',
+                background: 'var(--primary)',
+                color: 'var(--primary-fg)',
+                border: 'none',
+                borderRadius: 6,
+                cursor: 'pointer',
+                transition: 'opacity 0.15s',
+              }}
+              onMouseEnter={e => (e.currentTarget.style.opacity = '0.9')}
+              onMouseLeave={e => (e.currentTarget.style.opacity = '1')}
+            >
+              <UserPlus size={13} /> Add User
+            </button>
+          ) : <div style={{ width: 88 }} />}
+        </header>
+
+        {/* Scrollable Content Workspace */}
+        <div
+          className="flex-1 overflow-y-auto"
+          style={{
+            padding: isMobile ? '24px 16px 40px' : '40px 60px',
+            background: 'var(--bg-app)',
+          }}
+        >
+          <div style={{ maxWidth: '800px', margin: '0 auto' }}>
 
            {/* ── Tab: Users ── */}
           {activeTab === 'users' && (
@@ -1051,6 +1102,7 @@ function UsersPage() {
               )}
             </div>
           )}
+          </div>
         </div>
       </main>
 

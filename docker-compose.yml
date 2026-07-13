@@ -42,6 +42,7 @@ services:
       - "127.0.0.1:8000:8000"
     volumes:
       - ./apps/ai-agent/data:/app/data
+      - notes_uploads:/web/uploads
     environment:
       - DATABASE_URL=postgresql://${POSTGRES_USER:-notes}:${POSTGRES_PASSWORD:-notes_secret}@postgres:5432/${POSTGRES_DB:-notesdb}
       - CELERY_BROKER_URL=redis://redis:6379/0
@@ -68,6 +69,7 @@ services:
     restart: always
     volumes:
       - ./apps/ai-agent/data:/app/data
+      - notes_uploads:/web/uploads
     environment:
       - DATABASE_URL=postgresql://${POSTGRES_USER:-notes}:${POSTGRES_PASSWORD:-notes_secret}@postgres:5432/${POSTGRES_DB:-notesdb}
       - CELERY_BROKER_URL=redis://redis:6379/0
@@ -96,7 +98,7 @@ services:
       - "127.0.0.1:3000:3000"
     volumes:
       - notes_data:/app/data
-      - notes_uploads:/app/uploads
+      - notes_uploads:/app/apps/web/uploads
     environment:
       - PORT=3000
       - NODE_ENV=production

@@ -224,82 +224,64 @@ function RAGIndexPage() {
   }
 
   return (
-    <div className="flex h-screen overflow-hidden">
+    <div className="flex h-screen overflow-hidden" style={{ background: 'var(--bg)' }}>
       <Sidebar activeNoteId={null} />
 
-      <main className="flex-1 overflow-y-auto" style={{ background: 'var(--bg)' }}>
-        <div style={{ padding: isMobile ? '64px 16px 24px' : '40px 40px' }}>
-          {/* Header */}
-          <div
-            style={{
-              display: 'flex',
-              flexDirection: isMobile ? 'column' : 'row',
-              alignItems: isMobile ? 'flex-start' : 'center',
-              justifyContent: 'space-between',
-              gap: isMobile ? 12 : 8,
-              marginBottom: 24,
-            }}
-          >
-            <div>
-              <h1 style={{ fontFamily: 'var(--font-heading)', fontWeight: 700, fontSize: '1.5rem', color: 'var(--fg)', margin: 0 }}>
-                RAG Engine
-              </h1>
-              <p style={{ fontSize: '0.875rem', color: 'var(--fg-muted)', margin: '4px 0 0' }}>
-                Upload, index, and query PDF document references
-              </p>
-            </div>
-            <UploadMenu />
+      <main className="flex-1 overflow-hidden flex flex-col" style={{ background: 'var(--bg-app)', position: 'relative' }}>
+        {/* Sticky Action Bar */}
+        <header
+          className="sticky top-0 z-30 border-b flex items-center justify-between gap-4"
+          style={{
+            background: 'var(--bg)',
+            borderColor: 'var(--border)',
+            padding: isMobile ? '12px 16px' : '16px 60px',
+            paddingLeft: isMobile ? '64px' : '64px',
+            minHeight: '63px',
+          }}
+        >
+          {/* Header left title */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <span style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--fg)', fontFamily: 'var(--font-heading)' }}>
+              RAG Engine
+            </span>
           </div>
 
-          {/* Error Block */}
-          {error ? (
-            <div
-              style={{
-                marginBottom: 20,
-                padding: '12px 14px',
-                background: 'rgba(235, 87, 87, 0.08)',
-                color: '#eb5757',
-                border: '1px solid rgba(235, 87, 87, 0.2)',
-                borderRadius: 8,
-                fontSize: '0.85rem',
-              }}
-            >
-              {error}
-            </div>
-          ) : null}
-
-          {/* Tabs Bar */}
-          <div style={{ display: 'flex', gap: 4, background: 'var(--muted)', borderRadius: 10, padding: 4, marginBottom: 24 }}>
+          {/* Navigation links */}
+          <nav className="flex items-center gap-1 rounded-md p-1" style={{ background: 'var(--input-bg)' }}>
             {tabs.map((tab) => {
               if (tab.id === 'ask-agent') {
                 return (
                   <Link
                     key={tab.id}
                     to="/documents/chat"
+                    className="inline-flex h-8 items-center gap-1.5 rounded px-2.5 text-xs font-medium transition hover:opacity-90"
                     style={{
-                      flex: 1,
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: 6,
-                      padding: '7px 12px',
-                      fontSize: '0.8125rem',
-                      fontWeight: 400,
-                      textDecoration: 'none',
-                      border: 'none',
-                      borderRadius: 7,
-                      cursor: 'pointer',
-                      fontFamily: 'var(--font-body)',
-                      background: 'transparent',
                       color: 'var(--fg-muted)',
-                      transition: 'all 0.15s',
+                      textDecoration: 'none',
                     }}
                   >
                     {tab.icon}
-                    <span className="hidden sm:inline">{tab.label}</span>
+                    <span className="hidden sm:inline" style={{ marginLeft: 6 }}>{tab.label}</span>
                   </Link>
                 )
               }
+              if (tab.id === 'pages') {
+                return (
+                  <Link
+                    key={tab.id}
+                    to="/documents/pages"
+                    className="inline-flex h-8 items-center gap-1.5 rounded px-2.5 text-xs font-medium transition hover:opacity-90"
+                    style={{
+                      color: 'var(--fg-muted)',
+                      textDecoration: 'none',
+                    }}
+                  >
+                    {tab.icon}
+                    <span className="hidden sm:inline" style={{ marginLeft: 6 }}>{tab.label}</span>
+                  </Link>
+                )
+              }
+              const isActive = activeTab === tab.id
               return (
                 <button
                   key={tab.id}
@@ -307,50 +289,56 @@ function RAGIndexPage() {
                     setActiveTab(tab.id)
                     setError(null)
                   }}
+                  className="inline-flex h-8 items-center gap-1.5 rounded px-2.5 text-xs font-medium transition hover:opacity-90"
                   style={{
-                    flex: 1,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: 6,
-                    padding: '7px 12px',
-                    fontSize: '0.8125rem',
-                    fontWeight: activeTab === tab.id ? 600 : 400,
+                    background: isActive ? 'var(--bg)' : 'transparent',
+                    color: isActive ? 'var(--fg)' : 'var(--fg-muted)',
+                    boxShadow: isActive ? '0 1px 3px rgba(0,0,0,0.05)' : 'none',
                     border: 'none',
-                    borderRadius: 7,
                     cursor: 'pointer',
-                    fontFamily: 'var(--font-body)',
-                    background: activeTab === tab.id ? 'var(--bg)' : 'transparent',
-                    color: activeTab === tab.id ? 'var(--fg)' : 'var(--fg-muted)',
-                    boxShadow: activeTab === tab.id ? '0 1px 4px rgba(0,0,0,0.08)' : 'none',
-                    transition: 'all 0.15s',
                   }}
                 >
                   {tab.icon}
-                  <span className="hidden sm:inline">{tab.label}</span>
+                  <span className="hidden sm:inline" style={{ marginLeft: 6 }}>{tab.label}</span>
                   {tab.badge !== undefined && (
-                    <span
-                      style={{
-                        minWidth: 18,
-                        height: 18,
-                        borderRadius: 9,
-                        padding: '0 5px',
-                        background: activeTab === tab.id ? 'var(--primary)' : 'var(--border)',
-                        color: activeTab === tab.id ? 'var(--primary-fg)' : 'var(--fg-muted)',
-                        fontSize: '0.65rem',
-                        fontWeight: 700,
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                      }}
-                    >
+                    <span style={{ minWidth: 16, height: 16, borderRadius: 8, padding: '0 4px', background: isActive ? 'var(--primary)' : 'var(--border)', color: isActive ? 'var(--primary-fg)' : 'var(--fg-muted)', fontSize: '0.6rem', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', marginLeft: 4 }}>
                       {tab.badge}
                     </span>
                   )}
                 </button>
               )
             })}
-          </div>
+          </nav>
+
+          {/* Upload Button */}
+          <UploadMenu />
+        </header>
+
+        {/* Scrollable Content Workspace */}
+        <div
+          className="flex-1 overflow-y-auto"
+          style={{
+            padding: isMobile ? '24px 16px 40px' : '40px 60px',
+            background: 'var(--bg-app)',
+          }}
+        >
+          <div style={{ maxWidth: '800px', margin: '0 auto' }}>
+            {/* Error Block */}
+            {error ? (
+              <div
+                style={{
+                  marginBottom: 20,
+                  padding: '12px 14px',
+                  background: 'rgba(235, 87, 87, 0.08)',
+                  color: '#eb5757',
+                  border: '1px solid rgba(235, 87, 87, 0.2)',
+                  borderRadius: 8,
+                  fontSize: '0.85rem',
+                }}
+              >
+                {error}
+              </div>
+            ) : null}
 
           {/* Tab 1: Documents */}
           {activeTab === 'documents' && (
@@ -990,6 +978,7 @@ function RAGIndexPage() {
               </div>
             </div>
           )}
+          </div>
         </div>
       </main>
     </div>
