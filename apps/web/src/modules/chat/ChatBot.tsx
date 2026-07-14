@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { Loader2, Trash2, ChevronRight, X, ArrowUp, Paperclip, BookOpen, FileText, Image as ImageIcon } from 'lucide-react'
+import { Loader2, RotateCcw, ChevronRight, X, ArrowUp, Paperclip, BookOpen, FileText, Image as ImageIcon } from 'lucide-react'
 import { useChat } from '@ai-sdk/react'
 import { DefaultChatTransport } from 'ai'
 import { marked } from 'marked'
@@ -738,8 +738,8 @@ export function ChatBot({
   }
 
   const handleClearHistory = () => {
-    if (!window.confirm('Delete all chat history?')) return
-    setMessages([{ id: 'cleared', role: 'assistant', parts: [{ type: 'text', text: 'History cleared. What would you like to ask?' }] }])
+    if (!window.confirm('Clear all messages in this chat? This only clears the view — your history is still saved.')) return
+    setMessages([{ id: 'cleared', role: 'assistant', parts: [{ type: 'text', text: 'Chat cleared. What would you like to ask?' }] }])
   }
 
   const quickPrompts = isRagMode ? [
@@ -796,12 +796,12 @@ export function ChatBot({
         <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
           <button
             onClick={handleClearHistory}
-            title="Clear history"
+            title="Clear chat view"
             style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--fg-subtle)', padding: '4px', borderRadius: 4, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
             onMouseEnter={e => { e.currentTarget.style.color = 'var(--fg-muted)'; e.currentTarget.style.background = 'var(--muted)' }}
             onMouseLeave={e => { e.currentTarget.style.color = 'var(--fg-subtle)'; e.currentTarget.style.background = 'none' }}
           >
-            <Trash2 size={13} />
+            <RotateCcw size={13} />
           </button>
           {!isRagMode && onClose && (
             <button

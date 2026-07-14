@@ -165,7 +165,8 @@ function RagChatPage() {
     }
   }
 
-  const deleteChatSession = async (id: string) => {
+  const deleteChatSession = async (id: string, title: string) => {
+    if (!window.confirm(`Delete "${title}"? All messages in this session will be permanently removed.`)) return
     const res = await fetch(`/api/chat-sessions/${id}`, { method: 'DELETE' })
     if (res.ok) {
       await loadChatSessions()
@@ -351,7 +352,7 @@ function RagChatPage() {
                         <Pencil size={11} />
                       </button>
                       <button
-                        onClick={(e) => { e.stopPropagation(); deleteChatSession(sess.id) }}
+                        onClick={(e) => { e.stopPropagation(); deleteChatSession(sess.id, sess.title) }}
                         style={{
                           background: 'none', border: 'none', cursor: 'pointer',
                           color: 'var(--fg-subtle)', padding: 2, display: 'flex',
