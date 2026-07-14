@@ -1,0 +1,128 @@
+services:
+  # PostgreSQL database
+  postgres:
+    image: postgres:16-alpine
+    container_name: notes-postgres-dev
+    restart: always
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-notesdb}
+      POSTGRES_USER: ${POSTGRES_USER:-notes}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-notes_secret}
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - postgres_dev_data:/var/lib/postgresql/data
+    networks:
+      - notes-dev-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-notes} -d ${POSTGRES_DB:-notesdb}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis service used as message broker for Celery sub-agent tasks
+  redis:
+    image: redis:7-alpine
+    container_name: notes-redis-dev
+    restart: always
+    command: redis-server --save 60 1 --loglevel warning
+    volumes:
+      - redis_dev_data:/data
+    networks:
+      - notes-dev-network
+
+  # FastAPI Python service hosting the AI agent and tools API
+  ai-agent:
+    build:
+      context: ./apps/ai-agent
+      dockerfile: Dockerfile.dev
+    container_name: notes-ai-agent-dev
+    restart: always
+    ports:
+      - "127.0.0.1:8000:8000"
+    volumes:
+      - ./apps/ai-agent:/app
+      - /app/.venv
+      - notes_dev_uploads:/web/uploads
+    environment:
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-notes}:${POSTGRES_PASSWORD:-notes_secret}@postgres:5432/${POSTGRES_DB:-notesdb}
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+      - OPENROUTER_MODEL=${OPENROUTER_MODEL:-google/gemini-2.5-flash:free}
+      - OPENROUTER_BASE_URL=${OPENROUTER_BASE_URL:-https://openrouter.ai/api/v1}
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
+      - LOG_DIR=/app/data
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    networks:
+      - notes-dev-network
+
+  # Celery background worker for executing sub-agent tasks asynchronously
+  celery-worker:
+    build:
+      context: ./apps/ai-agent
+      dockerfile: Dockerfile.dev
+    container_name: notes-celery-worker-dev
+    command: uv run celery -A tasks.celery_app worker --loglevel=info
+    restart: always
+    volumes:
+      - ./apps/ai-agent:/app
+      - /app/.venv
+      - notes_dev_uploads:/web/uploads
+    environment:
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-notes}:${POSTGRES_PASSWORD:-notes_secret}@postgres:5432/${POSTGRES_DB:-notesdb}
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+      - OPENROUTER_MODEL=${OPENROUTER_MODEL:-google/gemini-2.5-flash:free}
+      - OPENROUTER_BASE_URL=${OPENROUTER_BASE_URL:-https://openrouter.ai/api/v1}
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+      ai-agent:
+        condition: service_started
+    networks:
+      - notes-dev-network
+
+  # Web frontend and proxy Node.js API server
+  notes-app:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile.dev
+    container_name: notes-web-app-dev
+    restart: always
+    ports:
+      - "127.0.0.1:3000:3000"
+    volumes:
+      # Mount whole monorepo root to /app for hot reload
+      - .:/app
+      # Do not overwrite the container's installed node_modules with local node_modules
+      - /app/node_modules
+      - /app/apps/web/node_modules
+      - notes_dev_uploads:/app/apps/web/uploads
+    environment:
+      - PORT=3000
+      - NODE_ENV=development
+      - AI_AGENT_URL=http://ai-agent:8000
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-notes}:${POSTGRES_PASSWORD:-notes_secret}@postgres:5432/${POSTGRES_DB:-notesdb}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      ai-agent:
+        condition: service_started
+    networks:
+      - notes-dev-network
+
+volumes:
+  postgres_dev_data:
+  redis_dev_data:
+  notes_dev_uploads:
+
+networks:
+  notes-dev-network:
+    driver: bridge

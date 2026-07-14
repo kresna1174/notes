@@ -1,0 +1,25 @@
+# Base image for Node development
+FROM node:20-alpine
+
+# Set working directory
+WORKDIR /app
+
+# Copy dependency manifests (root + workspace)
+COPY package*.json ./
+COPY apps/web/package*.json ./apps/web/
+
+# Install all dependencies (including devDependencies like Vite)
+RUN npm install --legacy-peer-deps
+
+# Copy application source code (though we mount it in docker-compose, this is good for fallback)
+COPY . .
+
+# Expose port
+EXPOSE 3000
+
+# Environment variables
+ENV PORT=3000
+ENV NODE_ENV=development
+
+# Start development server
+CMD ["npm", "run", "dev", "--workspace=apps/web", "--", "--host", "0.0.0.0"]

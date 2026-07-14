@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { Loader2, Trash2, ChevronRight, X, ArrowUp, Paperclip, BookOpen, FileText } from 'lucide-react'
+import { Loader2, Trash2, ChevronRight, X, ArrowUp, Paperclip, BookOpen, FileText, Image as ImageIcon } from 'lucide-react'
 import { useChat } from '@ai-sdk/react'
 import { DefaultChatTransport } from 'ai'
 import { marked } from 'marked'
@@ -24,6 +24,29 @@ function LiveMetrics() {
       <Loader2 className="animate-spin" size={11} color="var(--fg-subtle)" />
       <span style={{ fontSize: '0.65rem', color: 'var(--fg-subtle)' }}>Thinking...</span>
     </div>
+  )
+}
+
+function ChatImageAttachment({ file, onZoom }: { file: any; onZoom: (url: string) => void }) {
+  const [error, setError] = useState(false)
+
+  if (error) {
+    return (
+      <div style={{ padding: '24px 16px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, background: 'rgba(235, 87, 87, 0.04)', borderBottom: '1px solid var(--border)' }}>
+        <ImageIcon size={20} style={{ color: '#eb5757', opacity: 0.8 }} />
+        <span style={{ fontSize: '0.68rem', color: '#eb5757', fontWeight: 500 }}>Gambar tidak ditemukan</span>
+      </div>
+    )
+  }
+
+  return (
+    <img
+      src={`/${file.filePath}`}
+      alt={file.filename}
+      onClick={() => onZoom(`/${file.filePath}`)}
+      onError={() => setError(true)}
+      style={{ width: '100%', height: 'auto', display: 'block', maxHeight: '200px', objectFit: 'contain', cursor: 'zoom-in' }}
+    />
   )
 }
 
@@ -873,7 +896,7 @@ export function ChatBot({
                             boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
                           }}
                         >
-                          <span style={{ fontSize: '1rem' }}>📖</span>
+                          <FileText size={14} style={{ flexShrink: 0 }} />
                           <span style={{ fontWeight: 500, maxWidth: '180px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                             {refDocName}
                           </span>
@@ -902,11 +925,9 @@ export function ChatBot({
                                 background: 'var(--card-bg)'
                               }}
                             >
-                              <img
-                                src={`/${file.filePath}`}
-                                alt={file.filename}
-                                onClick={() => setPreviewImageUrl(`/${file.filePath}`)}
-                                style={{ width: '100%', height: 'auto', display: 'block', maxHeight: '200px', objectFit: 'contain', cursor: 'zoom-in' }}
+                              <ChatImageAttachment
+                                file={file}
+                                onZoom={setPreviewImageUrl}
                               />
                               <div
                                 style={{
@@ -1351,7 +1372,8 @@ export function ChatBot({
                   color: 'var(--primary)',
                 }}
               >
-                <span>📖 {doc.name.length > 30 ? doc.name.slice(0, 30) + '…' : doc.name}</span>
+                <FileText size={13} style={{ flexShrink: 0 }} />
+                <span>{doc.name.length > 30 ? doc.name.slice(0, 30) + '…' : doc.name}</span>
                 <button
                   onClick={() => setReferencedDocs(prev => prev.filter((_, idx) => idx !== i))}
                   style={{

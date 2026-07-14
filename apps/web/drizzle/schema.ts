@@ -25,6 +25,7 @@ export const users = pgTable('users', {
 
 export const notes = pgTable('notes', {
   id: text('id').primaryKey(),
+  parentId: text('parent_id').references(() => notes.id, { onDelete: 'cascade' }),
   userId: text('user_id').notNull().default(''),
   title: text('title').notNull().default(''),
   content: text('content').notNull().default('{"type":"doc","content":[]}'),

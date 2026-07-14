@@ -427,12 +427,13 @@ app.get('/api/notes', authMiddleware, async (c) => {
 
 app.post('/api/notes', authMiddleware, async (c) => {
   const session = c.get('session')
-  const body = await c.req.json().catch(() => ({})) as { organizationId?: string | null; type?: 'individual' | 'organization' | null } | null
+  const body = await c.req.json().catch(() => ({})) as { organizationId?: string | null; type?: 'individual' | 'organization' | null; parentId?: string | null } | null
+  const parentId = body?.parentId ?? null
   const organizationId = body?.organizationId ?? null
   const type = body?.type || (organizationId ? 'organization' : 'individual')
   const now = Date.now()
   const id = randomUUID()
-  const note = { id, userId: session.userId, organizationId, type, title: '', content: '{"type":"doc","content":[]}', createdAt: now, updatedAt: now }
+  const note = { id, parentId, userId: session.userId, organizationId, type, title: '', content: '{"type":"doc","content":[]}', createdAt: now, updatedAt: now }
   await db.insert(notes).values(note)
   return c.json(await stripAndEnrich(note), 201)
 })
@@ -839,14 +840,15 @@ app.put('/api/notes/:id', authMiddleware, async (c) => {
   const id = c.req.param('id')
   const session = c.get('session')
   const ownerFilter = await getOwnerFilter(id, session.userId, session.role)
-  const body = await c.req.json().catch(() => ({})) as { title?: string; content?: string; coverImage?: string | null; icon?: string | null }
-  const { title, content, coverImage, icon } = body
+  const body = await c.req.json().catch(() => ({})) as { title?: string; content?: string; coverImage?: string | null; icon?: string | null; parentId?: string | null }
+  const { title, content, coverImage, icon, parentId } = body
   await db.update(notes)
     .set({
       ...(title !== undefined && { title }),
       ...(content !== undefined && { content }),
       ...(coverImage !== undefined && { coverImage }),
       ...(icon !== undefined && { icon }),
+      ...(parentId !== undefined && { parentId }),
       updatedByUserId: session.userId,
       updatedAt: Date.now()
     })

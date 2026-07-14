@@ -49,6 +49,7 @@ export async function initDb() {
   await db.execute(sql`
     CREATE TABLE IF NOT EXISTS notes (
       id TEXT PRIMARY KEY,
+      parent_id TEXT REFERENCES notes(id) ON DELETE CASCADE,
       user_id TEXT NOT NULL DEFAULT '',
       title TEXT NOT NULL DEFAULT '',
       content TEXT NOT NULL DEFAULT '{"type":"doc","content":[]}',
@@ -64,6 +65,10 @@ export async function initDb() {
       created_at BIGINT NOT NULL,
       updated_at BIGINT NOT NULL
     )
+  `)
+
+  await db.execute(sql`
+    ALTER TABLE notes ADD COLUMN IF NOT EXISTS parent_id TEXT REFERENCES notes(id) ON DELETE CASCADE;
   `)
 
   await db.execute(sql`
