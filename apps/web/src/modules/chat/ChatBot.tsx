@@ -619,7 +619,10 @@ export function ChatBot({
     setInputValue('')
     setAttachments([])
     setReferencedDocs([])
-    if (textareaRef.current) textareaRef.current.style.height = 'auto'
+    if (textareaRef.current) {
+      textareaRef.current.style.height = 'auto'
+      textareaRef.current.focus()
+    }
   }
 
   const handleSelectMention = (doc: any) => {
