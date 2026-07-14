@@ -1,7 +1,7 @@
 import { Node, mergeAttributes } from '@tiptap/core'
 import { ReactNodeViewRenderer, NodeViewWrapper } from '@tiptap/react'
 import { useState, useRef, useEffect } from 'react'
-import { Sparkles, Check, RefreshCw, Trash2, ArrowRight, Loader2, X, BookOpen, FileText } from 'lucide-react'
+import { Sparkles, Check, RefreshCw, Trash2, ArrowRight, Loader2, X, BookOpen, FileText, Paperclip } from 'lucide-react'
 import { marked } from 'marked'
 import { listDocuments } from '#/modules/shared/ragApi'
 
@@ -32,6 +32,62 @@ function AiDraftNodeView({ node, updateAttributes, getPos, editor }: any) {
   const [ragDocs, setRagDocs] = useState<any[]>([])
   const [referencedDocs, setReferencedDocs] = useState<any[]>([])
   const [isRagMenuOpen, setIsRagMenuOpen] = useState(false)
+  const [attachments, setAttachments] = useState<{ filename: string; mimeType: string; filePath: string }[]>([])
+  const [isUploadingFile, setIsUploadingFile] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files
+    if (!files || files.length === 0) return
+    const file = files[0]
+
+    setIsUploadingFile(true)
+    try {
+      const activeNoteId = (editor.storage as any).noteId || '00000000-0000-0000-0000-000000000000'
+      const form = new FormData()
+      form.append('file', file)
+      form.append('noteId', activeNoteId)
+
+      const res = await fetch('/api/attachments', {
+        method: 'POST',
+        body: form
+      })
+      if (!res.ok) {
+        const errText = await res.text()
+        throw new Error(`Failed to upload file: ${errText}`)
+      }
+
+      const data = await res.json()
+      setAttachments(prev => [
+        ...prev,
+        {
+          filename: data.filename,
+          mimeType: data.mimeType,
+          filePath: `uploads/${data.storedAs}`
+        }
+      ])
+
+      const ext = '.' + file.name.split('.').pop()?.toLowerCase()
+      const allowedRagExtensions = ['.pdf', '.docx', '.doc', '.pptx', '.ppt', '.xlsx', '.xls', '.txt', '.md', '.json']
+      if (allowedRagExtensions.includes(ext)) {
+        const ragForm = new FormData()
+        ragForm.append('file', file)
+        fetch('/api/documents', {
+          method: 'POST',
+          body: ragForm
+        }).then(async (ragRes) => {
+          if (ragRes.ok) {
+            window.dispatchEvent(new CustomEvent('documents-changed'))
+          }
+        }).catch(console.error)
+      }
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Upload failed')
+    } finally {
+      setIsUploadingFile(false)
+      if (fileInputRef.current) fileInputRef.current.value = ''
+    }
+  }
 
   const [mentionQuery, setMentionQuery] = useState<string | null>(null)
   const [mentionIndex, setMentionIndex] = useState<number>(0)
@@ -102,7 +158,8 @@ function AiDraftNodeView({ node, updateAttributes, getPos, editor }: any) {
     const activePrompt = customPrompt || inputText
     const hasActivePrompt = activePrompt.trim().length > 0
     const hasReferences = referencedDocs.length > 0
-    if (!hasActivePrompt && !hasReferences) return
+    const hasAttachments = attachments.length > 0
+    if (!hasActivePrompt && !hasReferences && !hasAttachments) return
 
     setLoading(true)
     updateAttributes({
@@ -122,6 +179,12 @@ function AiDraftNodeView({ node, updateAttributes, getPos, editor }: any) {
       ).join('\n')
       messageToSend = `${ragPrefix}\n\n${messageToSend}`
     }
+    if (attachments.length > 0) {
+      const attachmentsPrefix = attachments.map(att =>
+        `[Isi Dokumen Terlampir: "${att.filename}" filePath="${att.filePath}" mimeType="${att.mimeType}"]`
+      ).join('\n')
+      messageToSend = `${attachmentsPrefix}\n\n${messageToSend}`
+    }
 
     try {
       const response = await fetch('/api/ai/chat/stream', {
@@ -133,6 +196,7 @@ function AiDraftNodeView({ node, updateAttributes, getPos, editor }: any) {
           note_title: 'Draft Generation',
           note_content: editor.getText(),
           agent: 'editor',
+          attachments: attachments,
         })
       })
 
@@ -380,23 +444,24 @@ function AiDraftNodeView({ node, updateAttributes, getPos, editor }: any) {
 
             {/* Referenced pills */}
             {referencedDocs.length > 0 && (
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 2, padding: '0 4px' }}>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 8, padding: '0 4px' }}>
                 {referencedDocs.map((doc, i) => (
                   <div
                     key={i}
                     style={{
                       display: 'flex',
                       alignItems: 'center',
-                      gap: 4,
+                      gap: 6,
                       padding: '4px 8px',
                       borderRadius: 6,
-                      background: 'rgba(59, 130, 246, 0.08)',
-                      border: '1px solid rgba(59, 130, 246, 0.2)',
+                      background: 'rgba(22, 163, 74, 0.08)',
+                      border: '1px solid rgba(22, 163, 74, 0.2)',
                       fontSize: '0.72rem',
                       color: 'var(--primary)',
                     }}
                   >
-                    <span>📖 {doc.name.length > 30 ? doc.name.slice(0, 30) + '…' : doc.name}</span>
+                    <FileText size={13} style={{ flexShrink: 0 }} />
+                    <span>{doc.name.length > 30 ? doc.name.slice(0, 30) + '…' : doc.name}</span>
                     <button
                       onClick={() => setReferencedDocs(prev => prev.filter((_, idx) => idx !== i))}
                       style={{
@@ -409,6 +474,46 @@ function AiDraftNodeView({ node, updateAttributes, getPos, editor }: any) {
                         padding: 0,
                       }}
                       title="Remove reference"
+                    >
+                      <X size={12} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Attachments pills */}
+            {attachments.length > 0 && (
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 8, padding: '0 4px' }}>
+                {attachments.map((file, i) => (
+                  <div
+                    key={i}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 6,
+                      padding: '4px 8px',
+                      borderRadius: 6,
+                      background: 'rgba(22, 163, 74, 0.08)',
+                      border: '1px solid rgba(22, 163, 74, 0.2)',
+                      fontSize: '0.72rem',
+                      color: 'var(--primary)',
+                    }}
+                  >
+                    <FileText size={13} style={{ flexShrink: 0 }} />
+                    <span>{file.filename.length > 30 ? file.filename.slice(0, 30) + '…' : file.filename}</span>
+                    <button
+                      onClick={() => setAttachments(prev => prev.filter((_, idx) => idx !== i))}
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        color: 'var(--primary)',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        padding: 0,
+                      }}
+                      title="Hapus Lampiran"
                     >
                       <X size={12} />
                     </button>
@@ -466,7 +571,7 @@ function AiDraftNodeView({ node, updateAttributes, getPos, editor }: any) {
               }}
             />
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div style={{ display: 'flex', alignItems: 'center' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                 <button
                   onClick={(e) => { e.stopPropagation(); setIsRagMenuOpen(!isRagMenuOpen) }}
                   title="Mention reference document from library"
@@ -488,6 +593,33 @@ function AiDraftNodeView({ node, updateAttributes, getPos, editor }: any) {
                 >
                   <BookOpen size={14} />
                 </button>
+                <button
+                  onClick={(e) => { e.stopPropagation(); fileInputRef.current?.click() }}
+                  title="Attach file / photo"
+                  style={{
+                    width: 28,
+                    height: 28,
+                    borderRadius: 6,
+                    background: 'none',
+                    border: 'none',
+                    color: 'var(--fg-muted)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    cursor: isUploadingFile ? 'not-allowed' : 'pointer',
+                    transition: 'background 0.15s',
+                  }}
+                  onMouseEnter={e => e.currentTarget.style.background = 'var(--muted)'}
+                  onMouseLeave={e => e.currentTarget.style.background = 'none'}
+                >
+                  {isUploadingFile ? <Loader2 size={14} className="animate-spin" /> : <Paperclip size={14} />}
+                </button>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  style={{ display: 'none' }}
+                  onChange={handleFileChange}
+                />
               </div>
               <div style={{ display: 'flex', gap: '8px' }}>
                 <button
@@ -506,7 +638,7 @@ function AiDraftNodeView({ node, updateAttributes, getPos, editor }: any) {
                 </button>
                 <button
                   onClick={() => handleGenerate()}
-                  disabled={(!inputText.trim() && referencedDocs.length === 0)}
+                  disabled={(!inputText.trim() && referencedDocs.length === 0 && attachments.length === 0)}
                   style={{
                     padding: '5px 14px',
                     background: 'var(--primary)',
@@ -515,8 +647,8 @@ function AiDraftNodeView({ node, updateAttributes, getPos, editor }: any) {
                     borderRadius: '6px',
                     fontSize: '0.75rem',
                     fontWeight: 600,
-                    cursor: (inputText.trim() || referencedDocs.length > 0) ? 'pointer' : 'not-allowed',
-                    opacity: (inputText.trim() || referencedDocs.length > 0) ? 1 : 0.6,
+                    cursor: (inputText.trim() || referencedDocs.length > 0 || attachments.length > 0) ? 'pointer' : 'not-allowed',
+                    opacity: (inputText.trim() || referencedDocs.length > 0 || attachments.length > 0) ? 1 : 0.6,
                     display: 'flex',
                     alignItems: 'center',
                     gap: '6px',
