@@ -979,22 +979,14 @@ app.post('/api/attachments', authMiddleware, async (c) => {
   const file = body.file as File
   const noteId = body.noteId as string
 
-  if (!file || !noteId) {
-    return c.json({ error: 'missing file or noteId' }, 400)
+  if (!file) {
+    return c.json({ error: 'missing file' }, 400)
   }
 
-  // Ensure the note exists (especially for RAG dummy note)
-  const [existingNote] = await db.select().from(notes).where(eq(notes.id, noteId))
-  if (!existingNote) {
-    if (noteId === '00000000-0000-0000-0000-000000000000') {
-      await db.insert(notes).values({
-        id: noteId,
-        title: 'RAG Global Chat Attachments',
-        content: '',
-        createdAt: Date.now(),
-        updatedAt: Date.now(),
-      })
-    } else {
+  // If a noteId is provided, verify it exists
+  if (noteId) {
+    const [existingNote] = await db.select().from(notes).where(eq(notes.id, noteId))
+    if (!existingNote) {
       return c.json({ error: 'Referenced note not found' }, 404)
     }
   }

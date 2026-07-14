@@ -44,7 +44,7 @@ export const notes = pgTable('notes', {
 
 export const attachments = pgTable('attachments', {
   id: text('id').primaryKey(),
-  noteId: text('note_id').notNull().references(() => notes.id, { onDelete: 'cascade' }),
+  noteId: text('note_id').references(() => notes.id, { onDelete: 'set null' }),
   filename: text('filename').notNull(),
   storedAs: text('stored_as').notNull(),
   mimeType: text('mime_type').notNull(),

@@ -123,6 +123,12 @@ export async function initDb() {
   await db.execute(sql`ALTER TABLE chat_sessions ADD COLUMN IF NOT EXISTS type TEXT NOT NULL DEFAULT 'rag'`).catch(() => {})
   await db.execute(sql`ALTER TABLE chat_sessions ADD COLUMN IF NOT EXISTS note_id TEXT REFERENCES notes(id) ON DELETE SET NULL`).catch(() => {})
 
+  // Make attachments.note_id nullable (remove NOT NULL constraint if it exists)
+  await db.execute(sql`ALTER TABLE attachments ALTER COLUMN note_id DROP NOT NULL`).catch(() => {})
+
+  // Clean up the dummy RAG Global note that was auto-created for old attachment uploads
+  await db.execute(sql`DELETE FROM notes WHERE id = '00000000-0000-0000-0000-000000000000'`).catch(() => {})
+
   await db.execute(sql`
     CREATE TABLE IF NOT EXISTS chat_messages (
       id TEXT PRIMARY KEY,
