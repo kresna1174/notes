@@ -1288,11 +1288,16 @@ app.post('/api/ai/chat/stream', authMiddleware, async (c) => {
         }
 
         // Save the user's message to Postgres!
+        const lastMessage = body.messages && Array.isArray(body.messages)
+          ? body.messages[body.messages.length - 1]
+          : null
+        const userMessageContent = body.message || (lastMessage ? lastMessage.content : '')
+
         await db.insert(chatMessages).values({
           id: randomUUID(),
           sessionId: body.session_id,
           role: 'user',
-          content: body.message || '',
+          content: userMessageContent || '',
           createdAt: Date.now()
         }).catch(err => console.error('[Save User Msg Error]', err))
       }
