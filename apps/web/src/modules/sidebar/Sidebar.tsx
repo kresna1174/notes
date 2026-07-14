@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
-import { useNavigate } from '@tanstack/react-router'
+import { useNavigate, useLocation } from '@tanstack/react-router'
 import { ScrollArea } from '../shared/ui'
 import { NoteTree } from './NoteTree'
 import { SearchBar } from './SearchBar'
-import { Plus, LogOut, Users, Shield, Eye, Info, Menu, X, KeyRound, Brain, ChevronDown, Check, FileStack } from 'lucide-react'
+import { Plus, LogOut, Users, Shield, Eye, Info, Menu, X, KeyRound, Brain, ChevronDown, Check, FileStack, MessageSquare, Trash2 } from 'lucide-react'
 import { FontPicker } from './FontPicker'
 import { ThemeToggle } from './ThemeToggle'
 import { useAuth } from '../shared/auth'
@@ -33,6 +33,68 @@ export function Sidebar({ activeNoteId, onShareNote, notesUpdateTrigger }: Sideb
   const [showAbout, setShowAbout] = useState(false)
   const [showChangePassword, setShowChangePassword] = useState(false)
 
+  // Chat sessions state
+  const [chatSessionsList, setChatSessionsList] = useState<any[]>([])
+  const [aiChatsExpanded, setAiChatsExpanded] = useState(true)
+  const [editingChatId, setEditingChatId] = useState<string | null>(null)
+  const [editChatValue, setEditChatValue] = useState('')
+  const [hoverChatId, setHoverChatId] = useState<string | null>(null)
+
+  const location = useLocation()
+  const searchParams = new URLSearchParams(location.search)
+  const activeChatSessionId = searchParams.get('session')
+
+  async function loadChatSessions() {
+    const res = await fetch('/api/chat-sessions')
+    if (res.ok) {
+      const data = await res.json()
+      setChatSessionsList(data)
+    }
+  }
+
+  async function createChatSession() {
+    const res = await fetch('/api/chat-sessions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title: 'Chat Baru' })
+    })
+    if (res.ok) {
+      const sess = await res.json()
+      await loadChatSessions()
+      navigateAndClose({ to: '/documents/chat', search: { session: sess.id } })
+    }
+  }
+
+  async function renameChatSession(id: string, title: string) {
+    const res = await fetch(`/api/chat-sessions/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title })
+    })
+    if (res.ok) {
+      await loadChatSessions()
+    }
+  }
+
+  async function deleteChatSession(id: string) {
+    const res = await fetch(`/api/chat-sessions/${id}`, { method: 'DELETE' })
+    if (res.ok) {
+      await loadChatSessions()
+      if (activeChatSessionId === id) {
+        const remaining = chatSessionsList.filter(s => s.id !== id)
+        if (remaining.length > 0) {
+          navigateAndClose({ to: '/documents/chat', search: { session: remaining[0].id } })
+        } else {
+          navigateAndClose({ to: '/documents/chat' })
+        }
+      }
+    }
+  }
+
+  useEffect(() => {
+    loadChatSessions()
+  }, [activeChatSessionId])
+
   // Mobile states
   const [isMobile, setIsMobile] = useState(false)
   const [isOpen, setIsOpen] = useState(false)
@@ -57,8 +119,8 @@ export function Sidebar({ activeNoteId, onShareNote, notesUpdateTrigger }: Sideb
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
 
-  function navigateAndClose(opts: { to: string; params?: any }) {
-    navigate(opts)
+  function navigateAndClose(opts: { to: string; params?: any; search?: any }) {
+    navigate(opts as any)
     if (window.innerWidth < 768) {
       setIsOpen(false)
     }
@@ -421,6 +483,122 @@ export function Sidebar({ activeNoteId, onShareNote, notesUpdateTrigger }: Sideb
                   onShare={onShareNote}
                 />
               )}
+
+              {/* Divider */}
+              <div style={{ height: '1px', background: 'var(--border)', margin: '12px 8px' }} />
+
+              {/* AI Chats Section */}
+              <div style={{ padding: '0 8px 12px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+                  <button
+                    onClick={() => setAiChatsExpanded(!aiChatsExpanded)}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: 6, background: 'none', border: 'none',
+                      fontSize: '0.68rem', fontWeight: 700, color: 'var(--fg-muted)',
+                      textTransform: 'uppercase', letterSpacing: '0.05em', cursor: 'pointer', padding: 0
+                    }}
+                  >
+                    <ChevronDown size={11} style={{ transform: aiChatsExpanded ? 'rotate(0deg)' : 'rotate(-90deg)', transition: 'transform 0.2s' }} />
+                    AI Chat History
+                  </button>
+                  <button
+                    onClick={createChatSession}
+                    title="Start new AI chat session"
+                    style={{
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      width: 18, height: 18, borderRadius: 4, border: 'none',
+                      background: 'none', color: 'var(--fg-muted)', cursor: 'pointer'
+                    }}
+                    onMouseEnter={e => e.currentTarget.style.background = 'var(--muted)'}
+                    onMouseLeave={e => e.currentTarget.style.background = 'none'}
+                  >
+                    <Plus size={12} />
+                  </button>
+                </div>
+
+                {aiChatsExpanded && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                    {chatSessionsList.length === 0 ? (
+                      <span style={{ fontSize: '0.72rem', color: 'var(--fg-subtle)', paddingLeft: 18 }}>No chat sessions yet</span>
+                    ) : (
+                      chatSessionsList.map(sess => {
+                        const isChatActive = activeChatSessionId === sess.id
+                        const isEditing = editingChatId === sess.id
+
+                        return (
+                          <div
+                            key={sess.id}
+                            style={{
+                              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                              padding: '5px 8px 5px 8px', borderRadius: 6,
+                              background: isChatActive ? 'var(--accent)' : 'transparent',
+                              color: isChatActive ? 'var(--primary)' : 'var(--fg)',
+                              fontSize: '0.78rem', position: 'relative', cursor: 'pointer',
+                              transition: 'background 0.15s'
+                            }}
+                            onClick={() => {
+                              if (!isEditing) {
+                                navigateAndClose({ to: '/documents/chat', search: { session: sess.id } })
+                              }
+                            }}
+                            onDoubleClick={() => {
+                              setEditingChatId(sess.id)
+                              setEditChatValue(sess.title)
+                            }}
+                            onMouseEnter={() => setHoverChatId(sess.id)}
+                            onMouseLeave={() => setHoverChatId(null)}
+                          >
+                            <div style={{ display: 'flex', alignItems: 'center', minWidth: 0, flex: 1 }}>
+                              <MessageSquare size={13} style={{ marginRight: 6, flexShrink: 0, color: isChatActive ? 'var(--primary)' : 'var(--fg-muted)' }} />
+                              {isEditing ? (
+                                <input
+                                  value={editChatValue}
+                                  onChange={e => setEditChatValue(e.target.value)}
+                                  onBlur={() => {
+                                    renameChatSession(sess.id, editChatValue.trim() || 'Chat Baru')
+                                    setEditingChatId(null)
+                                  }}
+                                  onKeyDown={e => {
+                                    if (e.key === 'Enter') {
+                                      renameChatSession(sess.id, editChatValue.trim() || 'Chat Baru')
+                                      setEditingChatId(null)
+                                    } else if (e.key === 'Escape') {
+                                      setEditingChatId(null)
+                                    }
+                                  }}
+                                  autoFocus
+                                  style={{
+                                    background: 'var(--bg)', border: '1px solid var(--primary)',
+                                    borderRadius: 4, color: 'var(--fg)', fontSize: '0.76rem',
+                                    padding: '1px 4px', width: '100%', outline: 'none'
+                                  }}
+                                />
+                              ) : (
+                                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: isChatActive ? 500 : 400 }}>
+                                  {sess.title}
+                                </span>
+                              )}
+                            </div>
+                            {!isEditing && (isChatActive || hoverChatId === sess.id) && (
+                              <button
+                                onClick={(e) => { e.stopPropagation(); deleteChatSession(sess.id) }}
+                                style={{
+                                  background: 'none', border: 'none', cursor: 'pointer',
+                                  color: 'var(--fg-subtle)', padding: 2, display: 'flex',
+                                  alignItems: 'center', justifyContent: 'center'
+                                }}
+                                title="Hapus Chat"
+                              >
+                                <Trash2 size={12} />
+                              </button>
+                            )}
+                          </div>
+                        )
+                      })
+                    )}
+                  </div>
+                )}
+              </div>
             </div>
           )}
         </ScrollArea>

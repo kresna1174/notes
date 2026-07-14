@@ -63,3 +63,19 @@ export const noteHistory = pgTable('note_history', {
   createdAt: bigint('created_at', { mode: 'number' }).notNull(),
   versionName: text('version_name'),
 })
+
+export const chatSessions = pgTable('chat_sessions', {
+  id: text('id').primaryKey(),
+  userId: text('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  title: text('title').notNull().default('New Chat'),
+  createdAt: bigint('created_at', { mode: 'number' }).notNull(),
+  updatedAt: bigint('updated_at', { mode: 'number' }).notNull(),
+})
+
+export const chatMessages = pgTable('chat_messages', {
+  id: text('id').primaryKey(),
+  sessionId: text('session_id').notNull().references(() => chatSessions.id, { onDelete: 'cascade' }),
+  role: text('role').notNull(), // 'user' or 'assistant'
+  content: text('content').notNull(),
+  createdAt: bigint('created_at', { mode: 'number' }).notNull(),
+})

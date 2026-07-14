@@ -14,6 +14,7 @@ interface ChatBotProps {
   mode?: 'note' | 'rag'
   pinnedDocs?: { id: string; name: string }[]
   fullWidth?: boolean
+  chatSessionId?: string
 }
 
 
@@ -435,9 +436,10 @@ export function ChatBot({
   mode = 'note',
   pinnedDocs = [],
   fullWidth = false,
+  chatSessionId,
 }: ChatBotProps) {
   const isRagMode = mode === 'rag'
-  const sessionId = isRagMode ? 'rag-global' : (noteId ?? 'default')
+  const sessionId = chatSessionId ?? (isRagMode ? 'rag-global' : (noteId ?? 'default'))
   const [fetchingHistory, setFetchingHistory] = useState(true)
   const [inputValue, setInputValue] = useState('')
   const messagesEndRef = useRef<HTMLDivElement>(null)

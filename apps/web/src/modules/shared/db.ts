@@ -107,6 +107,26 @@ export async function initDb() {
     )
   `)
 
+  await db.execute(sql`
+    CREATE TABLE IF NOT EXISTS chat_sessions (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      title TEXT NOT NULL DEFAULT 'New Chat',
+      created_at BIGINT NOT NULL,
+      updated_at BIGINT NOT NULL
+    )
+  `)
+
+  await db.execute(sql`
+    CREATE TABLE IF NOT EXISTS chat_messages (
+      id TEXT PRIMARY KEY,
+      session_id TEXT NOT NULL REFERENCES chat_sessions(id) ON DELETE CASCADE,
+      role TEXT NOT NULL,
+      content TEXT NOT NULL,
+      created_at BIGINT NOT NULL
+    )
+  `)
+
   // Seed default admin
   const result = await db.execute(sql`SELECT COUNT(*) as c FROM users`)
   const count = Number((result.rows[0] as { c: string }).c)

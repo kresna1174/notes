@@ -1,7 +1,7 @@
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { createReadStream, existsSync } from 'node:fs'
 import { db } from '../shared/db'
-import { notes, attachments, users, organizations, userOrganizations, noteHistory } from '../../../drizzle/schema'
+import { notes, attachments, users, organizations, userOrganizations, noteHistory, chatSessions, chatMessages } from '../../../drizzle/schema'
 import { desc, eq, and, sql, or, inArray } from 'drizzle-orm'
 import { randomUUID } from 'crypto'
 import { saveFile, getFilePath, deleteFile } from '../shared/storage'
@@ -1093,11 +1093,141 @@ app.get('/api/admin/ai-logs', adminMiddleware, async (c) => {
   }
 })
 
+// --- PERSISTENT CHAT HISTORY ENDPOINTS ---
+
+app.get('/api/chat-sessions', authMiddleware, async (c) => {
+  const session = c.get('session')
+  try {
+    const sessions = await db
+      .select()
+      .from(chatSessions)
+      .where(eq(chatSessions.userId, session.userId))
+      .orderBy(desc(chatSessions.updatedAt))
+    return c.json(sessions)
+  } catch (err) {
+    return c.json({ error: `Failed to retrieve chat sessions: ${String(err)}` }, 500)
+  }
+})
+
+app.post('/api/chat-sessions', authMiddleware, async (c) => {
+  const session = c.get('session')
+  try {
+    const body = await c.req.json().catch(() => ({})) as any
+    const title = body.title?.trim() || 'New Chat'
+    const newSession = {
+      id: randomUUID(),
+      userId: session.userId,
+      title: title,
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+    }
+    await db.insert(chatSessions).values(newSession)
+    return c.json(newSession)
+  } catch (err) {
+    return c.json({ error: `Failed to create chat session: ${String(err)}` }, 500)
+  }
+})
+
+app.put('/api/chat-sessions/:id', authMiddleware, async (c) => {
+  const sessionId = c.req.param('id')
+  const session = c.get('session')
+  try {
+    const body = await c.req.json() as any
+    const title = body.title?.trim()
+    if (!title) {
+      return c.json({ error: 'Title is required' }, 400)
+    }
+
+    const [existing] = await db
+      .select()
+      .from(chatSessions)
+      .where(and(eq(chatSessions.id, sessionId), eq(chatSessions.userId, session.userId)))
+    if (!existing) {
+      return c.json({ error: 'Chat session not found' }, 404)
+    }
+
+    await db
+      .update(chatSessions)
+      .set({ title, updatedAt: Date.now() })
+      .where(eq(chatSessions.id, sessionId))
+
+    return c.json({ success: true, id: sessionId, title })
+  } catch (err) {
+    return c.json({ error: `Failed to update chat session: ${String(err)}` }, 500)
+  }
+})
+
+app.delete('/api/chat-sessions/:id', authMiddleware, async (c) => {
+  const sessionId = c.req.param('id')
+  const session = c.get('session')
+  try {
+    const [existing] = await db
+      .select()
+      .from(chatSessions)
+      .where(and(eq(chatSessions.id, sessionId), eq(chatSessions.userId, session.userId)))
+    if (!existing) {
+      return c.json({ error: 'Chat session not found' }, 404)
+    }
+
+    await db.delete(chatSessions).where(eq(chatSessions.id, sessionId))
+    return c.json({ ok: true })
+  } catch (err) {
+    return c.json({ error: `Failed to delete chat session: ${String(err)}` }, 500)
+  }
+})
+
+app.get('/api/chat-sessions/:id/messages', authMiddleware, async (c) => {
+  const sessionId = c.req.param('id')
+  const session = c.get('session')
+  try {
+    const [chatSess] = await db
+      .select()
+      .from(chatSessions)
+      .where(and(eq(chatSessions.id, sessionId), eq(chatSessions.userId, session.userId)))
+    if (!chatSess) {
+      return c.json({ error: 'Chat session not found' }, 404)
+    }
+
+    const messages = await db
+      .select()
+      .from(chatMessages)
+      .where(eq(chatMessages.sessionId, sessionId))
+      .orderBy(chatMessages.createdAt)
+    return c.json(messages)
+  } catch (err) {
+    return c.json({ error: `Failed to retrieve messages: ${String(err)}` }, 500)
+  }
+})
+
 // --- AI AGENT PROXY ENDPOINTS ---
 
 app.get('/api/ai/chat/history/:id', authMiddleware, async (c) => {
   const sessionId = c.req.param('id')
+  const session = c.get('session')
   try {
+    // If it is a persistent database chat session, load from Postgres first
+    const [dbSession] = await db
+      .select()
+      .from(chatSessions)
+      .where(and(eq(chatSessions.id, sessionId), eq(chatSessions.userId, session.userId)))
+    if (dbSession) {
+      const messages = await db
+        .select()
+        .from(chatMessages)
+        .where(eq(chatMessages.sessionId, sessionId))
+        .orderBy(chatMessages.createdAt)
+      
+      // Map schema messages back to the structure expected by useChat
+      // Role is either 'user' or 'assistant'.
+      const formatted = messages.map(m => ({
+        role: m.role,
+        content: m.content,
+        type: 'completed' // Tell useChat this is a completed markdown response
+      }))
+      return c.json({ messages: formatted })
+    }
+
+    // Otherwise, fall back to Python agent history
     const forwardRes = await fetch(`${AI_AGENT_URL}/api/chat/history/${sessionId}`)
     if (!forwardRes.ok) {
       const errText = await forwardRes.text()
@@ -1115,6 +1245,26 @@ app.post('/api/ai/chat/stream', authMiddleware, async (c) => {
   try {
     const body = await c.req.json() as any
     body.user_id = session.userId
+
+    // Check if session_id is a valid persistent session
+    let isPersistentSession = false
+    if (body.session_id) {
+      const [dbSession] = await db
+        .select()
+        .from(chatSessions)
+        .where(and(eq(chatSessions.id, body.session_id), eq(chatSessions.userId, session.userId)))
+      if (dbSession) {
+        isPersistentSession = true
+        // Save the user's message to Postgres!
+        await db.insert(chatMessages).values({
+          id: randomUUID(),
+          sessionId: body.session_id,
+          role: 'user',
+          content: body.message || '',
+          createdAt: Date.now()
+        }).catch(err => console.error('[Save User Msg Error]', err))
+      }
+    }
 
     const forwardRes = await fetch(`${AI_AGENT_URL}/api/chat/stream`, {
       method: 'POST',
@@ -1138,11 +1288,55 @@ app.post('/api/ai/chat/stream', authMiddleware, async (c) => {
       const reader = forwardRes.body?.getReader()
       if (!reader) return
       
+      const decoder = new TextDecoder()
+      let assistantResponseText = ''
+      let buffer = ''
+      
       try {
         while (true) {
           const { done, value } = await reader.read()
-          if (done) break
+          if (done) {
+            // Save the assistant's message when the stream is completed successfully!
+            if (isPersistentSession && assistantResponseText.trim().length > 0) {
+              await db.insert(chatMessages).values({
+                id: randomUUID(),
+                sessionId: body.session_id,
+                role: 'assistant',
+                content: assistantResponseText,
+                createdAt: Date.now()
+              }).catch(err => console.error('[Save Assistant Msg Error]', err))
+
+              // Also update the session's updatedAt time
+              await db.update(chatSessions)
+                .set({ updatedAt: Date.now() })
+                .where(eq(chatSessions.id, body.session_id))
+                .catch(err => console.error('[Update Sess UpdatedAt Error]', err))
+            }
+            break
+          }
+          
           await s.write(value)
+
+          // Decode and reconstruct the assistant's text
+          const chunkStr = decoder.decode(value, { stream: true })
+          buffer += chunkStr
+          const lines = buffer.split('\n')
+          buffer = lines.pop() || ''
+          for (const line of lines) {
+            const cleanLine = line.trim()
+            if (cleanLine.startsWith('data: ')) {
+              const dataStr = cleanLine.substring(6)
+              if (dataStr === '[DONE]') continue
+              try {
+                const parsed = JSON.parse(dataStr)
+                if (parsed.type === 'text-delta' && parsed.delta) {
+                  assistantResponseText += parsed.delta
+                }
+              } catch (e) {
+                // Ignore parse errors for tool-calls or non-JSON parts
+              }
+            }
+          }
         }
       } finally {
         reader.releaseLock()
