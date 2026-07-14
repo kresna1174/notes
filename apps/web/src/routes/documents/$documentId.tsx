@@ -3,6 +3,7 @@ import { Trash2, ArrowLeft, ChevronRight, Library } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
 
 import { Sidebar } from '#/modules/sidebar'
+import { ConfirmDialog } from '#/modules/shared/ui'
 import { listenForDocumentsChanged } from '#/modules/shared/ui/UploadMenu'
 import {
   deleteDocument,
@@ -23,6 +24,7 @@ function DocumentDetailPage() {
   const [pages, setPages] = useState<Array<PageResponse>>([])
   const [isLoading, setIsLoading] = useState(true)
   const [isDeleting, setIsDeleting] = useState(false)
+  const [deleteTarget, setDeleteTarget] = useState<DocumentMetadata | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [isMobile, setIsMobile] = useState(false)
 
@@ -64,21 +66,24 @@ function DocumentDetailPage() {
     return listenForDocumentsChanged(() => void loadDocument())
   }, [loadDocument])
 
-  async function handleDelete() {
+  function handleDelete() {
     if (!document) return
+    setDeleteTarget(document)
+  }
 
-    const confirmed = window.confirm(`Delete ${document.name}?`)
-    if (!confirmed) return
+  async function confirmDelete() {
+    if (!deleteTarget) return
 
     setIsDeleting(true)
     setError(null)
     try {
-      await deleteDocument(document.id)
+      await deleteDocument(deleteTarget.id)
       navigate({ to: '/documents' })
     } catch (deleteError) {
       setError(deleteError instanceof Error ? deleteError.message : 'Unable to delete document')
     } finally {
       setIsDeleting(false)
+      setDeleteTarget(null)
     }
   }
 
@@ -226,6 +231,16 @@ function DocumentDetailPage() {
           ) : null}
         </div>
       </main>
+
+      <ConfirmDialog
+        open={!!deleteTarget}
+        title="Hapus Dokumen"
+        description={<>Yakin ingin menghapus <strong style={{ color: 'var(--fg)' }}>"{deleteTarget?.name}"</strong>? Tindakan ini tidak bisa dibatalkan.</>}
+        confirmLabel="Hapus"
+        cancelLabel="Batal"
+        onConfirm={confirmDelete}
+        onCancel={() => setDeleteTarget(null)}
+      />
     </div>
   )
 }

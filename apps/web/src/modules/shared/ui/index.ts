@@ -12,5 +12,6 @@ export { EmptyState, DocumentsTable, PageList, formatDate, StatusBadge } from '.
 export { UploadMenu } from './UploadMenu';
 export { RagLayout } from './RagLayout';
 export { RagDocPanel } from './RagDocPanel';
+export { ConfirmDialog } from './ConfirmDialog';
 
 

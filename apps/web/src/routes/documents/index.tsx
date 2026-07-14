@@ -5,6 +5,7 @@ import ReactMarkdown from 'react-markdown'
 
 import { Sidebar } from '#/modules/sidebar'
 import { UploadMenu } from '#/modules/shared/ui/UploadMenu'
+import { ConfirmDialog } from '#/modules/shared/ui'
 import { listenForDocumentsChanged, notifyDocumentsChanged } from '#/modules/shared/ui/UploadMenu'
 import {
   deleteDocument,
@@ -49,6 +50,7 @@ function RAGIndexPage() {
   const [chatHits, setChatHits] = useState<Array<QueryHit>>([])
   const [isAsking, setIsAsking] = useState(false)
 
+  const [deleteTarget, setDeleteTarget] = useState<DocumentMetadata | null>(null)
   const [isMobile, setIsMobile] = useState(false)
 
   useEffect(() => {
@@ -135,21 +137,25 @@ function RAGIndexPage() {
   }, [selectedDoc])
 
   async function handleDelete(document: DocumentMetadata, e: React.MouseEvent) {
-    e.stopPropagation() // Prevent opening modal
-    const confirmed = window.confirm(`Delete ${document.name}?`)
-    if (!confirmed) return
+    e.stopPropagation()
+    setDeleteTarget(document)
+  }
 
-    setDeletingDocumentId(document.id)
+  async function confirmDelete() {
+    if (!deleteTarget) return
+
+    setDeletingDocumentId(deleteTarget.id)
     setError(null)
     try {
-      await deleteDocument(document.id)
+      await deleteDocument(deleteTarget.id)
       notifyDocumentsChanged()
       await loadDocuments()
-      if (selectedDoc?.id === document.id) setSelectedDoc(null)
+      if (selectedDoc?.id === deleteTarget.id) setSelectedDoc(null)
     } catch (deleteError) {
       setError(deleteError instanceof Error ? deleteError.message : 'Unable to delete document')
     } finally {
       setDeletingDocumentId(null)
+      setDeleteTarget(null)
     }
   }
 
@@ -981,6 +987,16 @@ function RAGIndexPage() {
           </div>
         </div>
       </main>
+
+      <ConfirmDialog
+        open={!!deleteTarget}
+        title="Hapus Dokumen"
+        description={<>Yakin ingin menghapus <strong style={{ color: 'var(--fg)' }}>"{deleteTarget?.name}"</strong>? Tindakan ini tidak bisa dibatalkan.</>}
+        confirmLabel="Hapus"
+        cancelLabel="Batal"
+        onConfirm={confirmDelete}
+        onCancel={() => setDeleteTarget(null)}
+      />
     </div>
   )
 }

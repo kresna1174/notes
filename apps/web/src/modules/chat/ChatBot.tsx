@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { Loader2, RotateCcw, ChevronRight, X, ArrowUp, Paperclip, BookOpen, FileText, Image as ImageIcon } from 'lucide-react'
+import { ConfirmDialog } from '#/modules/shared/ui'
 import { useChat } from '@ai-sdk/react'
 import { DefaultChatTransport } from 'ai'
 import { marked } from 'marked'
@@ -459,6 +460,7 @@ export function ChatBot({
   const [mentionQuery, setMentionQuery] = useState<string | null>(null)
   const [mentionIndex, setMentionIndex] = useState<number>(0)
   const [mentionTriggerIndex, setMentionTriggerIndex] = useState<number>(-1)
+  const [showClearConfirm, setShowClearConfirm] = useState(false)
 
   useEffect(() => {
     const fetchDocs = () => {
@@ -738,8 +740,7 @@ export function ChatBot({
   }
 
   const handleClearHistory = () => {
-    if (!window.confirm('Clear all messages in this chat? This only clears the view — your history is still saved.')) return
-    setMessages([{ id: 'cleared', role: 'assistant', parts: [{ type: 'text', text: 'Chat cleared. What would you like to ask?' }] }])
+    setShowClearConfirm(true)
   }
 
   const quickPrompts = isRagMode ? [
@@ -755,6 +756,7 @@ export function ChatBot({
   const hasUserMessage = messages.some((m: any) => m.role === 'user')
 
   return (
+    <>
     <div
       style={{
         ...(fullWidth ? { flex: 1 } : { width: '360px', borderLeft: '1px solid var(--border)', flexShrink: 0 }),
@@ -1649,5 +1651,16 @@ export function ChatBot({
         </div>
       )}
     </div>
+
+    <ConfirmDialog
+      open={showClearConfirm}
+      title="Hapus Chat"
+      description="Semua pesan dalam tampilan ini akan dihapus. Riwayat percakapan tetap tersimpan dan akan muncul kembali saat halaman dimuat ulang."
+      confirmLabel="Hapus"
+      cancelLabel="Batal"
+      onConfirm={() => setMessages([{ id: 'cleared', role: 'assistant', parts: [{ type: 'text', text: 'Chat cleared. What would you like to ask?' }] }])}
+      onCancel={() => setShowClearConfirm(false)}
+    />
+    </>
   )
 }

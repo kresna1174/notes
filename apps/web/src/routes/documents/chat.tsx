@@ -1,7 +1,7 @@
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { useState, useEffect, useRef } from 'react'
 import { ChatBot } from '#/modules/chat'
-import { RagLayout, RagDocPanel } from '#/modules/shared/ui'
+import { RagLayout, RagDocPanel, ConfirmDialog } from '#/modules/shared/ui'
 import { Plus, MessageSquare, Trash2, Pencil, ChevronDown, Check } from 'lucide-react'
 
 type ChatSearch = {
@@ -65,6 +65,7 @@ function RagChatPage() {
   const [editingChatId, setEditingChatId] = useState<string | null>(null)
   const [editChatValue, setEditChatValue] = useState('')
   const [hoverChatId, setHoverChatId] = useState<string | null>(null)
+  const [deleteTarget, setDeleteTarget] = useState<{ id: string; title: string } | null>(null)
   
   // Notes list state for selector
   const [notesList, setNotesList] = useState<any[]>([])
@@ -165,8 +166,7 @@ function RagChatPage() {
     }
   }
 
-  const deleteChatSession = async (id: string, title: string) => {
-    if (!window.confirm(`Delete "${title}"? All messages in this session will be permanently removed.`)) return
+  const deleteChatSession = async (id: string) => {
     const res = await fetch(`/api/chat-sessions/${id}`, { method: 'DELETE' })
     if (res.ok) {
       await loadChatSessions()
@@ -247,6 +247,7 @@ function RagChatPage() {
   }
 
   return (
+    <>
     <RagLayout noPadding>
       <div style={{ display: 'flex', height: '100%', overflow: 'hidden' }}>
         {/* Column 1: Sesi Chat (History) */}
@@ -352,7 +353,7 @@ function RagChatPage() {
                         <Pencil size={11} />
                       </button>
                       <button
-                        onClick={(e) => { e.stopPropagation(); deleteChatSession(sess.id, sess.title) }}
+                        onClick={(e) => { e.stopPropagation(); setDeleteTarget({ id: sess.id, title: sess.title }) }}
                         style={{
                           background: 'none', border: 'none', cursor: 'pointer',
                           color: 'var(--fg-subtle)', padding: 2, display: 'flex',
@@ -460,5 +461,16 @@ function RagChatPage() {
         )}
       </div>
     </RagLayout>
+
+    <ConfirmDialog
+      open={!!deleteTarget}
+      title="Hapus Chat"
+      description={<>Yakin ingin menghapus <strong style={{ color: 'var(--fg)' }}>&#34;{deleteTarget?.title}&#34;</strong>? Semua pesan dalam sesi ini akan dihapus secara permanen.</>}
+      confirmLabel="Hapus"
+      cancelLabel="Batal"
+      onConfirm={() => { if (deleteTarget) deleteChatSession(deleteTarget.id) }}
+      onCancel={() => setDeleteTarget(null)}
+    />
+    </>
   )
 }

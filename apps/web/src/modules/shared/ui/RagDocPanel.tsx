@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { FileText, Upload, ChevronLeft, ChevronRight, Check, Trash2 } from 'lucide-react'
 import { Link } from '@tanstack/react-router'
 import { listDocuments, deleteDocument, type DocumentMetadata } from '#/modules/shared/ragApi'
+import { ConfirmDialog } from './ConfirmDialog'
 
 interface RagDocPanelProps {
   pinnedDocs: { id: string; name: string }[]
@@ -14,6 +15,7 @@ export function RagDocPanel({ pinnedDocs, onToggle, onPinnedDocDeleted }: RagDoc
   const [collapsed, setCollapsed] = useState(false)
   const [hoverDocId, setHoverDocId] = useState<string | null>(null)
   const [deletingDocId, setDeletingDocId] = useState<string | null>(null)
+  const [deleteTarget, setDeleteTarget] = useState<DocumentMetadata | null>(null)
 
   const loadDocs = () => {
     listDocuments()
@@ -29,9 +31,8 @@ export function RagDocPanel({ pinnedDocs, onToggle, onPinnedDocDeleted }: RagDoc
 
   const pinnedIds = new Set(pinnedDocs.map(d => d.id))
 
-  const handleDelete = async (e: React.MouseEvent, doc: DocumentMetadata) => {
-    e.stopPropagation()
-    if (!confirm(`Delete "${doc.name}"? This cannot be undone.`)) return
+  const handleDelete = async (doc: DocumentMetadata) => {
+    setDeleteTarget(null)
     setDeletingDocId(doc.id)
     try {
       await deleteDocument(doc.id)
@@ -104,6 +105,7 @@ export function RagDocPanel({ pinnedDocs, onToggle, onPinnedDocDeleted }: RagDoc
   }
 
   return (
+    <>
     <div
       style={{
         width: 260,
@@ -258,7 +260,7 @@ export function RagDocPanel({ pinnedDocs, onToggle, onPinnedDocDeleted }: RagDoc
                 {/* Delete button — show on hover */}
                 {isHovered && (
                   <button
-                    onClick={(e) => handleDelete(e, doc)}
+                    onClick={(e) => { e.stopPropagation(); setDeleteTarget(doc) }}
                     disabled={isDeleting}
                     title="Delete document"
                     style={{
@@ -292,5 +294,16 @@ export function RagDocPanel({ pinnedDocs, onToggle, onPinnedDocDeleted }: RagDoc
         </p>
       </div>
     </div>
+
+    <ConfirmDialog
+      open={!!deleteTarget}
+      title="Hapus Dokumen"
+      description={<>Yakin ingin menghapus <strong style={{ color: 'var(--fg)' }}>"{deleteTarget?.name}"</strong>? Tindakan ini tidak bisa dibatalkan.</>}
+      confirmLabel="Hapus"
+      cancelLabel="Batal"
+      onConfirm={() => { if (deleteTarget) handleDelete(deleteTarget) }}
+      onCancel={() => setDeleteTarget(null)}
+    />
+    </>
   )
 }
