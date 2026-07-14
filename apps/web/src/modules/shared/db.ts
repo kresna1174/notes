@@ -112,10 +112,16 @@ export async function initDb() {
       id TEXT PRIMARY KEY,
       user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
       title TEXT NOT NULL DEFAULT 'New Chat',
+      type TEXT NOT NULL DEFAULT 'rag',
+      note_id TEXT REFERENCES notes(id) ON DELETE SET NULL,
       created_at BIGINT NOT NULL,
       updated_at BIGINT NOT NULL
     )
   `)
+
+  // Migrate existing tables
+  await db.execute(sql`ALTER TABLE chat_sessions ADD COLUMN IF NOT EXISTS type TEXT NOT NULL DEFAULT 'rag'`).catch(() => {})
+  await db.execute(sql`ALTER TABLE chat_sessions ADD COLUMN IF NOT EXISTS note_id TEXT REFERENCES notes(id) ON DELETE SET NULL`).catch(() => {})
 
   await db.execute(sql`
     CREATE TABLE IF NOT EXISTS chat_messages (

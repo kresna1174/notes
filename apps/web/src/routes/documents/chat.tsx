@@ -27,6 +27,9 @@ function RagChatPage() {
   const [editingChatId, setEditingChatId] = useState<string | null>(null)
   const [editChatValue, setEditChatValue] = useState('')
   const [hoverChatId, setHoverChatId] = useState<string | null>(null)
+  
+  // Notes list state for selector
+  const [notesList, setNotesList] = useState<{ id: string; title: string }[]>([])
 
   const loadChatSessions = async () => {
     const res = await fetch('/api/chat-sessions')
@@ -36,8 +39,19 @@ function RagChatPage() {
     }
   }
 
+  const loadNotes = async () => {
+    const res = await fetch('/api/notes?scope=mine')
+    if (res.ok) {
+      const data = await res.json()
+      if (Array.isArray(data)) {
+        setNotesList(data)
+      }
+    }
+  }
+
   useEffect(() => {
     loadChatSessions()
+    loadNotes()
   }, [session])
 
   useEffect(() => {
@@ -88,6 +102,17 @@ function RagChatPage() {
     }
   }
 
+  const linkNoteToSession = async (sessId: string, noteId: string) => {
+    const res = await fetch(`/api/chat-sessions/${sessId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ noteId })
+    })
+    if (res.ok) {
+      await loadChatSessions()
+    }
+  }
+
   const deleteChatSession = async (id: string) => {
     const res = await fetch(`/api/chat-sessions/${id}`, { method: 'DELETE' })
     if (res.ok) {
@@ -110,6 +135,9 @@ function RagChatPage() {
         : [...prev, doc]
     )
   }
+
+  const activeSession = chatSessionsList.find(s => s.id === session)
+  const activeSessionNoteId = activeSession?.noteId
 
   return (
     <RagLayout noPadding>
@@ -226,12 +254,41 @@ function RagChatPage() {
 
         {/* Column 3: Layar Chat */}
         {session && (
-          <ChatBot
-            mode="rag"
-            pinnedDocs={pinnedDocs}
-            fullWidth
-            chatSessionId={session}
-          />
+          <div style={{ display: 'flex', flexDirection: 'column', flex: 1, height: '100%', minWidth: 0 }}>
+            {/* Header bar for note context selection */}
+            <div style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              padding: '10px 16px', borderBottom: '1px solid var(--border)',
+              background: 'var(--card-bg)', flexShrink: 0
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--fg-muted)' }}>
+                  Reference Note:
+                </span>
+                <select
+                  value={activeSessionNoteId || 'none'}
+                  onChange={(e) => linkNoteToSession(session, e.target.value)}
+                  style={{
+                    background: 'var(--bg)', border: '1px solid var(--border)',
+                    borderRadius: 6, padding: '3px 8px', fontSize: '0.78rem', color: 'var(--fg)',
+                    outline: 'none', cursor: 'pointer'
+                  }}
+                >
+                  <option value="none">No Note Reference (General RAG)</option>
+                  {notesList.map(n => (
+                    <option key={n.id} value={n.id}>{n.title || 'Untitled Note'}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <ChatBot
+              mode="rag"
+              pinnedDocs={pinnedDocs}
+              fullWidth
+              chatSessionId={session}
+            />
+          </div>
         )}
       </div>
     </RagLayout>

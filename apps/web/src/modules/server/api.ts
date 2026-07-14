@@ -1101,11 +1101,20 @@ app.get('/api/admin/ai-logs', adminMiddleware, async (c) => {
 
 app.get('/api/chat-sessions', authMiddleware, async (c) => {
   const session = c.get('session')
+  const type = c.req.query('type') || 'rag'
+  const noteId = c.req.query('noteId')
   try {
+    const conditions = [
+      eq(chatSessions.userId, session.userId),
+      eq(chatSessions.type, type)
+    ]
+    if (type === 'note' && noteId) {
+      conditions.push(eq(chatSessions.noteId, noteId))
+    }
     const sessions = await db
       .select()
       .from(chatSessions)
-      .where(eq(chatSessions.userId, session.userId))
+      .where(and(...conditions))
       .orderBy(desc(chatSessions.updatedAt))
     return c.json(sessions)
   } catch (err) {
@@ -1118,10 +1127,14 @@ app.post('/api/chat-sessions', authMiddleware, async (c) => {
   try {
     const body = await c.req.json().catch(() => ({})) as any
     const title = body.title?.trim() || 'New Chat'
+    const type = body.type || 'rag'
+    const noteId = body.noteId || null
     const newSession = {
       id: randomUUID(),
       userId: session.userId,
       title: title,
+      type: type,
+      noteId: noteId,
       createdAt: Date.now(),
       updatedAt: Date.now(),
     }
@@ -1138,9 +1151,7 @@ app.put('/api/chat-sessions/:id', authMiddleware, async (c) => {
   try {
     const body = await c.req.json() as any
     const title = body.title?.trim()
-    if (!title) {
-      return c.json({ error: 'Title is required' }, 400)
-    }
+    const noteId = body.hasOwnProperty('noteId') ? (body.noteId === 'none' ? null : body.noteId) : undefined
 
     const [existing] = await db
       .select()
@@ -1150,12 +1161,16 @@ app.put('/api/chat-sessions/:id', authMiddleware, async (c) => {
       return c.json({ error: 'Chat session not found' }, 404)
     }
 
+    const updateData: any = { updatedAt: Date.now() }
+    if (title !== undefined) updateData.title = title
+    if (noteId !== undefined) updateData.noteId = noteId
+
     await db
       .update(chatSessions)
-      .set({ title, updatedAt: Date.now() })
+      .set(updateData)
       .where(eq(chatSessions.id, sessionId))
 
-    return c.json({ success: true, id: sessionId, title })
+    return c.json({ success: true, id: sessionId, title: title || existing.title, noteId: noteId !== undefined ? noteId : existing.noteId })
   } catch (err) {
     return c.json({ error: `Failed to update chat session: ${String(err)}` }, 500)
   }
@@ -1259,6 +1274,19 @@ app.post('/api/ai/chat/stream', authMiddleware, async (c) => {
         .where(and(eq(chatSessions.id, body.session_id), eq(chatSessions.userId, session.userId)))
       if (dbSession) {
         isPersistentSession = true
+
+        // If the session has noteId, retrieve and inject note content for context
+        if (dbSession.noteId) {
+          const [noteData] = await db
+            .select()
+            .from(notes)
+            .where(eq(notes.id, dbSession.noteId))
+          if (noteData) {
+            body.note_title = noteData.title || ''
+            body.note_content = noteData.content || ''
+          }
+        }
+
         // Save the user's message to Postgres!
         await db.insert(chatMessages).values({
           id: randomUUID(),

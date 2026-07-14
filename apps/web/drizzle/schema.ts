@@ -68,6 +68,8 @@ export const chatSessions = pgTable('chat_sessions', {
   id: text('id').primaryKey(),
   userId: text('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
   title: text('title').notNull().default('New Chat'),
+  type: text('type').notNull().default('rag'),
+  noteId: text('note_id').references(() => notes.id, { onDelete: 'set null' }),
   createdAt: bigint('created_at', { mode: 'number' }).notNull(),
   updatedAt: bigint('updated_at', { mode: 'number' }).notNull(),
 })
