@@ -2,7 +2,7 @@ import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { useState, useEffect, useRef } from 'react'
 import { ChatBot } from '#/modules/chat'
 import { RagLayout, RagDocPanel } from '#/modules/shared/ui'
-import { Plus, MessageSquare, Trash2, ChevronDown, Check } from 'lucide-react'
+import { Plus, MessageSquare, Trash2, Pencil, ChevronDown, Check } from 'lucide-react'
 
 type ChatSearch = {
   session?: string
@@ -337,17 +337,32 @@ function RagChatPage() {
                     )}
                   </div>
                   {!isEditing && (isActive || hoverChatId === sess.id) && (
-                    <button
-                      onClick={(e) => { e.stopPropagation(); deleteChatSession(sess.id) }}
-                      style={{
-                        background: 'none', border: 'none', cursor: 'pointer',
-                        color: 'var(--fg-subtle)', padding: 2, display: 'flex',
-                        alignItems: 'center', justifyContent: 'center'
-                      }}
-                      title="Delete chat"
-                    >
-                      <Trash2 size={12} />
-                    </button>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); setEditingChatId(sess.id); setEditChatValue(sess.title) }}
+                        style={{
+                          background: 'none', border: 'none', cursor: 'pointer',
+                          color: 'var(--fg-subtle)', padding: 2, display: 'flex',
+                          alignItems: 'center', justifyContent: 'center',
+                          borderRadius: 3,
+                        }}
+                        title="Rename chat"
+                      >
+                        <Pencil size={11} />
+                      </button>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); deleteChatSession(sess.id) }}
+                        style={{
+                          background: 'none', border: 'none', cursor: 'pointer',
+                          color: 'var(--fg-subtle)', padding: 2, display: 'flex',
+                          alignItems: 'center', justifyContent: 'center',
+                          borderRadius: 3,
+                        }}
+                        title="Delete chat"
+                      >
+                        <Trash2 size={11} />
+                      </button>
+                    </div>
                   )}
                 </div>
               )

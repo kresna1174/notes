@@ -1,29 +1,53 @@
 import { useEffect, useState } from 'react'
-import { FileText, Upload, ChevronLeft, ChevronRight, Check } from 'lucide-react'
+import { FileText, Upload, ChevronLeft, ChevronRight, Check, Trash2 } from 'lucide-react'
 import { Link } from '@tanstack/react-router'
-import { listDocuments, type DocumentMetadata } from '#/modules/shared/ragApi'
+import { listDocuments, deleteDocument, type DocumentMetadata } from '#/modules/shared/ragApi'
 
 interface RagDocPanelProps {
   pinnedDocs: { id: string; name: string }[]
   onToggle: (doc: { id: string; name: string }) => void
+  onPinnedDocDeleted?: (docId: string) => void
 }
 
-export function RagDocPanel({ pinnedDocs, onToggle }: RagDocPanelProps) {
+export function RagDocPanel({ pinnedDocs, onToggle, onPinnedDocDeleted }: RagDocPanelProps) {
   const [docs, setDocs] = useState<DocumentMetadata[]>([])
   const [collapsed, setCollapsed] = useState(false)
+  const [hoverDocId, setHoverDocId] = useState<string | null>(null)
+  const [deletingDocId, setDeletingDocId] = useState<string | null>(null)
+
+  const loadDocs = () => {
+    listDocuments()
+      .then(all => setDocs(all.filter(d => d.status === 'ready')))
+      .catch(console.error)
+  }
 
   useEffect(() => {
-    const load = () => {
-      listDocuments()
-        .then(all => setDocs(all.filter(d => d.status === 'ready')))
-        .catch(console.error)
-    }
-    load()
-    const id = setInterval(load, 5000)
+    loadDocs()
+    const id = setInterval(loadDocs, 5000)
     return () => clearInterval(id)
   }, [])
 
   const pinnedIds = new Set(pinnedDocs.map(d => d.id))
+
+  const handleDelete = async (e: React.MouseEvent, doc: DocumentMetadata) => {
+    e.stopPropagation()
+    if (!confirm(`Delete "${doc.name}"? This cannot be undone.`)) return
+    setDeletingDocId(doc.id)
+    try {
+      await deleteDocument(doc.id)
+      // Remove from pinned if it was pinned
+      if (pinnedIds.has(doc.id)) {
+        onPinnedDocDeleted?.(doc.id)
+        onToggle({ id: doc.id, name: doc.name })
+      }
+      loadDocs()
+    } catch (err) {
+      console.error('[Delete Doc Error]', err)
+      alert('Failed to delete document.')
+    } finally {
+      setDeletingDocId(null)
+    }
+  }
 
   if (collapsed) {
     return (
@@ -172,31 +196,31 @@ export function RagDocPanel({ pinnedDocs, onToggle }: RagDocPanelProps) {
         ) : (
           docs.map(doc => {
             const isPinned = pinnedIds.has(doc.id)
+            const isHovered = hoverDocId === doc.id
+            const isDeleting = deletingDocId === doc.id
             return (
-              <button
+              <div
                 key={doc.id}
-                onClick={() => onToggle({ id: doc.id, name: doc.name })}
                 style={{
                   width: '100%',
-                  textAlign: 'left',
                   padding: '7px 8px',
                   borderRadius: 6,
                   border: `1px solid ${isPinned ? 'var(--primary)' : 'transparent'}`,
-                  background: isPinned ? 'var(--accent)' : 'none',
+                  background: isPinned ? 'var(--accent)' : isHovered ? 'var(--muted)' : 'none',
                   cursor: 'pointer',
                   display: 'flex',
                   alignItems: 'center',
                   gap: 7,
                   marginBottom: 2,
                   transition: 'all 0.12s',
+                  position: 'relative',
+                  boxSizing: 'border-box',
                 }}
-                onMouseEnter={e => {
-                  if (!isPinned) e.currentTarget.style.background = 'var(--muted)'
-                }}
-                onMouseLeave={e => {
-                  if (!isPinned) e.currentTarget.style.background = 'none'
-                }}
+                onClick={() => onToggle({ id: doc.id, name: doc.name })}
+                onMouseEnter={() => setHoverDocId(doc.id)}
+                onMouseLeave={() => setHoverDocId(null)}
               >
+                {/* Checkbox */}
                 <div
                   style={{
                     width: 16,
@@ -213,7 +237,10 @@ export function RagDocPanel({ pinnedDocs, onToggle }: RagDocPanelProps) {
                 >
                   {isPinned && <Check size={10} color="var(--primary-fg)" strokeWidth={3} />}
                 </div>
+
                 <FileText size={13} color={isPinned ? 'var(--primary)' : 'var(--fg-muted)'} style={{ flexShrink: 0 }} />
+
+                {/* Doc name */}
                 <span
                   style={{
                     fontSize: '0.75rem',
@@ -227,7 +254,32 @@ export function RagDocPanel({ pinnedDocs, onToggle }: RagDocPanelProps) {
                 >
                   {doc.name}
                 </span>
-              </button>
+
+                {/* Delete button — show on hover */}
+                {isHovered && (
+                  <button
+                    onClick={(e) => handleDelete(e, doc)}
+                    disabled={isDeleting}
+                    title="Delete document"
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      cursor: isDeleting ? 'not-allowed' : 'pointer',
+                      color: 'var(--danger, #e55)',
+                      padding: '2px 3px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      borderRadius: 4,
+                      flexShrink: 0,
+                      opacity: isDeleting ? 0.4 : 1,
+                      transition: 'opacity 0.1s',
+                    }}
+                  >
+                    <Trash2 size={12} />
+                  </button>
+                )}
+              </div>
             )
           })
         )}
