@@ -89,6 +89,9 @@ function AiDraftNodeView({ node, updateAttributes, getPos, editor }: any) {
     } finally {
       setIsUploadingFile(false)
       if (fileInputRef.current) fileInputRef.current.value = ''
+      setTimeout(() => {
+        textareaRef.current?.focus()
+      }, 50)
     }
   }
 
@@ -407,6 +410,7 @@ function AiDraftNodeView({ node, updateAttributes, getPos, editor }: any) {
                       <button
                         key={doc.id}
                         disabled={isReferenced}
+                        onMouseDown={e => e.preventDefault()}
                         onClick={() => {
                           if (!isReferenced) {
                             handleSelectMention(doc)
@@ -576,6 +580,7 @@ function AiDraftNodeView({ node, updateAttributes, getPos, editor }: any) {
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                 <button
+                  onMouseDown={e => e.preventDefault()}
                   onClick={(e) => { e.stopPropagation(); setIsRagMenuOpen(!isRagMenuOpen) }}
                   title="Mention reference document from library"
                   style={{
@@ -597,6 +602,7 @@ function AiDraftNodeView({ node, updateAttributes, getPos, editor }: any) {
                   <BookOpen size={14} />
                 </button>
                 <button
+                  onMouseDown={e => e.preventDefault()}
                   onClick={(e) => { e.stopPropagation(); fileInputRef.current?.click() }}
                   title="Attach file / photo"
                   style={{
