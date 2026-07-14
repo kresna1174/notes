@@ -17,7 +17,10 @@ function AiDraftNodeView({ node, updateAttributes, getPos, editor }: any) {
   // Auto-focus textarea when block is created
   useEffect(() => {
     if (status === 'idle' && textareaRef.current) {
-      textareaRef.current.focus()
+      const timer = setTimeout(() => {
+        textareaRef.current?.focus()
+      }, 50)
+      return () => clearTimeout(timer)
     }
   }, [status])
 
