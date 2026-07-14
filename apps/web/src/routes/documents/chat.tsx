@@ -17,6 +17,44 @@ export const Route = createFileRoute('/documents/chat')({
   component: RagChatPage,
 })
 
+interface NoteTreeNode {
+  id: string
+  title: string
+  parentId: string | null
+  createdAt: number
+  children: NoteTreeNode[]
+}
+
+// Tree builder helper for notes list
+function buildNoteTree(notes: any[]): NoteTreeNode[] {
+  const map = new Map<string, NoteTreeNode>()
+  const roots: NoteTreeNode[] = []
+
+  // Initialize
+  for (const note of notes) {
+    map.set(note.id, { ...note, children: [] })
+  }
+
+  // Build relations
+  for (const node of map.values()) {
+    if (node.parentId && map.has(node.parentId)) {
+      const parent = map.get(node.parentId)!
+      parent.children.push(node)
+    } else {
+      roots.push(node)
+    }
+  }
+
+  // Sort by createdAt desc
+  const sortFn = (a: NoteTreeNode, b: NoteTreeNode) => b.createdAt - a.createdAt
+  roots.sort(sortFn)
+  for (const node of map.values()) {
+    node.children.sort(sortFn)
+  }
+
+  return roots
+}
+
 function RagChatPage() {
   const { session } = Route.useSearch()
   const navigate = useNavigate()
@@ -29,7 +67,7 @@ function RagChatPage() {
   const [hoverChatId, setHoverChatId] = useState<string | null>(null)
   
   // Notes list state for selector
-  const [notesList, setNotesList] = useState<{ id: string; title: string }[]>([])
+  const [notesList, setNotesList] = useState<any[]>([])
   
   // Custom dropdown states
   const [noteDropdownOpen, setNoteDropdownOpen] = useState(false)
@@ -152,6 +190,60 @@ function RagChatPage() {
 
   const activeSession = chatSessionsList.find(s => s.id === session)
   const activeSessionNoteId = activeSession?.noteId
+
+  // Build the hierarchical note tree from flat list
+  const noteTree = buildNoteTree(notesList)
+
+  // Recursive renderer for parent-child tree inside custom dropdown panel
+  const renderNoteOptions = (nodes: NoteTreeNode[], depth: number = 0) => {
+    const result: React.ReactNode[] = []
+    
+    for (const node of nodes) {
+      const isSelected = activeSessionNoteId === node.id
+      result.push(
+        <button
+          key={node.id}
+          onClick={() => {
+            linkNoteToSession(session, node.id)
+            setNoteDropdownOpen(false)
+          }}
+          style={{
+            width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+            padding: '8px 10px',
+            paddingLeft: `${10 + depth * 16}px`, // Visual parent-child indent
+            border: 'none', borderRadius: 7,
+            background: isSelected ? 'var(--accent)' : 'transparent',
+            color: isSelected ? 'var(--primary)' : 'var(--fg)',
+            cursor: 'pointer', textAlign: 'left',
+            fontFamily: 'var(--font-body)',
+            transition: 'background 0.1s',
+            marginTop: 2
+          }}
+          onMouseEnter={e => { if (!isSelected) e.currentTarget.style.background = 'var(--muted)' }}
+          onMouseLeave={e => { if (!isSelected) e.currentTarget.style.background = 'transparent' }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', minWidth: 0, flex: 1 }}>
+            {node.children.length > 0 ? (
+              <span style={{ marginRight: 6, opacity: 0.7, fontSize: '0.85rem' }}>📁</span>
+            ) : (
+              <span style={{ marginRight: 6, opacity: 0.7, fontSize: '0.85rem' }}>📄</span>
+            )}
+            <span style={{ fontSize: '0.78rem', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {node.title || 'Untitled Note'}
+            </span>
+          </div>
+          {isSelected && <Check size={13} style={{ flexShrink: 0, marginLeft: 8 }} />}
+        </button>
+      )
+      
+      // Recurse children
+      if (node.children.length > 0) {
+        result.push(...renderNoteOptions(node.children, depth + 1))
+      }
+    }
+    
+    return result
+  }
 
   return (
     <RagLayout noPadding>
@@ -285,7 +377,7 @@ function RagChatPage() {
                   onClick={() => setNoteDropdownOpen(v => !v)}
                   style={{
                     display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8,
-                    padding: '6px 12px', minWidth: 200, maxWidth: 300,
+                    padding: '6px 12px', minWidth: 220, maxWidth: 320,
                     fontSize: '0.78rem', fontWeight: 500, fontFamily: 'var(--font-body)',
                     border: `1px solid ${noteDropdownOpen ? 'var(--primary)' : 'var(--border)'}`,
                     borderRadius: 8, outline: 'none',
@@ -307,7 +399,7 @@ function RagChatPage() {
                 {noteDropdownOpen && (
                   <div style={{
                     position: 'absolute', top: 'calc(100% + 4px)', left: 95,
-                    width: 250, maxHeight: 280, overflowY: 'auto',
+                    width: 260, maxHeight: 300, overflowY: 'auto',
                     background: 'var(--bg)', border: '1px solid var(--border)',
                     borderRadius: 10, zIndex: 1000,
                     boxShadow: '0 8px 24px rgba(0,0,0,0.15)',
@@ -335,36 +427,8 @@ function RagChatPage() {
                       {!activeSessionNoteId && <Check size={13} style={{ flexShrink: 0 }} />}
                     </button>
 
-                    {/* Notes List Options */}
-                    {notesList.map(n => {
-                      const isSelected = activeSessionNoteId === n.id
-                      return (
-                        <button
-                          key={n.id}
-                          onClick={() => {
-                            linkNoteToSession(session, n.id)
-                            setNoteDropdownOpen(false)
-                          }}
-                          style={{
-                            width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                            padding: '8px 10px', border: 'none', borderRadius: 7,
-                            background: isSelected ? 'var(--accent)' : 'transparent',
-                            color: isSelected ? 'var(--primary)' : 'var(--fg)',
-                            cursor: 'pointer', textAlign: 'left',
-                            fontFamily: 'var(--font-body)',
-                            transition: 'background 0.1s',
-                            marginTop: 2
-                          }}
-                          onMouseEnter={e => { if (!isSelected) e.currentTarget.style.background = 'var(--muted)' }}
-                          onMouseLeave={e => { if (!isSelected) e.currentTarget.style.background = 'transparent' }}
-                        >
-                          <span style={{ fontSize: '0.78rem', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginRight: 8 }}>
-                            {n.title || 'Untitled Note'}
-                          </span>
-                          {isSelected && <Check size={13} style={{ flexShrink: 0 }} />}
-                        </button>
-                      )
-                    })}
+                    {/* Hierarchical note options */}
+                    {renderNoteOptions(noteTree, 0)}
                   </div>
                 )}
               </div>
