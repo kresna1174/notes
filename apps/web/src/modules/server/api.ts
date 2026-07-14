@@ -1,5 +1,5 @@
 import type { IncomingMessage, ServerResponse } from 'node:http'
-import { createReadStream, existsSync, promises as fsPromises } from 'node:fs'
+import { createReadStream, existsSync } from 'node:fs'
 import { db, initDb } from '../shared/db'
 import { notes, attachments, users, organizations, userOrganizations, noteHistory, chatSessions, chatMessages } from '../../../drizzle/schema'
 import { desc, eq, and, sql, or, inArray } from 'drizzle-orm'
@@ -1263,7 +1263,6 @@ app.post('/api/ai/chat/stream', authMiddleware, async (c) => {
   const session = c.get('session')
   try {
     const body = await c.req.json() as any
-    await fsPromises.writeFile('/Users/krisna/.gemini/antigravity-cli/brain/44f22846-63a2-443c-a210-6ede00520c99/scratch/received-body.json', JSON.stringify(body, null, 2)).catch(() => {})
     body.user_id = session.userId
 
     // Check if session_id is a valid persistent session
