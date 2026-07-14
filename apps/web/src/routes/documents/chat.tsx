@@ -1,8 +1,8 @@
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { ChatBot } from '#/modules/chat'
 import { RagLayout, RagDocPanel } from '#/modules/shared/ui'
-import { Plus, MessageSquare, Trash2 } from 'lucide-react'
+import { Plus, MessageSquare, Trash2, ChevronDown, Check } from 'lucide-react'
 
 type ChatSearch = {
   session?: string
@@ -30,6 +30,10 @@ function RagChatPage() {
   
   // Notes list state for selector
   const [notesList, setNotesList] = useState<{ id: string; title: string }[]>([])
+  
+  // Custom dropdown states
+  const [noteDropdownOpen, setNoteDropdownOpen] = useState(false)
+  const noteDropdownRef = useRef<HTMLDivElement>(null)
 
   const loadChatSessions = async () => {
     const res = await fetch('/api/chat-sessions')
@@ -53,6 +57,16 @@ function RagChatPage() {
     loadChatSessions()
     loadNotes()
   }, [session])
+
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (noteDropdownRef.current && !noteDropdownRef.current.contains(e.target as Node)) {
+        setNoteDropdownOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
 
   useEffect(() => {
     if (!session) {
@@ -261,24 +275,98 @@ function RagChatPage() {
               padding: '10px 16px', borderBottom: '1px solid var(--border)',
               background: 'var(--card-bg)', flexShrink: 0
             }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, position: 'relative' }} ref={noteDropdownRef}>
                 <span style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--fg-muted)' }}>
                   Reference Note:
                 </span>
-                <select
-                  value={activeSessionNoteId || 'none'}
-                  onChange={(e) => linkNoteToSession(session, e.target.value)}
+                
+                {/* Custom Dropdown Trigger */}
+                <button
+                  onClick={() => setNoteDropdownOpen(v => !v)}
                   style={{
-                    background: 'var(--bg)', border: '1px solid var(--border)',
-                    borderRadius: 6, padding: '3px 8px', fontSize: '0.78rem', color: 'var(--fg)',
-                    outline: 'none', cursor: 'pointer'
+                    display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8,
+                    padding: '6px 12px', minWidth: 200, maxWidth: 300,
+                    fontSize: '0.78rem', fontWeight: 500, fontFamily: 'var(--font-body)',
+                    border: `1px solid ${noteDropdownOpen ? 'var(--primary)' : 'var(--border)'}`,
+                    borderRadius: 8, outline: 'none',
+                    color: 'var(--fg)', background: 'var(--bg)',
+                    cursor: 'pointer',
+                    transition: 'border-color 0.15s',
                   }}
                 >
-                  <option value="none">No Note Reference (General RAG)</option>
-                  {notesList.map(n => (
-                    <option key={n.id} value={n.id}>{n.title || 'Untitled Note'}</option>
-                  ))}
-                </select>
+                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1, textAlign: 'left' }}>
+                    {activeSessionNoteId 
+                      ? (notesList.find(n => n.id === activeSessionNoteId)?.title || 'Untitled Note')
+                      : 'No Note Reference (General RAG)'
+                    }
+                  </span>
+                  <ChevronDown size={13} style={{ flexShrink: 0, color: 'var(--fg-muted)', transform: noteDropdownOpen ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }} />
+                </button>
+
+                {/* Custom Dropdown Panel */}
+                {noteDropdownOpen && (
+                  <div style={{
+                    position: 'absolute', top: 'calc(100% + 4px)', left: 95,
+                    width: 250, maxHeight: 280, overflowY: 'auto',
+                    background: 'var(--bg)', border: '1px solid var(--border)',
+                    borderRadius: 10, zIndex: 1000,
+                    boxShadow: '0 8px 24px rgba(0,0,0,0.15)',
+                    padding: '4px',
+                  }}>
+                    {/* "No Note Reference" Option */}
+                    <button
+                      onClick={() => {
+                        linkNoteToSession(session, 'none')
+                        setNoteDropdownOpen(false)
+                      }}
+                      style={{
+                        width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                        padding: '8px 10px', border: 'none', borderRadius: 7,
+                        background: !activeSessionNoteId ? 'var(--accent)' : 'transparent',
+                        color: !activeSessionNoteId ? 'var(--primary)' : 'var(--fg)',
+                        cursor: 'pointer', textAlign: 'left',
+                        fontFamily: 'var(--font-body)',
+                        transition: 'background 0.1s',
+                      }}
+                      onMouseEnter={e => { if (activeSessionNoteId) e.currentTarget.style.background = 'var(--muted)' }}
+                      onMouseLeave={e => { if (activeSessionNoteId) e.currentTarget.style.background = 'transparent' }}
+                    >
+                      <span style={{ fontSize: '0.78rem', fontWeight: 500 }}>No Note Reference</span>
+                      {!activeSessionNoteId && <Check size={13} style={{ flexShrink: 0 }} />}
+                    </button>
+
+                    {/* Notes List Options */}
+                    {notesList.map(n => {
+                      const isSelected = activeSessionNoteId === n.id
+                      return (
+                        <button
+                          key={n.id}
+                          onClick={() => {
+                            linkNoteToSession(session, n.id)
+                            setNoteDropdownOpen(false)
+                          }}
+                          style={{
+                            width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                            padding: '8px 10px', border: 'none', borderRadius: 7,
+                            background: isSelected ? 'var(--accent)' : 'transparent',
+                            color: isSelected ? 'var(--primary)' : 'var(--fg)',
+                            cursor: 'pointer', textAlign: 'left',
+                            fontFamily: 'var(--font-body)',
+                            transition: 'background 0.1s',
+                            marginTop: 2
+                          }}
+                          onMouseEnter={e => { if (!isSelected) e.currentTarget.style.background = 'var(--muted)' }}
+                          onMouseLeave={e => { if (!isSelected) e.currentTarget.style.background = 'transparent' }}
+                        >
+                          <span style={{ fontSize: '0.78rem', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginRight: 8 }}>
+                            {n.title || 'Untitled Note'}
+                          </span>
+                          {isSelected && <Check size={13} style={{ flexShrink: 0 }} />}
+                        </button>
+                      )
+                    })}
+                  </div>
+                )}
               </div>
             </div>
 
