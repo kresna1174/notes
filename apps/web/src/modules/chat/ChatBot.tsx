@@ -484,12 +484,15 @@ export function ChatBot({
   const attachmentsRef = useRef(attachments)
   attachmentsRef.current = attachments
 
+  const sessionIdRef = useRef(sessionId)
+  sessionIdRef.current = sessionId
+
   const transportRef = useRef<DefaultChatTransport | null>(null)
   if (!transportRef.current) {
     transportRef.current = new DefaultChatTransport({
       api: '/api/ai/chat/stream',
       body: () => ({
-        session_id: isRagMode ? 'rag-global' : noteStateRef.current.noteId,
+        session_id: sessionIdRef.current,
         note_title: noteStateRef.current.noteTitle,
         note_content: noteStateRef.current.noteContent,
         attachments: attachmentsRef.current,
@@ -498,6 +501,7 @@ export function ChatBot({
   }
 
   const { messages, setMessages, sendMessage, status, error } = useChat({
+    id: sessionId,
     transport: transportRef.current,
     onError: (err) => {
       console.error('[ChatBot stream error]', err)
@@ -531,7 +535,7 @@ export function ChatBot({
   useEffect(() => {
     let cancelled = false
     setFetchingHistory(true)
-    fetch(`/api/ai/chat/history/${isRagMode ? 'rag-global' : noteId}`)
+    fetch(`/api/ai/chat/history/${sessionId}`)
       .then(res => { if (!res.ok) throw new Error('Failed'); return res.json() })
       .then(data => {
         if (cancelled) return
@@ -569,7 +573,7 @@ export function ChatBot({
       })
       .finally(() => { if (!cancelled) setFetchingHistory(false) })
     return () => { cancelled = true }
-  }, [noteId, isRagMode, setMessages])
+  }, [sessionId, setMessages])
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
