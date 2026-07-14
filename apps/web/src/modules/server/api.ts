@@ -1,11 +1,15 @@
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { createReadStream, existsSync } from 'node:fs'
-import { db } from '../shared/db'
+import { db, initDb } from '../shared/db'
 import { notes, attachments, users, organizations, userOrganizations, noteHistory, chatSessions, chatMessages } from '../../../drizzle/schema'
 import { desc, eq, and, sql, or, inArray } from 'drizzle-orm'
 import { randomUUID } from 'crypto'
 import { saveFile, getFilePath, deleteFile } from '../shared/storage'
 import bcrypt from 'bcryptjs'
+
+// Run DB initialization on module load to guarantee new tables exist in running dev server
+initDb().catch(err => console.error('[api.ts] DB initialization failed:', err))
+
 
 // Hono Imports
 import { Hono } from 'hono'
