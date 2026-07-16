@@ -219,6 +219,7 @@ async def get_wiki_index(db: AsyncSession) -> dict:
         index[cat].append({
             "slug": page.slug,
             "title": page.title,
+            "category": page.category,
             "content": page.content,
             "tags": _loads(page.tags),
             "updated_at": page.updated_at.isoformat(),

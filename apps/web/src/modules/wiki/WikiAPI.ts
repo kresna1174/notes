@@ -151,6 +151,46 @@ export function deleteWikiPage(slug: string): Promise<void> {
 }
 
 /** Run wiki health-check / linter */
-export function lintWiki(): Promise<WikiLintResult> {
-  return wikiApiFetch<WikiLintResult>('/wiki/lint', { method: 'POST' })
+export async function lintWiki(): Promise<WikiLintResult> {
+  interface BackendReport {
+    total_pages: number
+    orphan_pages: string[]
+    missing_link_targets: { source: string; target: string }[]
+    empty_pages: string[]
+    stale_backlinks: { page: string; stale_backlink: string }[]
+    summary: string
+  }
+
+  const report = await wikiApiFetch<BackendReport>('/wiki/lint', { method: 'POST' })
+
+  const issues: string[] = []
+  const suggestions: string[] = []
+
+  if (report) {
+    if (Array.isArray(report.missing_link_targets)) {
+      report.missing_link_targets.forEach(m => {
+        issues.push(`Broken Link: [[${m.source}]] references [[${m.target}]], but [[${m.target}]] does not exist.`)
+      })
+    }
+    if (Array.isArray(report.stale_backlinks)) {
+      report.stale_backlinks.forEach(s => {
+        issues.push(`Stale Backlink: [[${s.page}]] records a backlink to [[${s.stale_backlink}]], but the source reference is gone.`)
+      })
+    }
+    if (Array.isArray(report.orphan_pages)) {
+      report.orphan_pages.forEach(slug => {
+        suggestions.push(`Orphan Page: [[${slug}]] is not linked by any other page.`)
+      })
+    }
+    if (Array.isArray(report.empty_pages)) {
+      report.empty_pages.forEach(slug => {
+        suggestions.push(`Empty Page: [[${slug}]] has little or no content.`)
+      })
+    }
+  }
+
+  return {
+    issues,
+    suggestions,
+  }
 }
