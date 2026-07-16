@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../shared/ui'
-import { Download, Copy, Check, FileText, Loader2 } from 'lucide-react'
+import { Download, Copy, Check, FileText, Loader2, Image as ImageIcon } from 'lucide-react'
 import { marked } from 'marked'
 
 interface AttachmentPreviewModalProps {
@@ -55,6 +55,13 @@ export function AttachmentPreviewModal({
   const [content, setContent] = useState<string>('')
   const [loading, setLoading] = useState<boolean>(false)
   const [copied, setCopied] = useState<boolean>(false)
+  const [imgError, setImgError] = useState<boolean>(false)
+
+  useEffect(() => {
+    if (isOpen) {
+      setImgError(false)
+    }
+  }, [isOpen])
 
   const isImg = mimeType.toLowerCase().startsWith('image/')
   const isPdf = mimeType.toLowerCase() === 'application/pdf'
@@ -143,13 +150,24 @@ export function AttachmentPreviewModal({
               <Loader2 className="animate-spin text-primary" size={32} />
               <span className="text-sm text-muted-foreground">Loading file…</span>
             </div>
-          ) : isImg ? (
+          ) : (isImg && !imgError) ? (
             <div className="flex items-center justify-center min-h-[200px]">
               <img
                 src={url}
                 alt={filename}
                 className="max-w-full max-h-[60vh] object-contain rounded-lg border border-border bg-muted/10 shadow-sm"
+                onError={() => setImgError(true)}
               />
+            </div>
+          ) : isImg ? (
+            <div className="flex flex-col items-center justify-center py-16 text-center gap-3">
+              <span className="p-3 rounded-full bg-red-500/10 text-red-500">
+                <ImageIcon size={32} />
+              </span>
+              <div className="flex flex-col gap-1">
+                <span className="text-sm font-semibold text-foreground">Gagal memuat gambar</span>
+                <span className="text-xs text-muted-foreground">Berkas kemungkinan telah dihapus dari server atau tidak dapat diakses.</span>
+              </div>
             </div>
           ) : isPdf ? (
             <div className="w-full h-[60vh] rounded-lg border border-border overflow-hidden bg-muted/5 shadow-inner">

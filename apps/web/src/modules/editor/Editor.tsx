@@ -753,9 +753,9 @@ export function Editor({ note, onUpdate, onSaveStatusChange, onLockChange, share
 
   useEffect(() => {
     function handleTriggerAi(e: Event) {
-      const customEvent = e as CustomEvent<{ prompt: string; action?: 'replace' | 'insert_below' | 'append_to_end'; from?: number; to?: number }>
-      const { prompt, action, from, to } = customEvent.detail
-      handleAiGenerate(prompt, action, from, to)
+      const customEvent = e as CustomEvent<{ prompt: string; action?: 'replace' | 'insert_below' | 'append_to_end'; from?: number; to?: number; agentKey?: string }>
+      const { prompt, action, from, to, agentKey } = customEvent.detail
+      handleAiGenerate(prompt, action, from, to, agentKey)
     }
     window.addEventListener('trigger-ai-action', handleTriggerAi)
     return () => window.removeEventListener('trigger-ai-action', handleTriggerAi)
@@ -765,7 +765,8 @@ export function Editor({ note, onUpdate, onSaveStatusChange, onLockChange, share
     overridePrompt?: string,
     action?: 'replace' | 'insert_below' | 'append_to_end',
     from?: number,
-    to?: number
+    to?: number,
+    agentKey?: string
   ) {
     const prompt = overridePrompt || aiPromptText
     if (!prompt.trim() || !editor) return
@@ -830,9 +831,8 @@ export function Editor({ note, onUpdate, onSaveStatusChange, onLockChange, share
           session_id: note.id,
           note_title: note.title,
           note_content: editor.getText(),
-          // Signal to backend that this is an in-editor inline request.
-          // The AI should write text directly, not call approval-gated tools.
-          agent: 'editor',
+          // Signal to backend which agent to use
+          agent: agentKey || 'editor',
         })
       })
 

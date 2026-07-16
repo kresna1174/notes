@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from '@tanstack/react-router'
 import { ScrollArea } from '../shared/ui'
-import { DayGroup } from './DayGroup'
+import { NoteTree } from './NoteTree'
 import { SearchBar } from './SearchBar'
 import { Plus, LogOut, Users, Shield, Eye, Info, Menu, X, KeyRound, Brain, ChevronDown, Check, FileStack } from 'lucide-react'
 import { FontPicker } from './FontPicker'
@@ -10,34 +10,12 @@ import { useAuth } from '../shared/auth'
 import { AboutModal } from '../auth'
 import { ChangePasswordModal } from '../auth'
 
-interface Note { id: string; title: string; createdAt: number; shareToken?: string | null; icon?: string | null }
+interface Note { id: string; title: string; createdAt: number; parentId?: string | null; shareToken?: string | null; icon?: string | null }
 interface SearchResult { id: string; title: string; createdAt: number; snippet: string }
 interface SidebarProps {
   activeNoteId: string | null
   onShareNote?: (id: string) => void
   notesUpdateTrigger?: number
-}
-
-function getDayLabel(ts: number): string {
-  const d = new Date(ts)
-  const today = new Date()
-  const yesterday = new Date(today)
-  yesterday.setDate(yesterday.getDate() - 1)
-  const sameDay = (a: Date, b: Date) =>
-    a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate()
-  if (sameDay(d, today)) return 'Today'
-  if (sameDay(d, yesterday)) return 'Yesterday'
-  return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
-}
-
-function groupByDay(notes: Note[]) {
-  const map = new Map<string, Note[]>()
-  for (const note of notes) {
-    const label = getDayLabel(note.createdAt)
-    if (!map.has(label)) map.set(label, [])
-    map.get(label)!.push(note)
-  }
-  return Array.from(map.entries()).map(([label, notes]) => ({ label, notes }))
 }
 
 export function Sidebar({ activeNoteId, onShareNote, notesUpdateTrigger }: SidebarProps) {
@@ -54,6 +32,7 @@ export function Sidebar({ activeNoteId, onShareNote, notesUpdateTrigger }: Sideb
   const { user, logout } = useAuth()
   const [showAbout, setShowAbout] = useState(false)
   const [showChangePassword, setShowChangePassword] = useState(false)
+
 
   // Mobile states
   const [isMobile, setIsMobile] = useState(false)
@@ -79,8 +58,8 @@ export function Sidebar({ activeNoteId, onShareNote, notesUpdateTrigger }: Sideb
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
 
-  function navigateAndClose(opts: { to: string; params?: any }) {
-    navigate(opts)
+  function navigateAndClose(opts: { to: string; params?: any; search?: any }) {
+    navigate(opts as any)
     if (window.innerWidth < 768) {
       setIsOpen(false)
     }
@@ -161,7 +140,20 @@ export function Sidebar({ activeNoteId, onShareNote, notesUpdateTrigger }: Sideb
     navigateAndClose({ to: '/notes/$id', params: { id: note.id } })
   }
 
-  const groups = groupByDay(notes)
+  async function createChildNote(parentId: string) {
+    const type = activeScope === 'personal' ? 'individual' : 'organization'
+    const organizationId = activeScope === 'personal' ? null : activeScope
+    const res = await fetch('/api/notes', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ organizationId, type, parentId }),
+    })
+    if (!res.ok) return
+    const note = await res.json()
+    if (!note?.id) return
+    await loadNotes()
+    navigateAndClose({ to: '/notes/$id', params: { id: note.id } })
+  }
 
   const C = {
     fg: 'var(--fg)', fgMuted: 'var(--fg-muted)', fgSubtle: 'var(--fg-subtle)',
@@ -420,16 +412,18 @@ export function Sidebar({ activeNoteId, onShareNote, notesUpdateTrigger }: Sideb
                   </button>
                 </div>
               ) : (
-                groups.map(g => (
-                  <DayGroup key={g.label} label={g.label} notes={g.notes}
-                    activeNoteId={activeNoteId}
-                    onSelect={id => navigateAndClose({ to: '/notes/$id', params: { id } })}
-                    onRename={renameNote}
-                    onDelete={deleteNote}
-                    onShare={onShareNote}
-                  />
-                ))
+                <NoteTree
+                  notes={notes}
+                  activeNoteId={activeNoteId}
+                  onSelect={id => navigateAndClose({ to: '/notes/$id', params: { id } })}
+                  onRename={renameNote}
+                  onDelete={deleteNote}
+                  onCreateChild={createChildNote}
+                  onShare={onShareNote}
+                />
               )}
+
+
             </div>
           )}
         </ScrollArea>

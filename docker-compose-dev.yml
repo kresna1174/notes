@@ -2,7 +2,7 @@ services:
   # PostgreSQL database
   postgres:
     image: postgres:16-alpine
-    container_name: notes-postgres
+    container_name: notes-postgres-dev
     restart: always
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-notesdb}
@@ -11,9 +11,9 @@ services:
     ports:
       - "127.0.0.1:5432:5432"
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - postgres_dev_data:/var/lib/postgresql/data
     networks:
-      - notes-network
+      - notes-dev-network
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-notes} -d ${POSTGRES_DB:-notesdb}"]
       interval: 10s
@@ -23,26 +23,27 @@ services:
   # Redis service used as message broker for Celery sub-agent tasks
   redis:
     image: redis:7-alpine
-    container_name: notes-redis
+    container_name: notes-redis-dev
     restart: always
     command: redis-server --save 60 1 --loglevel warning
     volumes:
-      - redis_data:/data
+      - redis_dev_data:/data
     networks:
-      - notes-network
+      - notes-dev-network
 
   # FastAPI Python service hosting the AI agent and tools API
   ai-agent:
     build:
       context: ./apps/ai-agent
-      dockerfile: Dockerfile
-    container_name: notes-ai-agent
+      dockerfile: Dockerfile.dev
+    container_name: notes-ai-agent-dev
     restart: always
     ports:
       - "127.0.0.1:8000:8000"
     volumes:
-      - ./apps/ai-agent/data:/app/data
-      - notes_uploads:/web/uploads
+      - ./apps/ai-agent:/app
+      - /app/.venv
+      - notes_dev_uploads:/web/uploads
     environment:
       - DATABASE_URL=postgresql://${POSTGRES_USER:-notes}:${POSTGRES_PASSWORD:-notes_secret}@postgres:5432/${POSTGRES_DB:-notesdb}
       - CELERY_BROKER_URL=redis://redis:6379/0
@@ -57,19 +58,20 @@ services:
       redis:
         condition: service_started
     networks:
-      - notes-network
+      - notes-dev-network
 
   # Celery background worker for executing sub-agent tasks asynchronously
   celery-worker:
     build:
       context: ./apps/ai-agent
-      dockerfile: Dockerfile
-    container_name: notes-celery-worker
-    command: celery -A tasks.celery_app worker --loglevel=info
+      dockerfile: Dockerfile.dev
+    container_name: notes-celery-worker-dev
+    command: uv run celery -A tasks.celery_app worker --loglevel=info
     restart: always
     volumes:
-      - ./apps/ai-agent/data:/app/data
-      - notes_uploads:/web/uploads
+      - ./apps/ai-agent:/app
+      - /app/.venv
+      - notes_dev_uploads:/web/uploads
     environment:
       - DATABASE_URL=postgresql://${POSTGRES_USER:-notes}:${POSTGRES_PASSWORD:-notes_secret}@postgres:5432/${POSTGRES_DB:-notesdb}
       - CELERY_BROKER_URL=redis://redis:6379/0
@@ -85,23 +87,27 @@ services:
       ai-agent:
         condition: service_started
     networks:
-      - notes-network
+      - notes-dev-network
 
   # Web frontend and proxy Node.js API server
   notes-app:
     build:
       context: .
-      dockerfile: apps/web/Dockerfile
-    container_name: notes-web-app
+      dockerfile: apps/web/Dockerfile.dev
+    container_name: notes-web-app-dev
     restart: always
     ports:
       - "127.0.0.1:3000:3000"
     volumes:
-      - notes_data:/app/data
-      - notes_uploads:/app/apps/web/uploads
+      # Mount whole monorepo root to /app for hot reload
+      - .:/app
+      # Do not overwrite the container's installed node_modules with local node_modules
+      - /app/node_modules
+      - /app/apps/web/node_modules
+      - notes_dev_uploads:/app/apps/web/uploads
     environment:
       - PORT=3000
-      - NODE_ENV=production
+      - NODE_ENV=development
       - AI_AGENT_URL=http://ai-agent:8000
       - DATABASE_URL=postgresql://${POSTGRES_USER:-notes}:${POSTGRES_PASSWORD:-notes_secret}@postgres:5432/${POSTGRES_DB:-notesdb}
     depends_on:
@@ -110,14 +116,13 @@ services:
       ai-agent:
         condition: service_started
     networks:
-      - notes-network
+      - notes-dev-network
 
 volumes:
-  postgres_data:
-  redis_data:
-  notes_data:
-  notes_uploads:
+  postgres_dev_data:
+  redis_dev_data:
+  notes_dev_uploads:
 
 networks:
-  notes-network:
+  notes-dev-network:
     driver: bridge

@@ -21,6 +21,7 @@ import { Route as ShareTokenRouteImport } from './routes/share/$token'
 import { Route as PagesPageIdRouteImport } from './routes/pages/$pageId'
 import { Route as NotesIdRouteImport } from './routes/notes/$id'
 import { Route as DocumentsPagesRouteImport } from './routes/documents/pages'
+import { Route as DocumentsChatRouteImport } from './routes/documents/chat'
 import { Route as DocumentsDocumentIdRouteImport } from './routes/documents/$documentId'
 
 const DocumentsRoute = DocumentsRouteImport.update({
@@ -83,6 +84,11 @@ const DocumentsPagesRoute = DocumentsPagesRouteImport.update({
   path: '/pages',
   getParentRoute: () => DocumentsRoute,
 } as any)
+const DocumentsChatRoute = DocumentsChatRouteImport.update({
+  id: '/chat',
+  path: '/chat',
+  getParentRoute: () => DocumentsRoute,
+} as any)
 const DocumentsDocumentIdRoute = DocumentsDocumentIdRouteImport.update({
   id: '/$documentId',
   path: '/$documentId',
@@ -93,6 +99,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/documents': typeof DocumentsRouteWithChildren
   '/documents/$documentId': typeof DocumentsDocumentIdRoute
+  '/documents/chat': typeof DocumentsChatRoute
   '/documents/pages': typeof DocumentsPagesRoute
   '/notes/$id': typeof NotesIdRoute
   '/pages/$pageId': typeof PagesPageIdRoute
@@ -107,6 +114,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/documents/$documentId': typeof DocumentsDocumentIdRoute
+  '/documents/chat': typeof DocumentsChatRoute
   '/documents/pages': typeof DocumentsPagesRoute
   '/notes/$id': typeof NotesIdRoute
   '/pages/$pageId': typeof PagesPageIdRoute
@@ -123,6 +131,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/documents': typeof DocumentsRouteWithChildren
   '/documents/$documentId': typeof DocumentsDocumentIdRoute
+  '/documents/chat': typeof DocumentsChatRoute
   '/documents/pages': typeof DocumentsPagesRoute
   '/notes/$id': typeof NotesIdRoute
   '/pages/$pageId': typeof PagesPageIdRoute
@@ -140,6 +149,7 @@ export interface FileRouteTypes {
     | '/'
     | '/documents'
     | '/documents/$documentId'
+    | '/documents/chat'
     | '/documents/pages'
     | '/notes/$id'
     | '/pages/$pageId'
@@ -154,6 +164,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/documents/$documentId'
+    | '/documents/chat'
     | '/documents/pages'
     | '/notes/$id'
     | '/pages/$pageId'
@@ -169,6 +180,7 @@ export interface FileRouteTypes {
     | '/'
     | '/documents'
     | '/documents/$documentId'
+    | '/documents/chat'
     | '/documents/pages'
     | '/notes/$id'
     | '/pages/$pageId'
@@ -280,6 +292,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DocumentsPagesRouteImport
       parentRoute: typeof DocumentsRoute
     }
+    '/documents/chat': {
+      id: '/documents/chat'
+      path: '/chat'
+      fullPath: '/documents/chat'
+      preLoaderRoute: typeof DocumentsChatRouteImport
+      parentRoute: typeof DocumentsRoute
+    }
     '/documents/$documentId': {
       id: '/documents/$documentId'
       path: '/$documentId'
@@ -292,12 +311,14 @@ declare module '@tanstack/react-router' {
 
 interface DocumentsRouteChildren {
   DocumentsDocumentIdRoute: typeof DocumentsDocumentIdRoute
+  DocumentsChatRoute: typeof DocumentsChatRoute
   DocumentsPagesRoute: typeof DocumentsPagesRoute
   DocumentsIndexRoute: typeof DocumentsIndexRoute
 }
 
 const DocumentsRouteChildren: DocumentsRouteChildren = {
   DocumentsDocumentIdRoute: DocumentsDocumentIdRoute,
+  DocumentsChatRoute: DocumentsChatRoute,
   DocumentsPagesRoute: DocumentsPagesRoute,
   DocumentsIndexRoute: DocumentsIndexRoute,
 }

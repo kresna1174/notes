@@ -72,6 +72,111 @@ def _run_ocr(pdf_path: Path) -> list[OcrPage]:
     return pages
 
 
+def _parse_document_to_pages(file_path: Path) -> list[OcrPage]:
+    ext = file_path.suffix.lower()
+    
+    if ext == ".pdf":
+        return _run_ocr(file_path)
+        
+    elif ext in [".pptx", ".ppt"]:
+        from pptx import Presentation
+        prs = Presentation(file_path)
+        pages = []
+        for i, slide in enumerate(prs.slides):
+            slide_text = []
+            for shape in slide.shapes:
+                if hasattr(shape, "text") and shape.text.strip():
+                    slide_text.append(shape.text.strip())
+            pages.append({"index": i, "markdown": "\n".join(slide_text)})
+        return pages
+        
+    elif ext in [".docx", ".doc"]:
+        import docx
+        doc = docx.Document(file_path)
+        pages = []
+        current_page_text = []
+        word_count = 0
+        page_index = 0
+        
+        for paragraph in doc.paragraphs:
+            text = paragraph.text.strip()
+            if not text:
+                continue
+            current_page_text.append(text)
+            word_count += len(text.split())
+            
+            # Simple check for page break inside runs
+            has_page_break = any(
+                "lastRenderedPageBreak" in run._r.xml or "w:br" in run._r.xml 
+                for run in paragraph.runs
+            )
+            
+            if word_count >= 400 or has_page_break:
+                pages.append({"index": page_index, "markdown": "\n\n".join(current_page_text)})
+                current_page_text = []
+                word_count = 0
+                page_index += 1
+                
+        if current_page_text:
+            pages.append({"index": page_index, "markdown": "\n\n".join(current_page_text)})
+        return pages
+        
+    elif ext in [".xlsx", ".xls"]:
+        import openpyxl
+        wb = openpyxl.load_workbook(file_path, data_only=True)
+        pages = []
+        for i, sheet_name in enumerate(wb.sheetnames):
+            sheet = wb[sheet_name]
+            rows = []
+            for row in sheet.iter_rows(values_only=True):
+                if any(cell is not None for cell in row):
+                    rows.append(row)
+            
+            # Format sheet as markdown table
+            markdown_table = []
+            if rows:
+                max_cols = max(len(r) for r in rows)
+                for r in rows:
+                    row_str = " | ".join(str(cell) if cell is not None else "" for cell in r)
+                    markdown_table.append(f"| {row_str} |")
+                if len(markdown_table) > 1:
+                    sep = " | ".join("---" for _ in range(max_cols))
+                    markdown_table.insert(1, f"| {sep} |")
+            
+            pages.append({"index": i, "markdown": f"### Sheet: {sheet_name}\n\n" + "\n".join(markdown_table)})
+        return pages
+        
+    elif ext in [".txt", ".md", ".json"]:
+        content = file_path.read_text(encoding="utf-8", errors="ignore")
+        # Split into pages of ~500 words
+        words = content.split()
+        pages = []
+        chunk_size = 500
+        for i in range(0, len(words), chunk_size):
+            chunk = words[i:i+chunk_size]
+            pages.append({"index": i // chunk_size, "markdown": " ".join(chunk)})
+        if not pages:
+            pages.append({"index": 0, "markdown": ""})
+        return pages
+        
+    else:
+        # Fallback for unrecognized extension: treat as plain text if readable
+        try:
+            content = file_path.read_text(encoding="utf-8")
+            words = content.split()
+            pages = []
+            chunk_size = 500
+            for i in range(0, len(words), chunk_size):
+                chunk = words[i:i+chunk_size]
+                pages.append({"index": i // chunk_size, "markdown": " ".join(chunk)})
+            if not pages:
+                pages.append({"index": 0, "markdown": ""})
+            return pages
+        except Exception:
+            raise ValueError(f"Unsupported file format: {ext}")
+
+
+
 def _persist_pages(document_id: str, pages: list[OcrPage]) -> Path:
     doc_dir = settings.ocr_dir / document_id
     doc_dir.mkdir(parents=True, exist_ok=True)
@@ -81,11 +186,13 @@ def _persist_pages(document_id: str, pages: list[OcrPage]) -> Path:
 
 
 def _index_pages(document_id: str, document_name: str, pages: list[OcrPage]) -> int:
-    if not pages:
+    # Filter out empty pages to prevent OpenRouter embedding API failures (e.g. blank slides)
+    valid_pages = [p for p in pages if p["markdown"] and p["markdown"].strip()]
+    if not valid_pages:
         return 0
 
-    ids = [make_page_id(document_id, page["index"]) for page in pages]
-    documents = [page["markdown"] for page in pages]
+    ids = [make_page_id(document_id, page["index"]) for page in valid_pages]
+    documents = [page["markdown"] for page in valid_pages]
     metadatas: list[Metadata] = [
         {
             "document_id": document_id,
@@ -93,13 +200,13 @@ def _index_pages(document_id: str, document_name: str, pages: list[OcrPage]) -> 
             "page_number": page["index"],
             "total_pages": len(pages),
         }
-        for page in pages
+        for page in valid_pages
     ]
     with chroma_lock:
         collection = get_collection()
         _ = collection.delete(where={"document_id": document_id})
         collection.add(ids=ids, documents=documents, metadatas=metadatas)
-    return len(pages)
+    return len(valid_pages)
 
 
 def _delete_page_rows(session: Session, document_id: str) -> None:
@@ -143,7 +250,7 @@ def create_document(
     document_id, saved_path = _save_upload(file_bytes, original_name)
     record = Document(
         id=document_id,
-        name=saved_path.name,
+        name=Path(original_name).name or "document.pdf",
         path=str(saved_path),
         uploaded_at=datetime.now(timezone.utc),
         status=DocumentStatus.PROCESSING,
@@ -162,8 +269,8 @@ def process_document(document_id: str) -> DocumentMetadata:
             raise ValueError(f"Document {document_id} not found")
 
         try:
-            pdf_path = Path(record.path)
-            pages = _run_ocr(pdf_path)
+            file_path = Path(record.path)
+            pages = _parse_document_to_pages(file_path)
             _ = _persist_pages(record.id, pages)
             _ = _index_pages(record.id, record.name, pages)
             _create_page_rows(session, record.id, pages)
@@ -202,6 +309,7 @@ def delete_document(session: Session, document_id: str) -> bool:
         _ = collection.delete(where={"document_id": document_id})
 
     _delete_page_rows(session, document_id)
+    session.flush()
 
     upload_path = Path(row.path)
     upload_path.unlink(missing_ok=True)

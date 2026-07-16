@@ -1,12 +1,24 @@
 import type { Plugin } from 'vite'
+import { loadEnv } from 'vite'
 import { WebSocketServer } from 'ws'
+import { resolve } from 'path'
 
 export function apiPlugin(): Plugin {
   const wss = new WebSocketServer({ noServer: true })
 
   return {
     name: 'notes-api',
-    configureServer(server) {
+    async configureServer(server) {
+      // Load .env from monorepo root into process.env so db.ts can read DATABASE_URL
+      const env = loadEnv(server.config.mode, resolve(server.config.root, '../..'), '')
+      for (const [key, value] of Object.entries(env)) {
+        if (!(key in process.env)) process.env[key] = value
+      }
+
+      // Initialize DB (create tables + seed admin) in dev mode
+      const { initDb } = await server.ssrLoadModule('/src/modules/shared/db.ts')
+      await initDb().catch((err: Error) => console.error('[api] DB init failed:', err))
+
       server.middlewares.use(async (req, res, next) => {
         if (!req.url?.startsWith('/api/')) return next()
         try {
@@ -34,7 +46,7 @@ export function apiPlugin(): Plugin {
             try {
               const { verifySession, handleYjsConnection } = await server.ssrLoadModule('/src/modules/server/yjs.ts')
               const cookieHeader = request.headers.cookie
-              const isAuth = verifySession(cookieHeader)
+              const isAuth = await verifySession(cookieHeader)
               console.log('[Dev WS] verifySession result:', isAuth)
               
               if (!isAuth) {

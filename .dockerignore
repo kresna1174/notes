@@ -8,3 +8,11 @@ data
 uploads
 .env
 .env.*
+
+# Python caches and virtual environments
+**/.venv
+**/__pycache__
+**/.pytest_cache
+.venv
+apps/ai-agent/.venv
+apps/ai-agent/__pycache__

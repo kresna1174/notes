@@ -21,6 +21,7 @@ function AttachmentNodeView({ node, updateAttributes, deleteNode, editor }: any)
   const [uploading, setUploading] = useState(false)
   const [dragging, setDragging] = useState(false)
   const [previewOpen, setPreviewOpen] = useState(false)
+  const [imgError, setImgError] = useState(false)
   const { attachmentId, filename, mimeType, size, uploadId } = node.attrs
 
   useEffect(() => {
@@ -224,7 +225,7 @@ function AttachmentNodeView({ node, updateAttributes, deleteNode, editor }: any)
     )
   }
 
-  if (isImage(mimeType)) {
+  if (isImage(mimeType) && !imgError) {
     return (
       <NodeViewWrapper>
         <div style={{ position: 'relative', display: 'inline-block', maxWidth: '100%' }}>
@@ -233,6 +234,7 @@ function AttachmentNodeView({ node, updateAttributes, deleteNode, editor }: any)
             alt={filename}
             style={{ maxWidth: '100%', borderRadius: 8, display: 'block', border: '1px solid var(--border)', cursor: 'pointer' }}
             onClick={() => setPreviewOpen(true)}
+            onError={() => setImgError(true)}
           />
           <div style={{
             position: 'absolute', top: 6, right: 6,
@@ -289,6 +291,55 @@ function AttachmentNodeView({ node, updateAttributes, deleteNode, editor }: any)
           mimeType={mimeType}
           size={size}
         />
+      </NodeViewWrapper>
+    )
+  }
+  if (isImage(mimeType) && imgError) {
+    return (
+      <NodeViewWrapper>
+        <div style={{
+          border: '1px solid var(--border)',
+          borderRadius: 8,
+          padding: '16px 20px',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: 8,
+          background: 'rgba(235, 87, 87, 0.04)',
+          borderColor: 'rgba(235, 87, 87, 0.2)',
+          fontFamily: 'var(--font-body)',
+          textAlign: 'center',
+          maxWidth: '350px',
+        }}>
+          <ImageIcon size={28} style={{ color: '#eb5757', opacity: 0.8 }} />
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+            <span style={{ fontSize: '0.8125rem', fontWeight: 600, color: 'var(--fg)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '300px' }}>
+              {filename}
+            </span>
+            <span style={{ fontSize: '0.72rem', color: '#eb5757', fontWeight: 500 }}>
+              Gambar gagal dimuat atau tidak ditemukan
+            </span>
+          </div>
+          <button 
+            onClick={remove}
+            style={{
+              padding: '4px 10px',
+              fontSize: '0.7rem',
+              fontWeight: 500,
+              borderRadius: 6,
+              border: '1px solid rgba(224,49,49,0.3)',
+              background: 'transparent',
+              color: '#e03131',
+              cursor: 'pointer',
+              marginTop: 4,
+            }}
+            onMouseEnter={e => (e.currentTarget.style.background = 'rgba(224,49,49,0.06)')}
+            onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+          >
+            Hapus Blok
+          </button>
+        </div>
       </NodeViewWrapper>
     )
   }

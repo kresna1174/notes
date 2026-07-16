@@ -13,7 +13,8 @@ dependencies = [
     "ddgs>=9.14.4",
     "openai-agents[any-llm,sqlalchemy]>=0.17.2",
     "redis>=7.4.0",
-    "aiosqlite>=0.22.1",
+    "asyncpg>=0.30.0",
+    "psycopg2-binary>=2.9.10",
     "greenlet>=3.5.1",
     "scalar-fastapi>=1.8.2",
     "pandas>=3.0.3",
@@ -27,4 +28,7 @@ dependencies = [
     "pydantic-settings>=2.0.0",
     "mistralai>=2.4.8",
     "python-multipart>=0.0.20",
+    "python-pptx>=1.0.2",
+    "python-docx>=1.1.2",
 ]
+

@@ -3,8 +3,7 @@ import { join, extname, dirname } from 'path'
 import { fileURLToPath } from 'url'
 import { randomUUID } from 'crypto'
 
-const __dirname = dirname(fileURLToPath(import.meta.url))
-const UPLOADS_DIR = join(__dirname, '../../uploads')
+const UPLOADS_DIR = join(process.cwd(), 'uploads')
 
 export function saveFile(buffer: Buffer, originalName: string): string {
   const ext = extname(originalName)

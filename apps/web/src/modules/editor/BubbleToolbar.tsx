@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
-import { Bold, Italic, Underline as UnderlineIcon, Strikethrough, Highlighter, Code, Sparkles, FileText, Globe } from 'lucide-react'
+import { Bold, Italic, Underline as UnderlineIcon, Strikethrough, Highlighter, Code, Sparkles, FileText, Globe, RefreshCw, AlignLeft, Languages, Briefcase, Smile, ArrowLeft } from 'lucide-react'
 import type { Editor } from '@tiptap/react'
 import { DOMSerializer } from '@tiptap/pm/model'
 
@@ -10,6 +10,7 @@ interface BubbleToolbarProps {
 export function BubbleToolbar({ editor }: BubbleToolbarProps) {
   const [pos, setPos] = useState<{ top: number; left: number } | null>(null)
   const [mode, setMode] = useState<'text' | 'table' | null>(null)
+  const [aiMenuOpen, setAiMenuOpen] = useState(false)
   const toolbarRef = useRef<HTMLDivElement>(null)
 
   const handleAiAction = (systemPrompt: string, actionType: 'replace' | 'insert_below' | 'append_to_end', useHtml: boolean = false) => {
@@ -52,6 +53,7 @@ export function BubbleToolbar({ editor }: BubbleToolbarProps) {
       if (!isTable && !hasSelection) {
         setPos(null)
         setMode(null)
+        setAiMenuOpen(false)
         return
       }
 
@@ -60,6 +62,7 @@ export function BubbleToolbar({ editor }: BubbleToolbarProps) {
       if (!domSelection || domSelection.rangeCount === 0) {
         setPos(null)
         setMode(null)
+        setAiMenuOpen(false)
         return
       }
 
@@ -68,6 +71,7 @@ export function BubbleToolbar({ editor }: BubbleToolbarProps) {
       if (!rect || rect.width === 0 && !isTable) {
         setPos(null)
         setMode(null)
+        setAiMenuOpen(false)
         return
       }
 
@@ -75,7 +79,7 @@ export function BubbleToolbar({ editor }: BubbleToolbarProps) {
       if (isTable) {
         const editorEl = editor!.view.dom
         const tableEl = editorEl.querySelector('table')
-        if (!tableEl) { setPos(null); setMode(null); return }
+        if (!tableEl) { setPos(null); setMode(null); setAiMenuOpen(false); return }
         const tableRect = tableEl.getBoundingClientRect()
         setPos({
           top: tableRect.top - 48,
@@ -125,41 +129,114 @@ export function BubbleToolbar({ editor }: BubbleToolbarProps) {
     >
       {mode === 'text' && (
         <>
-          <Btn icon={<Bold size={13} />} active={editor.isActive('bold')} onClick={() => editor.chain().focus().toggleBold().run()} title="Bold" />
-          <Btn icon={<Italic size={13} />} active={editor.isActive('italic')} onClick={() => editor.chain().focus().toggleItalic().run()} title="Italic" />
-          <Btn icon={<UnderlineIcon size={13} />} active={editor.isActive('underline')} onClick={() => editor.chain().focus().toggleUnderline().run()} title="Underline" />
-          <Btn icon={<Strikethrough size={13} />} active={editor.isActive('strike')} onClick={() => editor.chain().focus().toggleStrike().run()} title="Strikethrough" />
-          <Btn icon={<Code size={13} />} active={editor.isActive('code')} onClick={() => editor.chain().focus().toggleCode().run()} title="Code" />
-          <Btn icon={<Highlighter size={13} />} active={editor.isActive('highlight')} onClick={() => editor.chain().focus().toggleHighlight().run()} title="Highlight" />
-          <div style={{ width: 1, background: '#ffffff33', margin: '0 4px', height: 16 }} />
-          <Btn 
-            icon={<Sparkles size={13} style={{ color: '#c084fc' }} />} 
-            active={false} 
-            onClick={() => handleAiAction('Please fix grammar, fix typos, and improve the following text/HTML to be more professional. You MUST preserve all HTML tags (like <strong>, <em>, <u>, <span>, <mark>, etc.) at the correct word positions to maintain the formatting/style of the text.', 'replace', true)}
-            title="Fix with AI" 
-          />
-          <Btn 
-            icon={<FileText size={13} style={{ color: '#c084fc' }} />} 
-            active={false} 
-            onClick={() => handleAiAction('Please create a short summary in bullet points from the following text.', 'append_to_end')}
-            title="Summarize with AI" 
-          />
-          <Btn 
-            icon={<Globe size={13} style={{ color: '#c084fc' }} />} 
-            active={false} 
-            onClick={() => handleAiAction('Please translate the following text/HTML to English naturally. You MUST preserve all HTML tags (like <strong>, <em>, <u>, <span>, <mark>, etc.) at the correct word positions to maintain the formatting/style of the text.', 'replace', true)}
-            title="Translate to English" 
-          />
-          <div style={{ width: 1, background: '#ffffff33', margin: '0 4px', height: 16 }} />
-          {[1, 2, 3].map(level => (
-            <Btn
-              key={level}
-              icon={<span style={{ fontSize: '0.7rem', fontWeight: 700 }}>H{level}</span>}
-              active={editor.isActive('heading', { level })}
-              onClick={() => editor.chain().focus().toggleHeading({ level: level as 1|2|3 }).run()}
-              title={`Heading ${level}`}
-            />
-          ))}
+          {aiMenuOpen ? (
+            <>
+              <button
+                onClick={() => setAiMenuOpen(false)}
+                style={{
+                  padding: '3px 8px', fontSize: '0.72rem', fontWeight: 600,
+                  borderRadius: 5, border: 'none', cursor: 'pointer',
+                  background: 'transparent', color: '#ced4da', display: 'flex', alignItems: 'center', gap: 4
+                }}
+                onMouseEnter={e => (e.currentTarget.style.background = '#ffffff22')}
+                onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+              >
+                <ArrowLeft size={13} />
+              </button>
+              <div style={{ width: 1, background: '#ffffff33', margin: '0 4px', height: 16 }} />
+              <Btn 
+                icon={<Sparkles size={13} style={{ color: 'var(--primary)' }} />} 
+                active={false} 
+                onClick={() => {
+                  handleAiAction('Please fix grammar, fix typos, and improve the following text/HTML to be more professional. You MUST preserve all HTML tags (like <strong>, <em>, <u>, <span>, <mark>, etc.) at the correct word positions to maintain the formatting/style of the text.', 'replace', true, 'editor')
+                  setAiMenuOpen(false)
+                }}
+                title="Improve Writing"
+              />
+              <Btn 
+                icon={<RefreshCw size={13} style={{ color: 'var(--primary)' }} />} 
+                active={false} 
+                onClick={() => {
+                  handleAiAction('Please rewrite the following text/HTML to make it more engaging, clear, and varied in phrasing. You MUST preserve all HTML tags (like <strong>, <em>, <u>, <span>, <mark>, etc.) at the correct word positions to maintain the formatting/style of the text.', 'replace', true, 'editor')
+                  setAiMenuOpen(false)
+                }}
+                title="Rewrite / Rephrase"
+              />
+              <Btn 
+                icon={<AlignLeft size={13} style={{ color: 'var(--primary)' }} />} 
+                active={false} 
+                onClick={() => {
+                  handleAiAction('Please create a short summary in bullet points from the following text.', 'insert_below', false, 'summarizer')
+                  setAiMenuOpen(false)
+                }}
+                title="Summarize"
+              />
+              <Btn 
+                icon={<Globe size={13} style={{ color: 'var(--primary)' }} />} 
+                active={false} 
+                onClick={() => {
+                  handleAiAction('Please translate the following text/HTML to English naturally. You MUST preserve all HTML tags (like <strong>, <em>, <u>, <span>, <mark>, etc.) at the correct word positions to maintain the formatting/style of the text.', 'replace', true, 'translator')
+                  setAiMenuOpen(false)
+                }}
+                title="Translate to English"
+              />
+              <Btn 
+                icon={<Languages size={13} style={{ color: 'var(--primary)' }} />} 
+                active={false} 
+                onClick={() => {
+                  handleAiAction('Please translate the following text/HTML to Indonesian (Bahasa Indonesia) naturally. You MUST preserve all HTML tags (like <strong>, <em>, <u>, <span>, <mark>, etc.) at the correct word positions to maintain the formatting/style of the text.', 'replace', true, 'translator')
+                  setAiMenuOpen(false)
+                }}
+                title="Translate to Indonesian"
+              />
+              <Btn 
+                icon={<Briefcase size={13} style={{ color: 'var(--primary)' }} />} 
+                active={false} 
+                onClick={() => {
+                  handleAiAction('Please rewrite the following text/HTML in a formal, professional tone. You MUST preserve all HTML tags (like <strong>, <em>, <u>, <span>, <mark>, etc.) at the correct word positions to maintain the formatting/style of the text.', 'replace', true, 'editor')
+                  setAiMenuOpen(false)
+                }}
+                title="Change Tone to Formal"
+              />
+              <Btn 
+                icon={<Smile size={13} style={{ color: 'var(--primary)' }} />} 
+                active={false} 
+                onClick={() => {
+                  handleAiAction('Please rewrite the following text/HTML in a friendly, casual tone. You MUST preserve all HTML tags (like <strong>, <em>, <u>, <span>, <mark>, etc.) at the correct word positions to maintain the formatting/style of the text.', 'replace', true, 'editor')
+                  setAiMenuOpen(false)
+                }}
+                title="Change Tone to Casual"
+              />
+            </>
+          ) : (
+            <>
+              <Btn icon={<Bold size={13} />} active={editor.isActive('bold')} onClick={() => editor.chain().focus().toggleBold().run()} title="Bold" />
+              <Btn icon={<Italic size={13} />} active={editor.isActive('italic')} onClick={() => editor.chain().focus().toggleItalic().run()} title="Italic" />
+              <Btn icon={<UnderlineIcon size={13} />} active={editor.isActive('underline')} onClick={() => editor.chain().focus().toggleUnderline().run()} title="Underline" />
+              <Btn icon={<Strikethrough size={13} />} active={editor.isActive('strike')} onClick={() => editor.chain().focus().toggleStrike().run()} title="Strikethrough" />
+              <Btn icon={<Code size={13} />} active={editor.isActive('code')} onClick={() => editor.chain().focus().toggleCode().run()} title="Code" />
+              <Btn icon={<Highlighter size={13} />} active={editor.isActive('highlight')} onClick={() => editor.chain().focus().toggleHighlight().run()} title="Highlight" />
+              <div style={{ width: 1, background: '#ffffff33', margin: '0 4px', height: 16 }} />
+              
+              <Btn 
+                icon={<Sparkles size={13} style={{ color: 'var(--primary)' }} />} 
+                active={false} 
+                onClick={() => setAiMenuOpen(true)}
+                title="AI Assistant" 
+              />
+              
+              <div style={{ width: 1, background: '#ffffff33', margin: '0 4px', height: 16 }} />
+              {[1, 2, 3].map(level => (
+                <Btn
+                  key={level}
+                  icon={<span style={{ fontSize: '0.7rem', fontWeight: 700 }}>H{level}</span>}
+                  active={editor.isActive('heading', { level })}
+                  onClick={() => editor.chain().focus().toggleHeading({ level: level as 1|2|3 }).run()}
+                  title={`Heading ${level}`}
+                />
+              ))}
+            </>
+          )}
         </>
       )}
 

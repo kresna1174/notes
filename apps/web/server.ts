@@ -4,6 +4,7 @@ import { join, extname } from 'path'
 import { handleApiRequest } from './src/modules/server/api'
 import { WebSocketServer } from 'ws'
 import { verifySession, handleYjsConnection } from './src/modules/server/yjs'
+import { initDb } from './src/modules/shared/db'
 
 const PORT = process.env.PORT || 3000
 const DIST_DIR = join(process.cwd(), 'dist')
@@ -86,15 +87,15 @@ const server = createServer(async (req, res) => {
 
 const wss = new WebSocketServer({ noServer: true })
 
-server.on('upgrade', (request, socket, head) => {
+server.on('upgrade', async (request, socket, head) => {
   const url = new URL(request.url || '', `http://${request.headers.host || 'localhost'}`)
   const pathname = url.pathname
   const match = pathname.match(/^\/api\/notes\/([^\/]+)\/collaboration\/([^\/]+)$/)
-  
+
   if (match) {
     const noteId = match[1]
     const cookieHeader = request.headers.cookie
-    if (!verifySession(cookieHeader)) {
+    if (!await verifySession(cookieHeader)) {
       socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n')
       socket.destroy()
       return
@@ -111,6 +112,11 @@ wss.on('connection', (ws: any, _request: any, noteId: any) => {
   handleYjsConnection(ws, noteId as string)
 })
 
-server.listen(PORT, () => {
-  console.log(`Server running in production on port ${PORT}`)
+initDb().then(() => {
+  server.listen(PORT, () => {
+    console.log(`Server running in production on port ${PORT}`)
+  })
+}).catch((err) => {
+  console.error('[db init failed]', err)
+  process.exit(1)
 })
