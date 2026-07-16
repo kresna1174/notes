@@ -38,6 +38,7 @@ import { NoteIcon } from '../shared/ui'
 import { useEffect, useRef, useState, useMemo } from 'react'
 import { Eye, EyeOff, Lock, LockOpen, Share2, FileUp, Paperclip, Sparkles, Smile, Image as ImageIcon, Clock, Download, Loader2 } from 'lucide-react'
 import { ExportModal } from './ExportModal'
+import { WikiIngestButton } from '../wiki'
 import { marked } from 'marked'
 import mammoth from 'mammoth'
 import * as XLSX from 'xlsx'
@@ -1419,6 +1420,13 @@ export function Editor({ note, onUpdate, onSaveStatusChange, onLockChange, share
               >
                 <Download size={14} />
               </button>
+
+              <WikiIngestButton
+                noteId={note.id}
+                noteTitle={title || note.title || 'Untitled'}
+                noteContent={note.content || ''}
+                compact
+              />
 
               <input
                 ref={attachInputRef}
