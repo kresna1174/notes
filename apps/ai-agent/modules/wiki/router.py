@@ -336,7 +336,7 @@ async def lint_wiki(
     _WIKI_LINK_RE = _re.compile(r"\[\[([^\[\]]+?)\]\]")
 
     for page in pages:
-        targets = [m.group(1).strip() for m in _WIKI_LINK_RE.finditer(page.content)]
+        targets = [m.group(1).strip().split('|')[0].strip() for m in _WIKI_LINK_RE.finditer(page.content)]
         for target in targets:
             if target in slug_set:
                 inbound[target] = inbound.get(target, 0) + 1
@@ -362,7 +362,7 @@ async def lint_wiki(
                 stale_backlinks.append({"page": page.slug, "stale_backlink": backlink_slug})
                 continue
             # Verify the source page actually links to this page
-            refs = [m.group(1).strip() for m in _WIKI_LINK_RE.finditer(source_page.content)]
+            refs = [m.group(1).strip().split('|')[0].strip() for m in _WIKI_LINK_RE.finditer(source_page.content)]
             if page.slug not in refs:
                 stale_backlinks.append({"page": page.slug, "stale_backlink": backlink_slug})
 

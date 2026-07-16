@@ -53,7 +53,8 @@ def _parse_wikilinks(content: str) -> list[str]:
     seen: set[str] = set()
     slugs: list[str] = []
     for match in _WIKI_LINK_RE.finditer(content):
-        slug = match.group(1).strip()
+        raw_slug = match.group(1).strip()
+        slug = raw_slug.split('|')[0].strip()
         if slug and slug not in seen:
             seen.add(slug)
             slugs.append(slug)
