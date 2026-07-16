@@ -936,7 +936,7 @@ function PageView({ slug, onBack, onNavigate, onToast }: PageViewProps) {
       </div>
 
       <ScrollArea className="flex-1">
-        <div style={{ padding: '28px 36px', maxWidth: 780 }}>
+        <div style={{ padding: '28px 60px 48px', maxWidth: 'none', width: '100%', boxSizing: 'border-box' }}>
           {/* Title + Meta */}
           <h1
             style={{
