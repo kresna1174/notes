@@ -91,7 +91,7 @@ async def create_wiki_page(
     Automatically parses [[WikiLink]] references in content and propagates
     backlinks to the linked target pages.
     """
-    now = datetime.now(timezone.utc)
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
     page = WikiPage(
         id=str(uuid.uuid4()),
         slug=slug,
@@ -147,7 +147,7 @@ async def update_wiki_page(
     if backlinks is not None:
         page.backlinks = _dumps(backlinks)
 
-    page.updated_at = datetime.now(timezone.utc)
+    page.updated_at = datetime.now(timezone.utc).replace(tzinfo=None)
     db.add(page)
     await db.flush()
 
@@ -219,6 +219,7 @@ async def get_wiki_index(db: AsyncSession) -> dict:
         index[cat].append({
             "slug": page.slug,
             "title": page.title,
+            "content": page.content,
             "tags": _loads(page.tags),
             "updated_at": page.updated_at.isoformat(),
         })
@@ -286,7 +287,7 @@ async def create_wiki_ingest_log(
     summary: str | None = None,
 ) -> WikiIngestLog:
     """Create and persist a wiki ingest log entry."""
-    now = datetime.now(timezone.utc)
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
     log = WikiIngestLog(
         id=str(uuid.uuid4()),
         note_id=note_id,

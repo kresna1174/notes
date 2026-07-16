@@ -617,7 +617,7 @@ function IndexView({
                           slug={page.slug}
                           title={page.title}
                           category={page.category}
-                          excerpt={page.content.replace(/[#*`\[\]]/g, '').slice(0, 120)}
+                          excerpt={(page.content || '').replace(/[#*`\[\]]/g, '').slice(0, 120)}
                           tags={page.tags}
                           updatedAt={page.updated_at}
                           onClick={() => onOpenPage(page.slug)}
@@ -816,7 +816,7 @@ function PageView({ slug, onBack, onNavigate, onToast }: PageViewProps) {
 
   const renderedHTML = useMemo(() => {
     if (!page) return ''
-    const withLinks = resolveWikiLinks(page.content)
+    const withLinks = resolveWikiLinks(page.content || '')
     return renderMarkdown(withLinks)
   }, [page])
 
