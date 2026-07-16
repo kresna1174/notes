@@ -35,6 +35,8 @@ from modules.chat.api import _register_routes
 from modules.documents.router import router as documents_router
 from modules.pages.router import router as pages_router
 from modules.queries.router import router as queries_router
+from modules.wiki.router import router as wiki_router
+import modules.wiki.models  # noqa: F401 — registers WikiPage / WikiIngestLog with Base.metadata
 
 
 @asynccontextmanager
@@ -57,6 +59,7 @@ _register_routes(app)
 app.include_router(documents_router)
 app.include_router(pages_router)
 app.include_router(queries_router)
+app.include_router(wiki_router)
 
 
 @app.get("/docs", include_in_schema=False)

@@ -499,3 +499,144 @@ def search_rag_documents(query: str, document_id: str | None = None, n_results: 
     except Exception as e:
         return f"Error searching RAG documents: {str(e)}"
 
+
+# ── Wiki tools ────────────────────────────────────────────────────────────────
+
+@function_tool
+async def query_wiki(ctx: RunContextWrapper[dict], query: str) -> str:
+    """Search the wiki knowledge base for information compiled from ingested notes.
+
+    Use this when the user asks about topics that may have been previously covered
+    in notes that were ingested into the wiki. Returns the most relevant wiki pages
+    with excerpts, ranked by BM25 relevance score.
+
+    Args:
+        query: A search query or question to look up in the wiki.
+    """
+    try:
+        from core.database import AsyncSessionLocal
+        from modules.wiki import methods as wiki_methods
+
+        async with AsyncSessionLocal() as db:
+            results = await wiki_methods.search_wiki_pages(db, query)
+
+        if not results:
+            return f"No wiki pages found matching '{query}'."
+
+        output_parts = [f"Wiki search results for: **{query}**\n"]
+        for i, r in enumerate(results[:8], 1):
+            output_parts.append(
+                f"{i}. **{r['title']}** (`{r['slug']}`) [{r['category']}]\n"
+                f"   Score: {r['score']} | Excerpt: {r['excerpt']}"
+            )
+        return "\n".join(output_parts)
+    except Exception as e:
+        return f"Error searching wiki: {str(e)}"
+
+
+@function_tool
+async def ingest_note_to_wiki(
+    ctx: RunContextWrapper[dict],
+    note_id: str,
+    note_title: str,
+    note_content: str,
+) -> str:
+    """Process and integrate a note into the persistent wiki knowledge base.
+
+    Runs the WikiIngestAgent which automatically:
+    - Creates a summary page for the note
+    - Creates or updates entity pages (people, orgs, projects)
+    - Creates or updates concept pages (ideas, themes)
+    - Cross-links pages using [[WikiLink]] syntax
+
+    Use this when the user asks to "add to wiki", "save to wiki", or "remember this".
+
+    Args:
+        note_id: The unique ID of the note to ingest.
+        note_title: The title of the note.
+        note_content: The full text or HTML content of the note.
+    """
+    try:
+        from agents import Runner
+        from core.database import AsyncSessionLocal
+        from modules.wiki.agent import wiki_ingest_agent
+        from modules.wiki import methods as wiki_methods
+
+        agent_input = (
+            f"Ingest the following note into the wiki.\n\n"
+            f"**Note ID:** {note_id}\n"
+            f"**Note Title:** {note_title}\n\n"
+            f"## Note Content\n\n{note_content}"
+        )
+
+        result = await Runner.run(
+            wiki_ingest_agent,
+            agent_input,
+            context={"note_id": note_id, "note_title": note_title},
+            max_turns=30,
+        )
+
+        agent_summary = result.final_output or "Wiki ingest completed."
+
+        # Fetch the most recent ingest log for this note to report counts
+        async with AsyncSessionLocal() as db:
+            recent_logs = await wiki_methods.get_wiki_log(db)
+
+        matching = next((lg for lg in recent_logs if lg.note_id == note_id), None)
+        if matching:
+            import json as _json
+            created = _json.loads(matching.pages_created or "[]")
+            updated = _json.loads(matching.pages_updated or "[]")
+            return (
+                f"✓ Wiki ingest complete for **{note_title}**.\n"
+                f"  Pages created: {len(created)} ({', '.join(created) or 'none'})\n"
+                f"  Pages updated: {len(updated)} ({', '.join(updated) or 'none'})\n"
+                f"  Summary: {agent_summary}"
+            )
+
+        return f"✓ Wiki ingest complete for **{note_title}**.\n  {agent_summary}"
+    except Exception as e:
+        return f"Error ingesting note into wiki: {str(e)}"
+
+
+@function_tool
+async def read_wiki_index(ctx: RunContextWrapper[dict]) -> str:
+    """Browse the full wiki index organised by category.
+
+    Returns a Markdown-formatted listing of all wiki pages grouped by category
+    (summary, entity, concept, synthesis, etc.). Use this when the user wants
+    an overview of the accumulated knowledge wiki.
+    """
+    try:
+        from core.database import AsyncSessionLocal
+        from modules.wiki import methods as wiki_methods
+
+        async with AsyncSessionLocal() as db:
+            index = await wiki_methods.get_wiki_index(db)
+
+        if not index:
+            return "The wiki is currently empty — no pages have been ingested yet."
+
+        lines = ["# Wiki Index\n"]
+        category_order = ["summary", "entity", "concept", "synthesis", "index", "log"]
+        all_cats = list(index.keys())
+        ordered_cats = [c for c in category_order if c in all_cats] + sorted(
+            c for c in all_cats if c not in category_order
+        )
+
+        total = sum(len(v) for v in index.values())
+        lines.append(f"**Total pages:** {total}\n")
+
+        for cat in ordered_cats:
+            entries = index[cat]
+            lines.append(f"\n## {cat.capitalize()} ({len(entries)})")
+            for entry in entries:
+                tags_str = ", ".join(entry["tags"]) if entry["tags"] else "—"
+                lines.append(
+                    f"- **{entry['title']}** (`{entry['slug']}`) — tags: {tags_str}"
+                )
+
+        return "\n".join(lines)
+    except Exception as e:
+        return f"Error reading wiki index: {str(e)}"
+

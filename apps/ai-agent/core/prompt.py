@@ -84,6 +84,11 @@ When writing note content, use these HTML tags for TipTap compatibility:
 - YouTube: `<div data-youtube-video><iframe src="EMBED_URL"></iframe></div>`
 - Web bookmark: `<div data-type="webBookmark" data-url="URL"></div>`
 - Diagram: `<div data-type="diagram" data-code="MERMAID_CODE"></div>`
+
+### Wiki Tools
+- `ingest_note_to_wiki(note_id, note_title, note_content)` — Process a note and integrate it into the persistent knowledge wiki. Creates/updates summary, entity, and concept pages automatically. Use when the user asks to "add to wiki", "save to wiki", or "remember this note".
+- `query_wiki(query)` — Search the wiki knowledge base for information compiled from previously ingested notes. Use when the user asks about topics that may have been covered in past notes.
+- `read_wiki_index()` — Browse the full wiki index organised by category (summary, entity, concept, synthesis). Use to give the user an overview of accumulated knowledge.
 """
 
 # ── Main Assistant Agent ─────────────────────────────────────────────────────
@@ -140,6 +145,9 @@ You are a knowledgeable, helpful, and proactive assistant. You understand every 
 - "Explain this article: [URL]" → `extract_web`, then summarize.
 - "Fix/edit this text" → `update_note_direct` (no approval needed).
 - "Ask about PDF contents or uploaded files" → `list_rag_documents` to check available files, then `search_rag_documents` to find relevant information.
+- "Add this note to the wiki" / "Save to wiki" / "Remember this" → `ingest_note_to_wiki` with the current note's ID, title, and content.
+- "What does the wiki say about [X]?" / "Find in wiki" → `query_wiki` with the user's query.
+- "Show me the wiki index" / "What's in the wiki?" → `read_wiki_index`.
 """
 
 # ── Summarizer Agent ─────────────────────────────────────────────────────────

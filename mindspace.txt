@@ -1,0 +1,138 @@
+# Mindspace
+
+> **Sistem Knowledge Management berbasis AI untuk Dokumentasi dan Pencarian Pengetahuan Organisasi**
+
+## Latar Belakang
+
+Pengetahuan (knowledge) merupakan salah satu aset paling berharga bagi setiap organisasi. Namun dalam praktiknya, pengetahuan sering kali tersebar di berbagai dokumen kerja, aplikasi, maupun hanya tersimpan dalam pengalaman individu (tacit knowledge) tanpa dokumentasi yang baik.
+
+Kondisi tersebut menimbulkan beberapa permasalahan, antara lain:
+
+- Sulit menemukan informasi yang dibutuhkan.
+- Risiko hilangnya knowledge ketika karyawan berpindah atau meninggalkan organisasi.
+- Tidak adanya standar dokumentasi yang konsisten.
+- Proses berbagi pengetahuan menjadi lambat dan kurang efektif.
+- Sulit mengubah hasil diskusi atau pengalaman kerja menjadi dokumentasi yang mudah dipahami.
+
+Akibatnya, organisasi kehilangan peluang untuk memanfaatkan pengetahuan sebagai aset yang dapat digunakan kembali dan dikembangkan.
+
+---
+
+## Solusi
+
+**Mindspace** adalah sistem **Knowledge Management** yang berfungsi sebagai pusat dokumentasi pengetahuan (Knowledge Base) organisasi.
+
+Mindspace memanfaatkan teknologi **Large Language Model (LLM)** dan **Retrieval-Augmented Generation (RAG)** untuk membantu proses pembuatan, pengelolaan, dan pencarian knowledge secara lebih cepat dan akurat.
+
+Dengan Mindspace, organisasi dapat:
+
+- Mendokumentasikan knowledge dalam format yang terstruktur.
+- Mengubah hasil diskusi maupun dokumen menjadi knowledge yang mudah dipahami.
+- Menemukan informasi secara cepat melalui AI Chat.
+- Menjaga agar knowledge organisasi tetap tersimpan meskipun terjadi pergantian personel.
+- Mempercepat proses onboarding, kolaborasi, dan inovasi melalui distribusi pengetahuan yang lebih merata.
+
+---
+
+# Minimum Viable Product (MVP)
+
+## 1. Knowledge Management
+
+Fitur untuk mengelola dokumen knowledge organisasi.
+
+**Fitur:**
+- Membuat dokumen (Create)
+- Mengubah dokumen (Edit)
+- Menghapus dokumen (Delete)
+- Rich Text Editor seperti Notion
+- Struktur halaman dan dokumentasi yang mudah dibaca
+
+---
+
+## 2. AI Writing Assistant
+
+Asisten AI yang membantu pengguna membuat dokumentasi berdasarkan berbagai sumber informasi.
+
+**Kemampuan:**
+
+- Mengubah hasil diskusi menjadi dokumentasi.
+- Membuat ringkasan dokumen.
+- Menyusun SOP, panduan kerja, maupun artikel knowledge.
+- Mengolah file sebagai referensi, seperti:
+  - PDF
+  - DOCX
+  - XLSX
+  - PPTX
+  - Gambar (OCR)
+
+---
+
+## 3. AI Knowledge Search
+
+Asisten AI yang dapat menjawab pertanyaan berdasarkan knowledge yang tersimpan di dalam sistem menggunakan teknologi **RAG (Retrieval-Augmented Generation)**.
+
+**Kemampuan:**
+
+- Menjawab pertanyaan berdasarkan knowledge internal.
+- Memberikan referensi dokumen yang digunakan.
+- Melakukan pencarian informasi menggunakan bahasa alami (Natural Language).
+
+---
+
+## 4. AI Assistant Skill Management
+
+Fitur untuk mengelola kemampuan (skill) AI sesuai kebutuhan organisasi.
+
+Contoh skill:
+
+- Knowledge Writer
+- Knowledge Reviewer
+- SOP Generator
+- Meeting Note Generator
+- Technical Documentation Assistant
+- Q&A Assistant
+
+---
+
+## 5. AI Instruction Management
+
+Fitur untuk mengatur perilaku AI agar sesuai dengan standar organisasi.
+
+Meliputi:
+
+- Writing Instruction
+  - Gaya bahasa
+  - Format dokumen
+  - Template dokumentasi
+  - Standar penulisan
+
+- Reading Instruction
+  - Prioritas sumber knowledge
+  - Aturan pencarian informasi
+  - Cara AI memberikan jawaban
+  - Format sitasi atau referensi
+
+---
+
+# Teknologi AI
+
+Mindspace memanfaatkan kombinasi teknologi AI modern:
+
+- **Large Language Model (LLM)** untuk memahami dan menghasilkan teks.
+- **Retrieval-Augmented Generation (RAG)** agar AI dapat menjawab berdasarkan knowledge organisasi.
+- **OCR (Optical Character Recognition)** untuk membaca dokumen berbentuk gambar.
+- **Document Parsing** untuk mengekstrak informasi dari PDF, Word, Excel, dan PowerPoint.
+
+---
+
+# Manfaat
+
+Dengan Mindspace, organisasi dapat memperoleh berbagai manfaat, antara lain:
+
+- Menjaga knowledge sebagai aset organisasi.
+- Mengurangi ketergantungan pada individu tertentu.
+- Mempercepat proses dokumentasi.
+- Mempermudah pencarian informasi.
+- Meningkatkan kolaborasi antar tim.
+- Mempercepat proses onboarding karyawan baru.
+- Mendukung terciptanya budaya berbagi pengetahuan dan inovasi secara berkelanjutan.
