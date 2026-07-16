@@ -1,7 +1,5 @@
-// WikiAPI.ts — API client for the LLM Wiki agent
-// Base URL: AI_AGENT_URL env var or http://localhost:8000
-
-const AI_AGENT_URL = (import.meta as any).env?.VITE_AI_AGENT_URL ?? 'http://localhost:8000'
+// WikiAPI.ts — API client for the LLM Wiki feature
+// All requests go through the BFF server (/api/wiki/*) to avoid CORS.
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -62,7 +60,7 @@ export interface WikiLintResult {
 // ─── Internal helpers ─────────────────────────────────────────────────────────
 
 async function wikiApiFetch<T>(path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(`${AI_AGENT_URL}${path}`, {
+  const response = await fetch(`/api${path}`, {
     ...init,
     headers: {
       'Content-Type': 'application/json',
@@ -79,7 +77,7 @@ async function wikiApiFetch<T>(path: string, init?: RequestInit): Promise<T> {
 }
 
 async function wikiApiFetchEmpty(path: string, init?: RequestInit): Promise<void> {
-  const response = await fetch(`${AI_AGENT_URL}${path}`, {
+  const response = await fetch(`/api${path}`, {
     ...init,
     headers: {
       'Content-Type': 'application/json',
