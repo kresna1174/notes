@@ -3,7 +3,7 @@ import json
 import logging
 from datetime import datetime, timezone
 
-from sqlmodel import Session, select
+from sqlmodel import Session
 
 from models.engine import engine
 from modules.notes_index.models import NoteIndex
@@ -31,7 +31,7 @@ def _extract_text_nodes(node: dict, texts: list[str]) -> None:
         return
     if node.get("type") == "text" and "text" in node:
         texts.append(node["text"])
-    for child in node.get("content", []):
+    for child in (node.get("content") or []):
         _extract_text_nodes(child, texts)
 
 
