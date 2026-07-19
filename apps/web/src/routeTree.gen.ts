@@ -17,6 +17,7 @@ import { Route as SearchIndexRouteImport } from './routes/search/index'
 import { Route as OrganizationsIndexRouteImport } from './routes/organizations/index'
 import { Route as LoginIndexRouteImport } from './routes/login/index'
 import { Route as DocumentsIndexRouteImport } from './routes/documents/index'
+import { Route as ConnectAccountIndexRouteImport } from './routes/connect-account/index'
 import { Route as AskAgentIndexRouteImport } from './routes/ask-agent/index'
 import { Route as ShareTokenRouteImport } from './routes/share/$token'
 import { Route as PagesPageIdRouteImport } from './routes/pages/$pageId'
@@ -65,6 +66,11 @@ const DocumentsIndexRoute = DocumentsIndexRouteImport.update({
   path: '/',
   getParentRoute: () => DocumentsRoute,
 } as any)
+const ConnectAccountIndexRoute = ConnectAccountIndexRouteImport.update({
+  id: '/connect-account/',
+  path: '/connect-account/',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AskAgentIndexRoute = AskAgentIndexRouteImport.update({
   id: '/ask-agent/',
   path: '/ask-agent/',
@@ -112,6 +118,7 @@ export interface FileRoutesByFullPath {
   '/pages/$pageId': typeof PagesPageIdRoute
   '/share/$token': typeof ShareTokenRoute
   '/ask-agent/': typeof AskAgentIndexRoute
+  '/connect-account/': typeof ConnectAccountIndexRoute
   '/documents/': typeof DocumentsIndexRoute
   '/login/': typeof LoginIndexRoute
   '/organizations/': typeof OrganizationsIndexRoute
@@ -128,6 +135,7 @@ export interface FileRoutesByTo {
   '/pages/$pageId': typeof PagesPageIdRoute
   '/share/$token': typeof ShareTokenRoute
   '/ask-agent': typeof AskAgentIndexRoute
+  '/connect-account': typeof ConnectAccountIndexRoute
   '/documents': typeof DocumentsIndexRoute
   '/login': typeof LoginIndexRoute
   '/organizations': typeof OrganizationsIndexRoute
@@ -146,6 +154,7 @@ export interface FileRoutesById {
   '/pages/$pageId': typeof PagesPageIdRoute
   '/share/$token': typeof ShareTokenRoute
   '/ask-agent/': typeof AskAgentIndexRoute
+  '/connect-account/': typeof ConnectAccountIndexRoute
   '/documents/': typeof DocumentsIndexRoute
   '/login/': typeof LoginIndexRoute
   '/organizations/': typeof OrganizationsIndexRoute
@@ -165,6 +174,7 @@ export interface FileRouteTypes {
     | '/pages/$pageId'
     | '/share/$token'
     | '/ask-agent/'
+    | '/connect-account/'
     | '/documents/'
     | '/login/'
     | '/organizations/'
@@ -181,6 +191,7 @@ export interface FileRouteTypes {
     | '/pages/$pageId'
     | '/share/$token'
     | '/ask-agent'
+    | '/connect-account'
     | '/documents'
     | '/login'
     | '/organizations'
@@ -198,6 +209,7 @@ export interface FileRouteTypes {
     | '/pages/$pageId'
     | '/share/$token'
     | '/ask-agent/'
+    | '/connect-account/'
     | '/documents/'
     | '/login/'
     | '/organizations/'
@@ -213,6 +225,7 @@ export interface RootRouteChildren {
   PagesPageIdRoute: typeof PagesPageIdRoute
   ShareTokenRoute: typeof ShareTokenRoute
   AskAgentIndexRoute: typeof AskAgentIndexRoute
+  ConnectAccountIndexRoute: typeof ConnectAccountIndexRoute
   LoginIndexRoute: typeof LoginIndexRoute
   OrganizationsIndexRoute: typeof OrganizationsIndexRoute
   SearchIndexRoute: typeof SearchIndexRoute
@@ -276,6 +289,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/documents/'
       preLoaderRoute: typeof DocumentsIndexRouteImport
       parentRoute: typeof DocumentsRoute
+    }
+    '/connect-account/': {
+      id: '/connect-account/'
+      path: '/connect-account'
+      fullPath: '/connect-account/'
+      preLoaderRoute: typeof ConnectAccountIndexRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/ask-agent/': {
       id: '/ask-agent/'
@@ -355,6 +375,7 @@ const rootRouteChildren: RootRouteChildren = {
   PagesPageIdRoute: PagesPageIdRoute,
   ShareTokenRoute: ShareTokenRoute,
   AskAgentIndexRoute: AskAgentIndexRoute,
+  ConnectAccountIndexRoute: ConnectAccountIndexRoute,
   LoginIndexRoute: LoginIndexRoute,
   OrganizationsIndexRoute: OrganizationsIndexRoute,
   SearchIndexRoute: SearchIndexRoute,

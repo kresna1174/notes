@@ -11,10 +11,10 @@ export const Route = createRootRouteWithContext<RouterContext>()({
     if (context.auth.loading || isPublic) return
 
     if (!context.auth.user && location.pathname !== '/login') {
-      throw redirect({ to: '/login' })
+      throw redirect({ to: '/login', search: {} })
     }
     if (context.auth.user && location.pathname === '/login') {
-      throw redirect({ to: '/' })
+      throw redirect({ to: '/', search: {} })
     }
   },
   component: RootComponent,

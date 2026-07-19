@@ -1,11 +1,15 @@
-import { createFileRoute, useNavigate } from '@tanstack/react-router'
+import { createFileRoute, useNavigate, useSearch } from '@tanstack/react-router'
 import { useState, useEffect, useRef } from 'react'
 import { useAuth } from '#/modules/shared/auth'
 import { useTheme } from '#/modules/shared/theme'
 import { Eye, EyeOff, Sun, Moon, Brain } from 'lucide-react'
 import { AboutModal } from '#/modules/auth'
+import { authClient } from '#/modules/shared/auth-client'
 
 export const Route = createFileRoute('/login/')({
+  validateSearch: (search: Record<string, unknown>) => ({
+    error: (search.error as string) ?? null,
+  }),
   component: LoginPage,
 })
 
@@ -339,6 +343,7 @@ function StaticTerminal({ title, lines, opacity, width, height, top, bottom, lef
 function LoginPage() {
   const { login, user } = useAuth()
   const navigate = useNavigate()
+  const search = useSearch({ from: '/login/' })
   const { theme, toggle } = useTheme()
   const [isRegister, setIsRegister] = useState(false)
   const [username, setUsername] = useState('')
@@ -399,7 +404,7 @@ function LoginPage() {
         setError(data.error || 'Registration failed')
         return
       }
-      setSuccessMsg('Registration successful! Your account is now pending admin approval.')
+      setSuccessMsg('Registration successful! You can now sign in.')
       setUsername('')
       setPassword('')
       setIsRegister(false)
@@ -596,9 +601,22 @@ function LoginPage() {
               {isRegister ? 'Create an account to get started' : 'Sign in to your account'}
             </p>
 
+            {/* OAuth Error Display */}
+            {search.error && (
+              <div style={{
+                padding: '9px 13px', background: 'rgba(224,49,49,0.08)',
+                border: '1px solid rgba(224,49,49,0.25)',
+                borderRadius: 8, fontSize: '0.8375rem', color: '#e03131',
+                marginBottom: 16
+              }}>
+                {search.error === 'oauth_failed' ? 'OAuth login failed. Please try again.' : search.error}
+              </div>
+            )}
+
             {/* Social Logins */}
             <button
               type="button"
+              onClick={() => authClient.signIn.social({ provider: 'google', callbackURL: '/' })}
               style={{
                 width: '100%',
                 display: 'flex',
@@ -627,6 +645,7 @@ function LoginPage() {
 
             <button
               type="button"
+              onClick={() => authClient.signIn.social({ provider: 'github', callbackURL: '/' })}
               style={{
                 width: '100%',
                 display: 'flex',

@@ -6,7 +6,8 @@ WORKDIR /app
 
 # Copy dependency manifests (root + workspace)
 COPY package*.json ./
-COPY apps/web/package*.json ./apps/web/
+COPY apps/web/package.json ./apps/web/
+COPY apps/web/package-lock.json ./apps/web/
 
 # Install all dependencies (including devDependencies like Vite)
 RUN npm install --legacy-peer-deps

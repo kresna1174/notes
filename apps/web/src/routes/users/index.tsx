@@ -4,7 +4,7 @@ import { Sidebar } from '#/modules/sidebar'
 import React, { useState, useEffect, useRef } from 'react'
 import { Trash2, UserPlus, Shield, Eye, KeyRound, Lock, LockOpen, X, AlertTriangle, Check, Users as UsersIcon, RefreshCw, Sparkles, Pencil, Plus, UsersRound, UserMinus } from 'lucide-react'
 
-interface User { id: string; username: string; role: 'admin' | 'viewer'; status: 'approved' | 'rejected' | 'pending'; createdAt: number }
+interface User { id: string; username: string; role: 'admin' | 'viewer'; status: string; createdAt: number }
 interface LockedNote { id: string; title: string; createdAt: number; updatedAt: number; ownerUsername: string; ownerId: string; type: string; organizationId: string | null }
 interface AiSession { session_id: string; user_id: string | null; username: string | null; note_title: string | null; created_at: string; updated_at: string; message_count: number; user_message_count: number; tool_call_count: number; prompt_preview: string; has_error: boolean; error_message: string | null; prompt_tokens: number; completion_tokens: number; messages: { role: string; type: string; content: string; name: string | null; tool_call_id: string | null }[] }
 interface AiStats { total_sessions: number; total_messages: number; total_user_messages: number; total_tool_calls: number; total_prompt_tokens: number; total_completion_tokens: number }
@@ -508,14 +508,6 @@ function UsersPage() {
     router.invalidate()
   }
 
-  async function handleApprove(id: string) {
-    await fetch(`/api/auth/users/${id}/approve`, { method: 'PUT' })
-    router.invalidate()
-  }
-  async function handleReject(id: string) {
-    await fetch(`/api/auth/users/${id}/reject`, { method: 'PUT' })
-    router.invalidate()
-  }
   async function handleDelete(id: string, username: string) {
     const target = users.find(u => u.id === id)
     if (target) setUserModal({ user: target, action: 'delete' })
@@ -686,36 +678,6 @@ function UsersPage() {
                 </form>
               )}
 
-              {users.some(u => u.status === 'pending') && (
-                <div style={{ marginBottom: 32 }}>
-                  <h2 style={{ fontFamily: 'var(--font-heading)', fontWeight: 600, fontSize: '1.1rem', color: 'var(--fg)', marginBottom: 12 }}>Registration Requests</h2>
-                  <div style={{ border: '1px solid var(--border)', borderRadius: 10, overflow: 'hidden' }}>
-                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.875rem', fontFamily: 'var(--font-body)' }}>
-                      <thead>
-                        <tr style={{ background: 'var(--muted)' }}>
-                          <th style={{ padding: '10px 16px', fontWeight: 600, fontSize: '0.8125rem', color: 'var(--fg-muted)', textAlign: 'left' }}>Users</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {users.filter(u => u.status === 'pending').map(u => (
-                          <tr key={u.id} style={{ borderTop: '1px solid var(--border)' }}>
-                            <td style={{ padding: '10px 16px' }}>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                                <div style={{ width: 30, height: 30, borderRadius: 7, background: 'var(--muted)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--fg-subtle)', flexShrink: 0 }}><Eye size={14} /></div>
-                                <span style={{ fontWeight: 600, color: 'var(--fg)' }}>{u.username}</span>
-                                <span style={{ fontSize: '0.72rem', color: 'var(--fg-subtle)' }}>Registered {new Date(u.createdAt).toLocaleDateString('en-US')}</span>
-                                <span style={{ flex: 1 }} />
-                                <button onClick={() => handleApprove(u.id)} style={{ padding: '4px 10px', fontSize: '0.72rem', fontWeight: 600, background: 'var(--primary)', color: 'var(--primary-fg)', border: 'none', borderRadius: 5, cursor: 'pointer' }}>Approve</button>
-                                <button onClick={() => handleReject(u.id)} style={{ padding: '4px 10px', fontSize: '0.72rem', fontWeight: 600, background: 'rgba(224,49,49,0.05)', color: '#e03131', border: '1px solid rgba(224,49,49,0.3)', borderRadius: 5, cursor: 'pointer' }}>Reject</button>
-                              </div>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              )}
 
               <div>
                 <h2 style={{ fontFamily: 'var(--font-heading)', fontWeight: 600, fontSize: '1.1rem', color: 'var(--fg)', marginBottom: 12 }}>User List</h2>
@@ -727,7 +689,7 @@ function UsersPage() {
                       </tr>
                     </thead>
                     <tbody>
-                      {users.filter(u => u.status !== 'pending').map(u => (
+                      {users.map(u => (
                         <tr key={u.id} style={{ borderTop: '1px solid var(--border)', background: u.id === user?.userId ? 'var(--accent)' : 'transparent' }}>
                           <td style={{ padding: '10px 16px' }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -736,12 +698,8 @@ function UsersPage() {
                               </div>
                               <span style={{ fontWeight: 600, color: 'var(--fg)' }}>{u.username}</span>
                               <span style={{ fontSize: '0.72rem', textTransform: 'capitalize', color: u.role === 'admin' ? 'var(--primary)' : 'var(--fg-subtle)' }}>{u.role}</span>
-                              {u.status === 'rejected' && <span style={{ fontSize: '0.68rem', padding: '1px 6px', background: 'rgba(224,49,49,0.1)', color: '#e03131', borderRadius: 20, fontWeight: 500 }}>Rejected</span>}
                               {u.id === user?.userId && <span style={{ fontSize: '0.68rem', padding: '1px 6px', background: 'var(--primary)', color: 'var(--primary-fg)', borderRadius: 20, fontWeight: 500 }}>You</span>}
                               <span style={{ flex: 1 }} />
-                              {u.status === 'rejected' && (
-                                <button onClick={() => handleApprove(u.id)} style={{ padding: '3px 8px', fontSize: '0.7rem', fontWeight: 600, background: 'transparent', color: 'var(--primary)', border: '1.5px solid var(--primary)', borderRadius: 5, cursor: 'pointer' }}>Activate</button>
-                              )}
                               <button onClick={() => handleEditUser(u.id, u.username, u.role)} title="Edit user" style={{ width: 26, height: 26, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: 'transparent', border: 'none', borderRadius: 5, cursor: 'pointer', color: 'var(--fg-subtle)' }} onMouseEnter={e => { e.currentTarget.style.background = 'var(--accent)'; e.currentTarget.style.color = 'var(--primary)' }} onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--fg-subtle)' }}>
                                 <Pencil size={12} />
                               </button>
@@ -968,7 +926,7 @@ function UsersPage() {
                       style={{ padding: '6px 10px', fontSize: '0.8rem', fontFamily: 'var(--font-body)', border: '1px solid var(--border)', borderRadius: 7, background: 'var(--input-bg)', color: 'var(--fg)', outline: 'none' }}
                     >
                       <option value="">All Users</option>
-                      {users.filter(u => u.status !== 'pending').map(u => (
+                      {users.map(u => (
                         <option key={u.id} value={u.id}>{u.username}</option>
                       ))}
                     </select>

@@ -1,4 +1,4 @@
-import { pgTable, text, bigint, primaryKey } from 'drizzle-orm/pg-core'
+import { pgTable, text, bigint, boolean, timestamp, primaryKey, unique } from 'drizzle-orm/pg-core'
 
 export const organizations = pgTable('organizations', {
   id: text('id').primaryKey(),
@@ -17,11 +17,71 @@ export const userOrganizations = pgTable('user_organizations', {
 export const users = pgTable('users', {
   id: text('id').primaryKey(),
   username: text('username').notNull().unique(),
-  passwordHash: text('password_hash').notNull(),
+  email: text('email').unique(),
+  passwordHash: text('password_hash'),  // nullable — NULL for OAuth-only users
   role: text('role').notNull().default('viewer'),
   status: text('status').notNull().default('approved'),
   createdAt: bigint('created_at', { mode: 'number' }).notNull(),
+  // better-auth required fields
+  name: text('name'),
+  emailVerified: boolean('email_verified').default(false),
+  image: text('image'),
+  updatedAt: timestamp('updated_at', { withTimezone: true }),
 })
+
+// better-auth internal session table (separate from our custom sessions table)
+export const betterAuthSession = pgTable('better_auth_session', {
+  id: text('id').primaryKey(),
+  userId: text('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  token: text('token').notNull().unique(),
+  expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+  ipAddress: text('ip_address'),
+  userAgent: text('user_agent'),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+})
+
+// better-auth internal account table
+export const betterAuthAccount = pgTable('better_auth_account', {
+  id: text('id').primaryKey(),
+  userId: text('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  accountId: text('account_id').notNull(),
+  providerId: text('provider_id').notNull(),
+  accessToken: text('access_token'),
+  refreshToken: text('refresh_token'),
+  idToken: text('id_token'),
+  accessTokenExpiresAt: timestamp('access_token_expires_at', { withTimezone: true }),
+  refreshTokenExpiresAt: timestamp('refresh_token_expires_at', { withTimezone: true }),
+  scope: text('scope'),
+  password: text('password'),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+}, (table) => [
+  unique().on(table.providerId, table.accountId),
+])
+
+// better-auth verification table (OAuth state, PKCE, etc.)
+export const betterAuthVerification = pgTable('better_auth_verification', {
+  id: text('id').primaryKey(),
+  identifier: text('identifier').notNull(),
+  value: text('value').notNull(),
+  expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow(),
+})
+
+export const oauthAccounts = pgTable('oauth_accounts', {
+  id: text('id').primaryKey(),
+  userId: text('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  provider: text('provider').notNull(),
+  providerAccountId: text('provider_account_id').notNull(),
+  accessToken: text('access_token'),
+  refreshToken: text('refresh_token'),
+  expiresAt: bigint('expires_at', { mode: 'number' }),
+  createdAt: bigint('created_at', { mode: 'number' }).notNull(),
+}, (table) => [
+  unique().on(table.provider, table.providerAccountId),
+])
 
 export const notes = pgTable('notes', {
   id: text('id').primaryKey(),

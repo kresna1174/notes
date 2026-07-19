@@ -139,6 +139,86 @@ export async function initDb() {
     )
   `)
 
+  // OAuth: add email column to users if not exists
+  await db.execute(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS email TEXT UNIQUE`)
+
+  // OAuth: make password_hash nullable (safe to run multiple times)
+  await db.execute(sql`ALTER TABLE users ALTER COLUMN password_hash DROP NOT NULL`).catch(() => {})
+
+  // better-auth: add required user fields if not exists
+  await db.execute(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS name TEXT`)
+  await db.execute(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS email_verified BOOLEAN DEFAULT FALSE`)
+  await db.execute(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS image TEXT`)
+  await db.execute(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ`)
+
+  // OAuth: create oauth_accounts table
+  await db.execute(sql`
+    CREATE TABLE IF NOT EXISTS oauth_accounts (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      provider TEXT NOT NULL,
+      provider_account_id TEXT NOT NULL,
+      access_token TEXT,
+      refresh_token TEXT,
+      expires_at BIGINT,
+      created_at BIGINT NOT NULL,
+      UNIQUE(provider, provider_account_id)
+    )
+  `)
+
+  // better-auth session table (separate from custom sessions table)
+  await db.execute(sql`
+    CREATE TABLE IF NOT EXISTS better_auth_session (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      token TEXT NOT NULL UNIQUE,
+      expires_at TIMESTAMPTZ NOT NULL,
+      ip_address TEXT,
+      user_agent TEXT,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `)
+  // add columns if table was created without them in a prior migration
+  await db.execute(sql`ALTER TABLE better_auth_session ADD COLUMN IF NOT EXISTS ip_address TEXT`).catch(() => {})
+  await db.execute(sql`ALTER TABLE better_auth_session ADD COLUMN IF NOT EXISTS user_agent TEXT`).catch(() => {})
+
+  // better-auth account table (used internally by better-auth)
+  await db.execute(sql`
+    CREATE TABLE IF NOT EXISTS better_auth_account (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      account_id TEXT NOT NULL,
+      provider_id TEXT NOT NULL,
+      access_token TEXT,
+      refresh_token TEXT,
+      id_token TEXT,
+      access_token_expires_at TIMESTAMPTZ,
+      refresh_token_expires_at TIMESTAMPTZ,
+      scope TEXT,
+      password TEXT,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      UNIQUE(provider_id, account_id)
+    )
+  `)
+  // better-auth verification table (OAuth state/PKCE tokens)
+  await db.execute(sql`
+    CREATE TABLE IF NOT EXISTS better_auth_verification (
+      id TEXT PRIMARY KEY,
+      identifier TEXT NOT NULL,
+      value TEXT NOT NULL,
+      expires_at TIMESTAMPTZ NOT NULL,
+      created_at TIMESTAMPTZ DEFAULT NOW(),
+      updated_at TIMESTAMPTZ DEFAULT NOW()
+    )
+  `)
+
+  // add columns if table was created without them in a prior migration
+  await db.execute(sql`ALTER TABLE better_auth_account ADD COLUMN IF NOT EXISTS id_token TEXT`).catch(() => {})
+  await db.execute(sql`ALTER TABLE better_auth_account ADD COLUMN IF NOT EXISTS refresh_token_expires_at TIMESTAMPTZ`).catch(() => {})
+  await db.execute(sql`ALTER TABLE better_auth_account ADD COLUMN IF NOT EXISTS password TEXT`).catch(() => {})
+
   // Seed default admin
   const result = await db.execute(sql`SELECT COUNT(*) as c FROM users`)
   const count = Number((result.rows[0] as { c: string }).c)

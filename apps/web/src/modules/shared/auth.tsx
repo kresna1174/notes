@@ -4,6 +4,9 @@ export interface AuthUser {
   userId: string
   username: string
   role: 'admin' | 'viewer'
+  email: string | null
+  hasPassword: boolean
+  connectedProviders: string[]
   organizations: { id: string; name: string }[]
 }
 
@@ -40,7 +43,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     })
     const data = await res.json()
     if (!res.ok) return data.error ?? 'Login failed'
-    setUser(data)
+    // Fetch full profile (includes email, hasPassword, connectedProviders)
+    const me = await fetch('/api/auth/me').then(r => r.ok ? r.json() : null)
+    setUser(me ?? data)
     return null
   }
 
