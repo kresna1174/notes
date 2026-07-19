@@ -68,3 +68,14 @@ def get_collection():
         name=settings.chroma_collection,
         embedding_function=emb_fn,
     )
+
+
+def get_notes_collection():
+    emb_fn = OpenRouterEmbeddingFunction(
+        api_key=settings.openrouter_api_key,
+        base_url=settings.openrouter_base_url,
+    )
+    return get_client().get_or_create_collection(
+        name="note_pages",
+        embedding_function=emb_fn,
+    )
