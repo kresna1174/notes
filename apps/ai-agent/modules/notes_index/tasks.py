@@ -1,7 +1,7 @@
 import logging
-from datetime import datetime, timezone
 
-from sqlmodel import Session, select, col
+from sqlalchemy import text
+from sqlmodel import Session, select
 
 from core.celery_app import celery_app
 from models.engine import engine
@@ -38,8 +38,6 @@ def sync_notes_task() -> dict:
     Uses content hash to skip unchanged notes. Cleans up deleted notes.
     Runs every 5 minutes.
     """
-    from sqlalchemy import text
-
     stats = {"indexed": 0, "skipped": 0, "deleted": 0, "errors": 0}
 
     with Session(engine) as session:
@@ -75,6 +73,7 @@ def sync_notes_task() -> dict:
                     stats["deleted"] += 1
                 except Exception as e:
                     logger.error(f"notes_index: cleanup failed for {row.note_id}: {e}")
+                    stats["errors"] += 1
 
     logger.info(f"notes_index: sync complete — {stats}")
     return stats
