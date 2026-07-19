@@ -11,7 +11,7 @@ celery_app = Celery(
     "ai_agent_tasks",
     broker=broker_url,
     backend=result_backend,
-    include=["tasks", "modules.documents.tasks"],
+    include=["tasks", "modules.documents.tasks", "modules.notes_index.tasks"],
 )
 
 celery_app.conf.update(
@@ -20,4 +20,10 @@ celery_app.conf.update(
     result_serializer="json",
     timezone="UTC",
     enable_utc=True,
+    beat_schedule={
+        "sync-notes-every-5-minutes": {
+            "task": "modules.notes_index.tasks.sync_notes_task",
+            "schedule": 300.0,  # seconds
+        },
+    },
 )

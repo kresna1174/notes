@@ -87,4 +87,5 @@ def tags_task(task_id: str, content: str, user_id: str | None = None):
 
 # Explicitly import RAG tasks to register them with the Celery worker
 import modules.documents.tasks
+import modules.notes_index.tasks
 
