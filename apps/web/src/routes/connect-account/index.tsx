@@ -21,14 +21,44 @@ const PROVIDER_LABELS: Record<string, string> = {
 const ALL_PROVIDERS = ['google', 'github']
 
 function ConnectAccountPage() {
-  const { user } = useAuth()
+  const { user, refresh } = useAuth()
+
   const [disconnecting, setDisconnecting] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
 
+  const [editingUsername, setEditingUsername] = useState(false)
+  const [newUsername, setNewUsername] = useState('')
+  const [usernameLoading, setUsernameLoading] = useState(false)
+  const [usernameError, setUsernameError] = useState<string | null>(null)
+
   if (!user) return null
 
   const isOnlyAuthMethod = !user.hasPassword && user.connectedProviders.length <= 1
+
+  async function handleChangeUsername(e: React.FormEvent) {
+    e.preventDefault()
+    setUsernameError(null)
+    setUsernameLoading(true)
+    try {
+      const res = await fetch('/api/auth/change-username', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: newUsername }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        setUsernameError(data.error ?? 'Failed to update username')
+      } else {
+        setSuccess(`Username changed to ${data.username}`)
+        setEditingUsername(false)
+        setNewUsername('')
+        await refresh()
+      }
+    } finally {
+      setUsernameLoading(false)
+    }
+  }
 
   async function handleDisconnect(provider: string) {
     setDisconnecting(provider)
@@ -63,10 +93,56 @@ function ConnectAccountPage() {
             Account
           </h2>
           <div style={{ background: 'var(--card-bg)', border: '1px solid var(--border)', borderRadius: 10, padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: 12 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span style={{ fontSize: '0.875rem', color: 'var(--fg-muted)' }}>Username</span>
-              <span style={{ fontSize: '0.875rem', fontWeight: 500, color: 'var(--fg)' }}>{user.username}</span>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
+              <span style={{ fontSize: '0.875rem', color: 'var(--fg-muted)', flexShrink: 0 }}>Username</span>
+              {editingUsername ? (
+                <form onSubmit={handleChangeUsername} style={{ display: 'flex', gap: 8, alignItems: 'center', flex: 1, justifyContent: 'flex-end' }}>
+                  <input
+                    autoFocus
+                    value={newUsername}
+                    onChange={e => { setNewUsername(e.target.value); setUsernameError(null) }}
+                    placeholder={user.username}
+                    style={{
+                      padding: '5px 10px', borderRadius: 6,
+                      border: `1px solid ${usernameError ? '#e03131' : 'var(--border)'}`,
+                      background: 'var(--bg)', color: 'var(--fg)',
+                      fontSize: '0.875rem', fontFamily: 'var(--font-body)',
+                      outline: 'none', width: 160,
+                    }}
+                  />
+                  <button type="submit" disabled={usernameLoading} style={{
+                    padding: '5px 12px', borderRadius: 6, border: 'none',
+                    background: 'var(--primary)', color: 'var(--primary-fg)',
+                    fontSize: '0.8125rem', fontWeight: 600, cursor: usernameLoading ? 'not-allowed' : 'pointer',
+                    opacity: usernameLoading ? 0.7 : 1,
+                  }}>
+                    {usernameLoading ? '…' : 'Save'}
+                  </button>
+                  <button type="button" onClick={() => { setEditingUsername(false); setUsernameError(null) }} style={{
+                    padding: '5px 10px', borderRadius: 6,
+                    background: 'transparent', border: '1px solid var(--border)',
+                    color: 'var(--fg-muted)', fontSize: '0.8125rem', cursor: 'pointer',
+                  }}>
+                    Cancel
+                  </button>
+                </form>
+              ) : (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <span style={{ fontSize: '0.875rem', fontWeight: 500, color: 'var(--fg)' }}>{user.username}</span>
+                  <button onClick={() => { setNewUsername(user.username); setEditingUsername(true); setError(null); setSuccess(null) }} style={{
+                    padding: '4px 10px', borderRadius: 6,
+                    background: 'transparent', border: '1px solid var(--border)',
+                    color: 'var(--fg-muted)', fontSize: '0.8125rem', fontWeight: 500,
+                    cursor: 'pointer',
+                  }}>
+                    Edit
+                  </button>
+                </div>
+              )}
             </div>
+            {usernameError && (
+              <div style={{ fontSize: '0.8rem', color: '#e03131', marginTop: -4 }}>{usernameError}</div>
+            )}
             <div style={{ height: 1, background: 'var(--border)' }} />
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span style={{ fontSize: '0.875rem', color: 'var(--fg-muted)' }}>Email</span>

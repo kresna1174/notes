@@ -219,6 +219,17 @@ export async function initDb() {
   await db.execute(sql`ALTER TABLE better_auth_account ADD COLUMN IF NOT EXISTS refresh_token_expires_at TIMESTAMPTZ`).catch(() => {})
   await db.execute(sql`ALTER TABLE better_auth_account ADD COLUMN IF NOT EXISTS password TEXT`).catch(() => {})
 
+  await db.execute(sql`
+    CREATE TABLE IF NOT EXISTS password_reset_tokens (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      token TEXT NOT NULL UNIQUE,
+      expires_at BIGINT NOT NULL,
+      used_at BIGINT,
+      created_at BIGINT NOT NULL
+    )
+  `)
+
   // Seed default admin
   const result = await db.execute(sql`SELECT COUNT(*) as c FROM users`)
   const count = Number((result.rows[0] as { c: string }).c)

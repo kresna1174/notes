@@ -1,11 +1,12 @@
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { createReadStream } from 'node:fs'
 import { db, initDb } from '../shared/db'
-import { notes, attachments, users, organizations, userOrganizations, noteHistory, chatSessions, chatMessages, betterAuthAccount } from '../../../drizzle/schema'
+import { notes, attachments, users, organizations, userOrganizations, noteHistory, chatSessions, chatMessages, betterAuthAccount, passwordResetTokens } from '../../../drizzle/schema'
 import { desc, eq, and, sql, or, inArray } from 'drizzle-orm'
 import { randomUUID } from 'crypto'
 import { saveFile, getFilePath, deleteFile } from '../shared/storage'
 import bcrypt from 'bcryptjs'
+import nodemailer from 'nodemailer'
 import { auth } from './auth-oauth'
 
 // Run DB initialization on module load to guarantee new tables exist in running dev server
@@ -238,6 +239,22 @@ app.post('/api/auth/public-register', async (c) => {
   return c.json({ id, username: cleanUsername, status: 'approved' }, 201)
 })
 
+app.post('/api/auth/change-username', authMiddleware, async (c) => {
+  const session = c.get('session')
+  const body = await c.req.json().catch(() => ({})) as { username?: string }
+  const newUsername = body.username?.trim()
+  if (!newUsername) return c.json({ error: 'username required' }, 400)
+  if (!/^[a-zA-Z0-9_]{3,32}$/.test(newUsername)) {
+    return c.json({ error: 'Username must be 3–32 chars, letters/numbers/underscores only' }, 400)
+  }
+  const [existing] = await db.select({ id: users.id }).from(users).where(eq(users.username, newUsername)).limit(1)
+  if (existing) return c.json({ error: 'Username already taken' }, 409)
+  await db.update(users).set({ username: newUsername }).where(eq(users.id, session.userId))
+  // Update all sessions for this user
+  await db.execute(sql`UPDATE sessions SET username = ${newUsername} WHERE user_id = ${session.userId}`)
+  return c.json({ ok: true, username: newUsername })
+})
+
 app.post('/api/auth/change-password', authMiddleware, async (c) => {
   const session = c.get('session')
   const body = await c.req.json().catch(() => ({})) as { oldPassword?: string; newPassword?: string }
@@ -270,6 +287,87 @@ app.put('/api/auth/users/:id/reset-password', adminMiddleware, async (c) => {
   }
   const hash = bcrypt.hashSync(newPassword, 10)
   await db.update(users).set({ passwordHash: hash }).where(eq(users.id, userId))
+  return c.json({ ok: true })
+})
+
+function createMailTransport() {
+  return nodemailer.createTransport({
+    host: process.env.SMTP_HOST,
+    port: Number(process.env.SMTP_PORT ?? 587),
+    secure: process.env.SMTP_SECURE === 'true',
+    auth: {
+      user: process.env.SMTP_USER,
+      pass: process.env.SMTP_PASS,
+    },
+  })
+}
+
+app.post('/api/auth/forgot-password', async (c) => {
+  const body = await c.req.json().catch(() => ({})) as { email?: string }
+  const { email } = body
+  if (!email) return c.json({ error: 'email required' }, 400)
+
+  const [user] = await db.select({ id: users.id, email: users.email })
+    .from(users).where(eq(users.email, email.toLowerCase().trim())).limit(1)
+
+  // Always respond OK — don't leak whether email exists
+  if (!user || !user.email) return c.json({ ok: true })
+
+  // Invalidate any existing unused tokens for this user
+  await db.execute(sql`
+    UPDATE password_reset_tokens SET used_at = ${Date.now()}
+    WHERE user_id = ${user.id} AND used_at IS NULL
+  `)
+
+  const token = randomUUID()
+  const expiresAt = Date.now() + 10 * 60 * 1000 // 10 minutes
+  await db.insert(passwordResetTokens).values({
+    id: randomUUID(),
+    userId: user.id,
+    token,
+    expiresAt,
+    createdAt: Date.now(),
+  })
+
+  const baseUrl = process.env.BETTER_AUTH_URL || 'http://localhost:3000'
+  const resetLink = `${baseUrl}/reset-password?token=${token}`
+
+  if (!process.env.SMTP_HOST) {
+    // Dev: log link to console instead of sending email
+    console.log(`[forgot-password] Reset link for ${email}: ${resetLink}`)
+  } else {
+    const transporter = createMailTransport()
+    await transporter.sendMail({
+      from: process.env.SMTP_FROM || process.env.SMTP_USER,
+      to: user.email,
+      subject: 'Reset your password',
+      text: `Click the link below to reset your password. This link expires in 10 minutes.\n\n${resetLink}\n\nIf you didn't request this, ignore this email.`,
+      html: `<p>Click the link below to reset your password. This link expires in <strong>10 minutes</strong>.</p><p><a href="${resetLink}">${resetLink}</a></p><p>If you didn't request this, ignore this email.</p>`,
+    })
+  }
+
+  return c.json({ ok: true })
+})
+
+app.post('/api/password-reset/confirm', async (c) => {
+  const body = await c.req.json().catch(() => ({})) as { token?: string; password?: string }
+  const { token, password } = body
+  if (!token || !password) return c.json({ error: 'token and password required' }, 400)
+  if (password.length < 6) return c.json({ error: 'Password must be at least 6 characters' }, 400)
+
+  const [row] = await db.select().from(passwordResetTokens)
+    .where(eq(passwordResetTokens.token, token)).limit(1)
+
+  if (!row) return c.json({ error: 'invalid_token' }, 400)
+  if (row.usedAt) return c.json({ error: 'expired_token' }, 400)
+  if (row.expiresAt < Date.now()) return c.json({ error: 'expired_token' }, 400)
+
+  const hash = bcrypt.hashSync(password, 10)
+  await db.update(users).set({ passwordHash: hash }).where(eq(users.id, row.userId))
+  await db.execute(sql`
+    UPDATE password_reset_tokens SET used_at = ${Date.now()} WHERE token = ${token}
+  `)
+
   return c.json({ ok: true })
 })
 

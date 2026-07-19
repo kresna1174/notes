@@ -261,6 +261,11 @@ function LoginPage() {
   const [successMsg, setSuccessMsg] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [showAbout, setShowAbout] = useState(false)
+  const [showForgot, setShowForgot] = useState(false)
+  const [forgotEmail, setForgotEmail] = useState('')
+  const [forgotLoading, setForgotLoading] = useState(false)
+  const [forgotMsg, setForgotMsg] = useState<string | null>(null)
+  const [forgotError, setForgotError] = useState<string | null>(null)
 
   const isDark = theme === 'dark'
   
@@ -293,6 +298,30 @@ function LoginPage() {
     setLoading(false)
     if (err) { setError(err); return }
     navigate({ to: '/' })
+  }
+
+  async function handleForgotPassword(e: React.FormEvent) {
+    e.preventDefault()
+    setForgotError(null)
+    setForgotMsg(null)
+    setForgotLoading(true)
+    try {
+      const res = await fetch('/api/auth/forgot-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: forgotEmail }),
+      })
+      if (res.ok) {
+        setForgotMsg('If an account with that email exists, a reset link has been sent.')
+      } else {
+        const data = await res.json()
+        setForgotError(data.error ?? 'Something went wrong')
+      }
+    } catch {
+      setForgotError('Network error. Please try again.')
+    } finally {
+      setForgotLoading(false)
+    }
   }
 
   async function handleRegister(e: React.FormEvent) {
@@ -620,6 +649,7 @@ function LoginPage() {
                   {!isRegister && (
                     <button
                       type="button"
+                      onClick={() => { setShowForgot(true); setForgotMsg(null); setForgotError(null); setForgotEmail('') }}
                       style={{
                         background: 'none', border: 'none',
                         fontSize: '0.8125rem', color: textMuted,
@@ -740,6 +770,112 @@ function LoginPage() {
       </div>
 
       <AboutModal open={showAbout} onOpenChange={setShowAbout} />
+
+      {/* Forgot password modal */}
+      {showForgot && (
+        <div
+          onClick={() => setShowForgot(false)}
+          style={{
+            position: 'fixed', inset: 0, zIndex: 1000,
+            background: 'rgba(0,0,0,0.5)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            padding: 24,
+          }}
+        >
+          <div
+            onClick={e => e.stopPropagation()}
+            style={{
+              background: isDark ? '#18181b' : '#ffffff',
+              border: '1px solid var(--border)',
+              borderRadius: 16,
+              padding: '36px 32px',
+              width: '100%',
+              maxWidth: 400,
+              boxShadow: '0 8px 40px rgba(0,0,0,0.18)',
+            }}
+          >
+            <h3 style={{ fontSize: '1.125rem', fontWeight: 700, color: textTitle, marginBottom: 6 }}>
+              Reset your password
+            </h3>
+            <p style={{ fontSize: '0.875rem', color: textMuted, marginBottom: 20 }}>
+              Enter your account email and we'll send you a reset link.
+            </p>
+
+            {forgotMsg && (
+              <div style={{
+                padding: '9px 13px', borderRadius: 8, marginBottom: 16,
+                background: 'rgba(43,138,62,0.08)', border: '1px solid rgba(43,138,62,0.25)',
+                fontSize: '0.8375rem', color: '#2b8a3e',
+              }}>
+                {forgotMsg}
+              </div>
+            )}
+            {forgotError && (
+              <div style={{
+                padding: '9px 13px', borderRadius: 8, marginBottom: 16,
+                background: 'rgba(224,49,49,0.08)', border: '1px solid rgba(224,49,49,0.25)',
+                fontSize: '0.8375rem', color: '#e03131',
+              }}>
+                {forgotError}
+              </div>
+            )}
+
+            {!forgotMsg && (
+              <form onSubmit={handleForgotPassword} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: 600, color: textTitle, marginBottom: 8 }}>
+                    Email address
+                  </label>
+                  <input
+                    type="email"
+                    value={forgotEmail}
+                    onChange={e => setForgotEmail(e.target.value)}
+                    placeholder="you@example.com"
+                    required
+                    autoFocus
+                    style={{
+                      width: '100%', padding: '11px 16px', borderRadius: 8,
+                      border: `1px solid ${borderInput}`,
+                      background: bgInput, color: textInput,
+                      fontSize: '0.9375rem', fontFamily: 'var(--font-body)',
+                      outline: 'none', boxSizing: 'border-box',
+                    }}
+                    onFocus={e => { e.currentTarget.style.borderColor = borderFocus; e.currentTarget.style.boxShadow = `0 0 0 1px ${borderFocus}` }}
+                    onBlur={e => { e.currentTarget.style.borderColor = borderInput; e.currentTarget.style.boxShadow = 'none' }}
+                  />
+                </div>
+                <button
+                  type="submit"
+                  disabled={forgotLoading}
+                  style={{
+                    padding: '11px', borderRadius: 8, border: 'none',
+                    background: 'var(--primary)', color: 'var(--primary-fg)',
+                    fontWeight: 600, fontSize: '0.9375rem', fontFamily: 'var(--font-body)',
+                    cursor: forgotLoading ? 'not-allowed' : 'pointer',
+                    opacity: forgotLoading ? 0.7 : 1,
+                  }}
+                >
+                  {forgotLoading ? 'Sending…' : 'Send reset link'}
+                </button>
+              </form>
+            )}
+
+            <button
+              type="button"
+              onClick={() => setShowForgot(false)}
+              style={{
+                marginTop: 20, display: 'block', width: '100%',
+                background: 'none', border: 'none',
+                fontSize: '0.875rem', color: textMuted,
+                cursor: 'pointer', fontFamily: 'var(--font-body)',
+                textAlign: 'center',
+              }}
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
 
       <style>{`
         @keyframes blink {

@@ -14,6 +14,7 @@ import { Route as DocumentsRouteImport } from './routes/documents'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as UsersIndexRouteImport } from './routes/users/index'
 import { Route as SearchIndexRouteImport } from './routes/search/index'
+import { Route as ResetPasswordIndexRouteImport } from './routes/reset-password/index'
 import { Route as OrganizationsIndexRouteImport } from './routes/organizations/index'
 import { Route as LoginIndexRouteImport } from './routes/login/index'
 import { Route as DocumentsIndexRouteImport } from './routes/documents/index'
@@ -49,6 +50,11 @@ const UsersIndexRoute = UsersIndexRouteImport.update({
 const SearchIndexRoute = SearchIndexRouteImport.update({
   id: '/search/',
   path: '/search/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ResetPasswordIndexRoute = ResetPasswordIndexRouteImport.update({
+  id: '/reset-password/',
+  path: '/reset-password/',
   getParentRoute: () => rootRouteImport,
 } as any)
 const OrganizationsIndexRoute = OrganizationsIndexRouteImport.update({
@@ -122,6 +128,7 @@ export interface FileRoutesByFullPath {
   '/documents/': typeof DocumentsIndexRoute
   '/login/': typeof LoginIndexRoute
   '/organizations/': typeof OrganizationsIndexRoute
+  '/reset-password/': typeof ResetPasswordIndexRoute
   '/search/': typeof SearchIndexRoute
   '/users/': typeof UsersIndexRoute
 }
@@ -139,6 +146,7 @@ export interface FileRoutesByTo {
   '/documents': typeof DocumentsIndexRoute
   '/login': typeof LoginIndexRoute
   '/organizations': typeof OrganizationsIndexRoute
+  '/reset-password': typeof ResetPasswordIndexRoute
   '/search': typeof SearchIndexRoute
   '/users': typeof UsersIndexRoute
 }
@@ -158,6 +166,7 @@ export interface FileRoutesById {
   '/documents/': typeof DocumentsIndexRoute
   '/login/': typeof LoginIndexRoute
   '/organizations/': typeof OrganizationsIndexRoute
+  '/reset-password/': typeof ResetPasswordIndexRoute
   '/search/': typeof SearchIndexRoute
   '/users/': typeof UsersIndexRoute
 }
@@ -178,6 +187,7 @@ export interface FileRouteTypes {
     | '/documents/'
     | '/login/'
     | '/organizations/'
+    | '/reset-password/'
     | '/search/'
     | '/users/'
   fileRoutesByTo: FileRoutesByTo
@@ -195,6 +205,7 @@ export interface FileRouteTypes {
     | '/documents'
     | '/login'
     | '/organizations'
+    | '/reset-password'
     | '/search'
     | '/users'
   id:
@@ -213,6 +224,7 @@ export interface FileRouteTypes {
     | '/documents/'
     | '/login/'
     | '/organizations/'
+    | '/reset-password/'
     | '/search/'
     | '/users/'
   fileRoutesById: FileRoutesById
@@ -228,6 +240,7 @@ export interface RootRouteChildren {
   ConnectAccountIndexRoute: typeof ConnectAccountIndexRoute
   LoginIndexRoute: typeof LoginIndexRoute
   OrganizationsIndexRoute: typeof OrganizationsIndexRoute
+  ResetPasswordIndexRoute: typeof ResetPasswordIndexRoute
   SearchIndexRoute: typeof SearchIndexRoute
   UsersIndexRoute: typeof UsersIndexRoute
 }
@@ -267,6 +280,13 @@ declare module '@tanstack/react-router' {
       path: '/search'
       fullPath: '/search/'
       preLoaderRoute: typeof SearchIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/reset-password/': {
+      id: '/reset-password/'
+      path: '/reset-password'
+      fullPath: '/reset-password/'
+      preLoaderRoute: typeof ResetPasswordIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/organizations/': {
@@ -378,6 +398,7 @@ const rootRouteChildren: RootRouteChildren = {
   ConnectAccountIndexRoute: ConnectAccountIndexRoute,
   LoginIndexRoute: LoginIndexRoute,
   OrganizationsIndexRoute: OrganizationsIndexRoute,
+  ResetPasswordIndexRoute: ResetPasswordIndexRoute,
   SearchIndexRoute: SearchIndexRoute,
   UsersIndexRoute: UsersIndexRoute,
 }

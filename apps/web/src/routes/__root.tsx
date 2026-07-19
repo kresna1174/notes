@@ -7,7 +7,7 @@ import '../styles.css'
 
 export const Route = createRootRouteWithContext<RouterContext>()({
   beforeLoad: ({ location, context }) => {
-    const isPublic = location.pathname.startsWith('/share/')
+    const isPublic = location.pathname.startsWith('/share/') || location.pathname.startsWith('/reset-password')
     if (context.auth.loading || isPublic) return
 
     if (!context.auth.user && location.pathname !== '/login') {
