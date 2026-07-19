@@ -500,6 +500,65 @@ def search_rag_documents(query: str, document_id: str | None = None, n_results: 
         return f"Error searching RAG documents: {str(e)}"
 
 
+@function_tool
+def search_knowledge(query: str, n_results: int = 5) -> str:
+    """
+    Search across all user knowledge: uploaded RAG documents and indexed notes.
+    Always use this when the user asks about their content, notes, or documents.
+    Returns merged results labelled by source (document or note).
+
+    Args:
+        query: The search term or question.
+        n_results: Max results per source (default 5).
+    """
+    from utils.chroma import chroma_lock, get_collection, get_notes_collection
+
+    output = []
+
+    # Search RAG documents (documents_v2)
+    try:
+        with chroma_lock:
+            doc_raw = get_collection().query(
+                query_texts=[query],
+                n_results=n_results,
+                include=["documents", "metadatas", "distances"],
+            )
+        doc_docs = (doc_raw.get("documents") or [[]])[0]
+        doc_metas = (doc_raw.get("metadatas") or [[]])[0]
+        doc_dists = (doc_raw.get("distances") or [[]])[0]
+        for doc, meta, dist in zip(doc_docs, doc_metas, doc_dists):
+            output.append(
+                f"[Source: Document — {meta.get('document_name', 'Unknown')}, "
+                f"Page {meta.get('page_number', 0) + 1}, Distance: {dist:.4f}]\n{doc}"
+            )
+    except Exception as e:
+        output.append(f"[Document search error: {e}]")
+
+    # Search indexed notes (note_pages)
+    try:
+        with chroma_lock:
+            note_raw = get_notes_collection().query(
+                query_texts=[query],
+                n_results=n_results,
+                include=["documents", "metadatas", "distances"],
+            )
+        note_docs = (note_raw.get("documents") or [[]])[0]
+        note_metas = (note_raw.get("metadatas") or [[]])[0]
+        note_dists = (note_raw.get("distances") or [[]])[0]
+        for doc, meta, dist in zip(note_docs, note_metas, note_dists):
+            output.append(
+                f"[Source: Note — \"{meta.get('note_title', 'Untitled')}\", "
+                f"Distance: {dist:.4f}]\n{doc}"
+            )
+    except Exception as e:
+        output.append(f"[Note search error: {e}]")
+
+    if not output:
+        return "No relevant results found in documents or notes."
+
+    return "\n\n---\n\n".join(output)
+
+
 # ── Wiki tools ────────────────────────────────────────────────────────────────
 
 @function_tool

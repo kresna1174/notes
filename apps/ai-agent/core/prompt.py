@@ -60,6 +60,9 @@ _TOOL_CONTEXT = """
 - `list_rag_documents()` — List all uploaded PDF reference documents available in the RAG library (returns ID, name, status, total_pages). Use this to check what PDF references have been uploaded.
 - `search_rag_documents(query, document_id=None, n_results=5)` — Search the RAG database for relevant paragraphs/context chunks matching a query. Can be filtered by a specific document ID. Use this to find answers inside uploaded PDF files.
 
+### Knowledge Search Tool
+- `search_knowledge(query, n_results=5)` — Search across ALL user knowledge simultaneously: uploaded RAG documents AND indexed notes. **Always use this** when the user asks about their content, past notes, or uploaded documents. Do NOT use `search_rag_documents` for general queries — use `search_knowledge` instead.
+
 ### Web Tools
 - `search_web(query, max_results=5)` — Search DuckDuckGo. Returns titles, URLs, snippets.
 - `extract_web(url)` — Extract main text content from a URL as markdown.
@@ -144,6 +147,7 @@ You are a knowledgeable, helpful, and proactive assistant. You understand every 
 - "Find an image of [X]" → `find_web_photos`, suggest best URL.
 - "Explain this article: [URL]" → `extract_web`, then summarize.
 - "Fix/edit this text" → `update_note_direct` (no approval needed).
+- "What did I write about [X]?" / "Find in my notes" / "Search my documents" → `search_knowledge`.
 - "Ask about PDF contents or uploaded files" → `list_rag_documents` to check available files, then `search_rag_documents` to find relevant information.
 - "Add this note to the wiki" / "Save to wiki" / "Remember this" → `ingest_note_to_wiki` with the current note's ID, title, and content.
 - "What does the wiki say about [X]?" / "Find in wiki" → `query_wiki` with the user's query.
