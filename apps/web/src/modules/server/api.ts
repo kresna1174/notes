@@ -1610,6 +1610,167 @@ app.post('/api/queries/chat', authMiddleware, async (c) => {
   }
 })
 
+// ── Wiki Proxy Routes ─────────────────────────────────────────────────────────
+
+// GET /api/wiki/pages — list all wiki pages
+app.get('/api/wiki/pages', authMiddleware, async (c) => {
+  try {
+    const forwardRes = await fetch(`${AI_AGENT_URL}/api/wiki/pages`)
+    if (!forwardRes.ok) {
+      const errText = await forwardRes.text()
+      return c.json({ error: `AI service error: ${errText}` }, forwardRes.status as any)
+    }
+    return c.json(await forwardRes.json())
+  } catch (err) {
+    return c.json({ error: `Failed to list wiki pages: ${String(err)}` }, 500)
+  }
+})
+
+// GET /api/wiki/index — structured index by category
+app.get('/api/wiki/index', authMiddleware, async (c) => {
+  try {
+    const forwardRes = await fetch(`${AI_AGENT_URL}/api/wiki/index`)
+    if (!forwardRes.ok) {
+      const errText = await forwardRes.text()
+      return c.json({ error: `AI service error: ${errText}` }, forwardRes.status as any)
+    }
+    return c.json(await forwardRes.json())
+  } catch (err) {
+    return c.json({ error: `Failed to get wiki index: ${String(err)}` }, 500)
+  }
+})
+
+// GET /api/wiki/log — recent ingest logs
+app.get('/api/wiki/log', authMiddleware, async (c) => {
+  try {
+    const forwardRes = await fetch(`${AI_AGENT_URL}/api/wiki/log`)
+    if (!forwardRes.ok) {
+      const errText = await forwardRes.text()
+      return c.json({ error: `AI service error: ${errText}` }, forwardRes.status as any)
+    }
+    return c.json(await forwardRes.json())
+  } catch (err) {
+    return c.json({ error: `Failed to get wiki log: ${String(err)}` }, 500)
+  }
+})
+
+// GET /api/wiki/graph — graph nodes + edges
+app.get('/api/wiki/graph', authMiddleware, async (c) => {
+  try {
+    const forwardRes = await fetch(`${AI_AGENT_URL}/api/wiki/graph`)
+    if (!forwardRes.ok) {
+      const errText = await forwardRes.text()
+      return c.json({ error: `AI service error: ${errText}` }, forwardRes.status as any)
+    }
+    return c.json(await forwardRes.json())
+  } catch (err) {
+    return c.json({ error: `Failed to get wiki graph: ${String(err)}` }, 500)
+  }
+})
+
+// GET /api/wiki/search?q=... — BM25 full-text search
+app.get('/api/wiki/search', authMiddleware, async (c) => {
+  try {
+    const q = c.req.query('q') || ''
+    const forwardRes = await fetch(`${AI_AGENT_URL}/api/wiki/search?q=${encodeURIComponent(q)}`)
+    if (!forwardRes.ok) {
+      const errText = await forwardRes.text()
+      return c.json({ error: `AI service error: ${errText}` }, forwardRes.status as any)
+    }
+    return c.json(await forwardRes.json())
+  } catch (err) {
+    return c.json({ error: `Failed to search wiki: ${String(err)}` }, 500)
+  }
+})
+
+// POST /api/wiki/ingest — trigger WikiIngestAgent for a note
+app.post('/api/wiki/ingest', authMiddleware, async (c) => {
+  try {
+    const body = await c.req.json()
+    const forwardRes = await fetch(`${AI_AGENT_URL}/api/wiki/ingest`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    })
+    if (!forwardRes.ok) {
+      const errText = await forwardRes.text()
+      return c.json({ error: `AI service error: ${errText}` }, forwardRes.status as any)
+    }
+    return c.json(await forwardRes.json())
+  } catch (err) {
+    return c.json({ error: `Failed to ingest note to wiki: ${String(err)}` }, 500)
+  }
+})
+
+// POST /api/wiki/lint — run wiki health check
+app.post('/api/wiki/lint', authMiddleware, async (c) => {
+  try {
+    const forwardRes = await fetch(`${AI_AGENT_URL}/api/wiki/lint`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+    })
+    if (!forwardRes.ok) {
+      const errText = await forwardRes.text()
+      return c.json({ error: `AI service error: ${errText}` }, forwardRes.status as any)
+    }
+    return c.json(await forwardRes.json())
+  } catch (err) {
+    return c.json({ error: `Failed to run wiki lint: ${String(err)}` }, 500)
+  }
+})
+
+// GET /api/wiki/pages/:slug — get page by slug (must be after specific routes)
+app.get('/api/wiki/pages/*', authMiddleware, async (c) => {
+  try {
+    const slug = c.req.path.replace('/api/wiki/pages/', '')
+    const forwardRes = await fetch(`${AI_AGENT_URL}/api/wiki/pages/${slug}`)
+    if (!forwardRes.ok) {
+      const errText = await forwardRes.text()
+      return c.json({ error: `AI service error: ${errText}` }, forwardRes.status as any)
+    }
+    return c.json(await forwardRes.json())
+  } catch (err) {
+    return c.json({ error: `Failed to get wiki page: ${String(err)}` }, 500)
+  }
+})
+
+// PUT /api/wiki/pages/:slug — manually update a wiki page
+app.put('/api/wiki/pages/*', authMiddleware, async (c) => {
+  try {
+    const slug = c.req.path.replace('/api/wiki/pages/', '')
+    const body = await c.req.json()
+    const forwardRes = await fetch(`${AI_AGENT_URL}/api/wiki/pages/${slug}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    })
+    if (!forwardRes.ok) {
+      const errText = await forwardRes.text()
+      return c.json({ error: `AI service error: ${errText}` }, forwardRes.status as any)
+    }
+    return c.json(await forwardRes.json())
+  } catch (err) {
+    return c.json({ error: `Failed to update wiki page: ${String(err)}` }, 500)
+  }
+})
+
+// DELETE /api/wiki/pages/:slug — delete a wiki page
+app.delete('/api/wiki/pages/*', authMiddleware, async (c) => {
+  try {
+    const slug = c.req.path.replace('/api/wiki/pages/', '')
+    const forwardRes = await fetch(`${AI_AGENT_URL}/api/wiki/pages/${slug}`, {
+      method: 'DELETE',
+    })
+    if (!forwardRes.ok) {
+      const errText = await forwardRes.text()
+      return c.json({ error: `AI service error: ${errText}` }, forwardRes.status as any)
+    }
+    return c.json(await forwardRes.json())
+  } catch (err) {
+    return c.json({ error: `Failed to delete wiki page: ${String(err)}` }, 500)
+  }
+})
+
 // Hono handler wrapper for backward compatibility with Vite middleware and server.ts
 const nodeHandler = getRequestListener(app.fetch)
 

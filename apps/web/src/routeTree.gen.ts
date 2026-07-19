@@ -9,6 +9,7 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as WikiRouteImport } from './routes/wiki'
 import { Route as DocumentsRouteImport } from './routes/documents'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as UsersIndexRouteImport } from './routes/users/index'
@@ -24,6 +25,11 @@ import { Route as DocumentsPagesRouteImport } from './routes/documents/pages'
 import { Route as DocumentsChatRouteImport } from './routes/documents/chat'
 import { Route as DocumentsDocumentIdRouteImport } from './routes/documents/$documentId'
 
+const WikiRoute = WikiRouteImport.update({
+  id: '/wiki',
+  path: '/wiki',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const DocumentsRoute = DocumentsRouteImport.update({
   id: '/documents',
   path: '/documents',
@@ -98,6 +104,7 @@ const DocumentsDocumentIdRoute = DocumentsDocumentIdRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/documents': typeof DocumentsRouteWithChildren
+  '/wiki': typeof WikiRoute
   '/documents/$documentId': typeof DocumentsDocumentIdRoute
   '/documents/chat': typeof DocumentsChatRoute
   '/documents/pages': typeof DocumentsPagesRoute
@@ -113,6 +120,7 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/wiki': typeof WikiRoute
   '/documents/$documentId': typeof DocumentsDocumentIdRoute
   '/documents/chat': typeof DocumentsChatRoute
   '/documents/pages': typeof DocumentsPagesRoute
@@ -130,6 +138,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/documents': typeof DocumentsRouteWithChildren
+  '/wiki': typeof WikiRoute
   '/documents/$documentId': typeof DocumentsDocumentIdRoute
   '/documents/chat': typeof DocumentsChatRoute
   '/documents/pages': typeof DocumentsPagesRoute
@@ -148,6 +157,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/documents'
+    | '/wiki'
     | '/documents/$documentId'
     | '/documents/chat'
     | '/documents/pages'
@@ -163,6 +173,7 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/wiki'
     | '/documents/$documentId'
     | '/documents/chat'
     | '/documents/pages'
@@ -179,6 +190,7 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/documents'
+    | '/wiki'
     | '/documents/$documentId'
     | '/documents/chat'
     | '/documents/pages'
@@ -196,6 +208,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   DocumentsRoute: typeof DocumentsRouteWithChildren
+  WikiRoute: typeof WikiRoute
   NotesIdRoute: typeof NotesIdRoute
   PagesPageIdRoute: typeof PagesPageIdRoute
   ShareTokenRoute: typeof ShareTokenRoute
@@ -208,6 +221,13 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/wiki': {
+      id: '/wiki'
+      path: '/wiki'
+      fullPath: '/wiki'
+      preLoaderRoute: typeof WikiRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/documents': {
       id: '/documents'
       path: '/documents'
@@ -330,6 +350,7 @@ const DocumentsRouteWithChildren = DocumentsRoute._addFileChildren(
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   DocumentsRoute: DocumentsRouteWithChildren,
+  WikiRoute: WikiRoute,
   NotesIdRoute: NotesIdRoute,
   PagesPageIdRoute: PagesPageIdRoute,
   ShareTokenRoute: ShareTokenRoute,

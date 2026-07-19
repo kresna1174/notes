@@ -25,6 +25,7 @@ from modules.chat.tools import (
     search_web, extract_web, crawl_web,
     execute_python_code, find_web_photos, find_youtube_videos,
     list_rag_documents, search_rag_documents,
+    query_wiki, ingest_note_to_wiki, read_wiki_index,
 )
 
 # ── Shared toolsets ──────────────────────────────────────────────────────────
@@ -32,7 +33,8 @@ from modules.chat.tools import (
 NOTE_TOOLS = [write_notes, update_note_direct]
 WEB_TOOLS = [search_web, extract_web, crawl_web, find_web_photos, find_youtube_videos]
 RAG_TOOLS = [list_rag_documents, search_rag_documents]
-ALL_TOOLS = NOTE_TOOLS + WEB_TOOLS + RAG_TOOLS + [execute_python_code]
+WIKI_TOOLS = [query_wiki, ingest_note_to_wiki, read_wiki_index]
+ALL_TOOLS = NOTE_TOOLS + WEB_TOOLS + RAG_TOOLS + WIKI_TOOLS + [execute_python_code]
 
 
 # ── Sub-Agents ───────────────────────────────────────────────────────────────
