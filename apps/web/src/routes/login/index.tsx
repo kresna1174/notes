@@ -1,344 +1,257 @@
-import { createFileRoute, useNavigate } from '@tanstack/react-router'
-import { useState, useEffect, useRef } from 'react'
+import { createFileRoute, useNavigate, useSearch } from '@tanstack/react-router'
+import { useState, useEffect } from 'react'
 import { useAuth } from '#/modules/shared/auth'
 import { useTheme } from '#/modules/shared/theme'
-import { Eye, EyeOff, Sun, Moon, Brain } from 'lucide-react'
+import { Eye, EyeOff, Sun, Moon, Brain, Map, Lightbulb, BarChart2, KeyRound, Calendar, Network, Users, Lock, Sparkles } from 'lucide-react'
 import { AboutModal } from '#/modules/auth'
+import { authClient } from '#/modules/shared/auth-client'
 
 export const Route = createFileRoute('/login/')({
+  validateSearch: (search: Record<string, unknown>) => ({
+    error: (search.error as string) ?? null,
+  }),
   component: LoginPage,
 })
 
-const TERMINAL_STEPS = [
-  { action: 'type', text: 'npx create-mindspace-app --init', delay: 45 },
-  { action: 'print', text: '==> Fetching https://registry.npmjs.org/create-mindspace-app.json', delay: 200 },
-  { action: 'print', text: '==> Initializing Mindspace workspace environment...', delay: 150 },
-  { action: 'print', text: 'Already downloaded: /Users/krisna/Library/Caches/Mindspace/create-mindspace-app--1.2.0.tgz', delay: 100 },
-  { action: 'print', text: '==> Preparing local SQLite database schemas...', delay: 100 },
-  { action: 'print', text: '==> Establishing secure local keypairs...', delay: 150 },
-  { action: 'print', text: '🧠  ~/.config/mindspace: 12 workspace files configured', delay: 200 },
-  { action: 'wait', delay: 500 },
-  { action: 'type', text: 'mindspace-db --migrate', delay: 45 },
-  { action: 'print', text: '==> Initializing SQLite tables (users, notes, teams, locks)...', delay: 200 },
-  { action: 'print', text: '✔ Database connection established at ~/.config/mindspace/db.sqlite', delay: 250 },
-  { action: 'wait', delay: 500 },
-  { action: 'type', text: 'mindspace start --secure', delay: 45 },
-  { action: 'print', text: '🚀 Starting Mindspace local workspace server...', delay: 150 },
-  { action: 'print', text: '📡 Collaborative websocket active at http://localhost:3000', delay: 80 },
-  { action: 'print', text: '🔑 Secure encrypted session keypair loaded.', delay: 80 },
-  { action: 'print', text: '----------------------------------------', delay: 40 },
-  { action: 'print', text: '📝 [Space] Product Roadmap & Ideas 💡', delay: 80 },
-  { action: 'print', text: '📊 [Flow] Collaborative App Flowchart', delay: 80 },
-  { action: 'print', text: '🔒 [Lock] Secured personal crypto passphrase', delay: 80 },
-  { action: 'print', text: '----------------------------------------', delay: 40 },
-  { action: 'print', text: '==> Client ready for secure authentication...', delay: 80 },
-  { action: 'wait', delay: 4000 },
-  { action: 'clear', delay: 300 }
+const DEMO_NOTES = [
+  { icon: Map, title: 'Product Roadmap 2026', active: true },
+  { icon: Lightbulb, title: 'Ideas & Brainstorm', active: false },
+  { icon: BarChart2, title: 'Q3 OKRs', active: false },
+  { icon: KeyRound, title: 'Credentials', active: false },
+  { icon: Calendar, title: 'Meeting Notes', active: false },
+  { icon: Brain, title: 'AI Research Notes', active: false },
 ]
 
-function MindspaceTerminal() {
-  const [lines, setLines] = useState<Array<{ text: string; isCommand?: boolean }>>([])
-  const [currentInput, setCurrentInput] = useState('')
-  const [stepIndex, setStepIndex] = useState(0)
-  const containerRef = useRef<HTMLDivElement>(null)
+type DemoLine =
+  | { tag: 'h1' | 'h2' | 'bullet' | 'p'; text: string }
+  | { tag: 'gap' }
+
+const DEMO_LINES: DemoLine[] = [
+  { tag: 'h1', text: 'Product Roadmap 2026' },
+  { tag: 'gap' },
+  { tag: 'h2', text: 'Q3 Milestones' },
+  { tag: 'bullet', text: 'Ship AI note summarization' },
+  { tag: 'bullet', text: 'Collaborative live cursors' },
+  { tag: 'bullet', text: 'Wiki knowledge graph' },
+  { tag: 'gap' },
+  { tag: 'p', text: 'Key metrics to track this quarter...' },
+  { tag: 'p', text: 'Focus on retention and daily active notes.' },
+  { tag: 'gap' },
+  { tag: 'h2', text: 'Q4 Goals' },
+  { tag: 'bullet', text: 'Mobile app beta launch' },
+  { tag: 'bullet', text: 'SSO & enterprise tier' },
+]
+
+function MiniAppPreview({ isDark }: { isDark: boolean }) {
+  const [lineIdx, setLineIdx] = useState(0)
+  const [charIdx, setCharIdx] = useState(0)
 
   useEffect(() => {
-    let active = true
-    let timer: any
-
-    async function run() {
-      const step = TERMINAL_STEPS[stepIndex]
-      if (!step) return
-
-      if (step.action === 'type') {
-        let typed = ''
-        const text = step.text || ''
-        for (let i = 0; i < text.length; i++) {
-          if (!active) return
-          await new Promise(r => { timer = setTimeout(r, step.delay || 50) })
-          typed += text[i]
-          setCurrentInput(typed)
-        }
-        await new Promise(r => { timer = setTimeout(r, 150) })
-        if (!active) return
-        setLines(prev => [...prev, { text: '$ ' + text, isCommand: true }])
-        setCurrentInput('')
-        setStepIndex(s => s + 1)
-      } else if (step.action === 'print') {
-        await new Promise(r => { timer = setTimeout(r, step.delay || 80) })
-        if (!active) return
-        setLines(prev => [...prev, { text: step.text || '' }])
-        setStepIndex(s => s + 1)
-      } else if (step.action === 'wait') {
-        await new Promise(r => { timer = setTimeout(r, step.delay || 800) })
-        if (!active) return
-        setStepIndex(s => s + 1)
-      } else if (step.action === 'clear') {
-        await new Promise(r => { timer = setTimeout(r, step.delay || 400) })
-        if (!active) return
-        setLines([])
-        setCurrentInput('')
-        setStepIndex(0)
-      }
+    if (lineIdx >= DEMO_LINES.length) {
+      const t = setTimeout(() => { setLineIdx(0); setCharIdx(0) }, 3500)
+      return () => clearTimeout(t)
     }
-
-    run()
-
-    return () => {
-      active = false
-      clearTimeout(timer)
+    const line = DEMO_LINES[lineIdx]
+    if (line.tag === 'gap') {
+      const t = setTimeout(() => { setLineIdx(i => i + 1); setCharIdx(0) }, 100)
+      return () => clearTimeout(t)
     }
-  }, [stepIndex])
-
-  useEffect(() => {
-    if (containerRef.current) {
-      containerRef.current.scrollTop = containerRef.current.scrollHeight
+    if (charIdx >= line.text.length) {
+      const t = setTimeout(() => { setLineIdx(i => i + 1); setCharIdx(0) }, 60)
+      return () => clearTimeout(t)
     }
-  }, [lines, currentInput])
+    const speed = line.tag === 'h1' ? 50 : 28
+    const t = setTimeout(() => setCharIdx(c => c + 1), speed)
+    return () => clearTimeout(t)
+  }, [lineIdx, charIdx])
+
+  const completedLines = DEMO_LINES.slice(0, lineIdx)
+  const currentLine = lineIdx < DEMO_LINES.length ? DEMO_LINES[lineIdx] : null
+  const currentText = currentLine && currentLine.tag !== 'gap' ? currentLine.text.slice(0, charIdx) : ''
+
+  // glassmorphism values
+  const glassBg = isDark
+    ? 'rgba(30,30,30,0.55)'
+    : 'rgba(255,255,255,0.55)'
+  const glassBorder = isDark
+    ? 'rgba(255,255,255,0.10)'
+    : 'rgba(0,0,0,0.08)'
+  const sidebarGlass = isDark
+    ? 'rgba(22,22,22,0.60)'
+    : 'rgba(247,247,245,0.65)'
+  const editorGlass = isDark
+    ? 'rgba(25,25,25,0.50)'
+    : 'rgba(255,255,255,0.45)'
+  const titlebarGlass = isDark
+    ? 'rgba(20,20,20,0.70)'
+    : 'rgba(240,240,238,0.75)'
+
+  function renderLine(line: DemoLine, key: number | string, text?: string, showCursor?: boolean) {
+    const t = text ?? (line.tag !== 'gap' ? line.text : '')
+    if (line.tag === 'gap') return <div key={key} style={{ height: 9 }} />
+    if (line.tag === 'h1') return (
+      <div key={key} style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--fg)', marginBottom: 6, fontFamily: 'var(--font-heading)', lineHeight: 1.2, display: 'flex', alignItems: 'center', letterSpacing: '-0.02em' }}>
+        {t}{showCursor && <Cursor tall />}
+      </div>
+    )
+    if (line.tag === 'h2') return (
+      <div key={key} style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--fg)', marginBottom: 5, fontFamily: 'var(--font-heading)', display: 'flex', alignItems: 'center', marginTop: 2 }}>
+        {t}{showCursor && <Cursor />}
+      </div>
+    )
+    if (line.tag === 'bullet') return (
+      <div key={key} style={{ display: 'flex', alignItems: 'baseline', gap: 6, marginBottom: 4 }}>
+        <span style={{ color: 'var(--primary)', fontSize: '0.55rem', flexShrink: 0, marginTop: 1 }}>●</span>
+        <span style={{ fontSize: '0.78rem', color: 'var(--fg-muted)', display: 'flex', alignItems: 'center', lineHeight: 1.4 }}>
+          {t}{showCursor && <Cursor />}
+        </span>
+      </div>
+    )
+    return (
+      <div key={key} style={{ fontSize: '0.78rem', color: 'var(--fg-muted)', marginBottom: 3, lineHeight: 1.6, display: 'flex', alignItems: 'center' }}>
+        {t}{showCursor && <Cursor />}
+      </div>
+    )
+  }
 
   return (
-    <div 
-      className="w-full max-w-[500px] rounded-xl overflow-hidden shadow-2xl border"
-      style={{
-        background: '#0d1117',
-        borderColor: '#21262d',
-        fontFamily: 'Courier New, Courier, monospace',
+    <div style={{
+      width: '100%',
+      borderRadius: 14,
+      overflow: 'hidden',
+      border: `1px solid ${glassBorder}`,
+      boxShadow: isDark
+        ? '0 32px 80px rgba(0,0,0,0.55), 0 8px 24px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.06)'
+        : '0 32px 80px rgba(0,0,0,0.14), 0 8px 24px rgba(0,0,0,0.08), inset 0 1px 0 rgba(255,255,255,0.9)',
+      backdropFilter: 'blur(24px) saturate(1.6)',
+      WebkitBackdropFilter: 'blur(24px) saturate(1.6)',
+      background: glassBg,
+    }}>
+      {/* macOS titlebar */}
+      <div style={{
+        background: titlebarGlass,
+        backdropFilter: 'blur(20px)',
+        WebkitBackdropFilter: 'blur(20px)',
+        borderBottom: `1px solid ${glassBorder}`,
+        padding: '11px 14px',
         display: 'flex',
-        flexDirection: 'column',
-        height: '350px',
-      }}
-    >
-      {/* Terminal Title Bar */}
-      <div 
-        style={{
-          background: '#161b22',
-          padding: '10px 16px',
-          display: 'flex',
-          alignItems: 'center',
-          borderBottom: '1px solid #21262d',
-          position: 'relative',
-        }}
-      >
-        {/* Traffic lights */}
-        <div style={{ display: 'flex', gap: 6, zIndex: 2 }}>
-          <span style={{ width: 10, height: 10, borderRadius: '50%', background: '#ff5f56' }} />
-          <span style={{ width: 10, height: 10, borderRadius: '50%', background: '#ffbd2e' }} />
-          <span style={{ width: 10, height: 10, borderRadius: '50%', background: '#27c93f' }} />
+        alignItems: 'center',
+        gap: 12,
+        userSelect: 'none',
+      }}>
+        <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+          <span style={{ width: 11, height: 11, borderRadius: '50%', background: '#ff5f56', display: 'block', boxShadow: '0 0 0 0.5px rgba(0,0,0,0.15)' }} />
+          <span style={{ width: 11, height: 11, borderRadius: '50%', background: '#ffbd2e', display: 'block', boxShadow: '0 0 0 0.5px rgba(0,0,0,0.15)' }} />
+          <span style={{ width: 11, height: 11, borderRadius: '50%', background: '#27c93f', display: 'block', boxShadow: '0 0 0 0.5px rgba(0,0,0,0.15)' }} />
         </div>
-        {/* Title */}
-        <div 
-          style={{
-            position: 'absolute',
-            inset: 0,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            fontSize: '0.72rem',
-            color: '#8b949e',
-            fontWeight: 500,
-          }}
-        >
-          krisna@mindspace: ~
+        <div style={{
+          flex: 1,
+          background: isDark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.06)',
+          border: `1px solid ${glassBorder}`,
+          borderRadius: 6,
+          padding: '4px 12px',
+          fontSize: '0.65rem',
+          color: 'var(--fg-subtle)',
+          fontFamily: 'var(--font-body)',
+          textAlign: 'center',
+          letterSpacing: '0.01em',
+        }}>
+          mindspace.app/notes/product-roadmap-2026
         </div>
       </div>
 
-      {/* Terminal Content Area */}
-      <div 
-        ref={containerRef}
-        style={{
-          padding: 16,
+      {/* App layout */}
+      <div style={{ display: 'flex', height: 380 }}>
+        {/* Sidebar */}
+        <div style={{
+          width: 175,
+          borderRight: `1px solid ${glassBorder}`,
+          background: sidebarGlass,
+          backdropFilter: 'blur(16px)',
+          WebkitBackdropFilter: 'blur(16px)',
+          display: 'flex',
+          flexDirection: 'column',
+          padding: '10px 0',
+          flexShrink: 0,
+        }}>
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: 7,
+            padding: '3px 12px 11px',
+            borderBottom: `1px solid ${glassBorder}`,
+            marginBottom: 6,
+          }}>
+            <Brain size={14} style={{ color: 'var(--primary)', flexShrink: 0 }} />
+            <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--fg)', fontFamily: 'var(--font-heading)', letterSpacing: '-0.02em' }}>
+              Mindspace
+            </span>
+          </div>
+          <div style={{ padding: '2px 6px 4px', marginBottom: 2 }}>
+            <span style={{ fontSize: '0.58rem', fontWeight: 600, color: 'var(--fg-subtle)', textTransform: 'uppercase', letterSpacing: '0.06em', paddingLeft: 6 }}>
+              My Notes
+            </span>
+          </div>
+          {DEMO_NOTES.map((note, i) => {
+            const NoteIcon = note.icon
+            return (
+              <div key={i} style={{
+                display: 'flex', alignItems: 'center', gap: 6,
+                padding: '5px 10px',
+                borderRadius: 6,
+                margin: '1px 5px',
+                background: note.active
+                  ? isDark ? 'rgba(255,255,255,0.10)' : 'rgba(0,0,0,0.07)'
+                  : 'transparent',
+              }}>
+                <NoteIcon size={11} style={{ color: note.active ? 'var(--primary)' : 'var(--fg-subtle)', flexShrink: 0 }} />
+                <span style={{
+                  fontSize: '0.68rem',
+                  color: note.active ? 'var(--fg)' : 'var(--fg-muted)',
+                  fontWeight: note.active ? 600 : 400,
+                  fontFamily: 'var(--font-body)',
+                  whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                }}>
+                  {note.title}
+                </span>
+              </div>
+            )
+          })}
+        </div>
+
+        {/* Editor */}
+        <div style={{
           flex: 1,
-          overflowY: 'auto',
-          fontSize: '0.8rem',
-          lineHeight: '1.45',
-          color: '#e6edf3',
-          textAlign: 'left',
-        }}
-      >
-        {lines.map((line, idx) => {
-          let color = '#e6edf3'
-          if (line.isCommand) {
-            color = '#58a6ff'
-          } else if (line.text.startsWith('🧠') || line.text.startsWith('✔') || line.text.startsWith('🚀') || line.text.startsWith('📡')) {
-            color = '#39d353'
-          } else if (line.text.startsWith('==>') || line.text.startsWith('┌') || line.text.startsWith('└') || line.text.startsWith('│')) {
-            color = '#8b949e'
-          }
-          return (
-            <div 
-              key={idx} 
-              style={{
-                color,
-                fontWeight: line.isCommand ? 600 : 400,
-                whiteSpace: 'pre-wrap',
-                marginBottom: 3,
-              }}
-            >
-              {line.text}
-            </div>
-          )
-        })}
-        
-        {/* Current typing line */}
-        <div style={{ color: '#58a6ff', fontWeight: 600, display: 'flex', alignItems: 'center' }}>
-          {stepIndex < TERMINAL_STEPS.length && TERMINAL_STEPS[stepIndex].action === 'type' && (
-            <span>$ {currentInput}</span>
-          )}
-          <span 
-            style={{
-              marginLeft: 2,
-              width: 7,
-              height: 13,
-              background: '#58a6ff',
-              display: 'inline-block',
-              animation: 'blink 1s step-end infinite',
-            }}
-          />
+          background: editorGlass,
+          backdropFilter: 'blur(20px)',
+          WebkitBackdropFilter: 'blur(20px)',
+          padding: '28px 28px',
+          overflowY: 'hidden',
+          display: 'flex',
+          flexDirection: 'column',
+          fontFamily: 'var(--font-body)',
+        }}>
+          {completedLines.map((line, i) => renderLine(line, i))}
+          {currentLine && renderLine(currentLine, 'current', currentText, true)}
         </div>
       </div>
     </div>
   )
 }
 
-const MOCK_GIT_LOG = [
-  'commit 100768fa6283bf5e58c537c38c8cb9ae7649558a',
-  'Author: Kresna <kresna@users.noreply.github.com>',
-  'Date:   Sat Jun 13 09:38:01 2026 +0700',
-  '',
-  '  * style: split-screen login page',
-  '  * feat: add MindspaceTerminal animation',
-  '  * docs: update changelog v1.3.2'
-]
-
-const MOCK_TEST_LOG = [
-  'RUN  v4.1.8 /Users/krisna/notes-app',
-  '✓ src/server/copy.test.ts (2 tests) 13ms',
-  '✓ src/server/auth.test.ts (5 tests) 706ms',
-  '',
-  'Test Files  2 passed (2)',
-  '     Tests  7 passed (7)',
-  '  Duration  1.41s'
-]
-
-const MOCK_DOCKER_LOG = [
-  '✔ Container db-1       Created',
-  '✔ Container redis-1    Created',
-  '✔ Container dev-app-1  Created',
-  'Attaching to dev-app-1',
-  'dev-app-1 | Server listening on port 3000',
-  'dev-app-1 | Connected to sqlite db'
-]
-
-const MOCK_NPM_LOG = [
-  'npm install @tanstack/react-router',
-  'added 142 packages, and audited 143 packages',
-  'found 0 vulnerabilities',
-  '',
-  'npm run build',
-  '✓ 2382 modules transformed.',
-  'dist/assets/login-BHMKjdvB.js  11.71 kB'
-]
-
-interface StaticTerminalProps {
-  title: string
-  lines: string[]
-  opacity: number
-  width: number
-  height: number
-  top?: string
-  bottom?: string
-  left?: string
-  right?: string
-  transform?: string
-  delay?: string
-}
-
-function StaticTerminal({ title, lines, opacity, width, height, top, bottom, left, right, transform, delay }: StaticTerminalProps) {
+function Cursor({ tall }: { tall?: boolean }) {
   return (
-    <div 
-      style={{
-        position: 'absolute',
-        top,
-        bottom,
-        left,
-        right,
-        width,
-        height,
-        transform,
-        zIndex: 1,
-      }}
-    >
-      <div 
-        className="w-full h-full rounded-lg border pointer-events-none select-none"
-        style={{
-          background: '#22170d',
-          borderColor: '#3a2717',
-          fontFamily: 'Courier New, Courier, monospace',
-          display: 'flex',
-          flexDirection: 'column',
-          opacity,
-          boxShadow: '0 8px 24px rgba(44, 30, 17, 0.12)',
-          animation: 'fadeInUp 0.8s cubic-bezier(0.16, 1, 0.3, 1) both',
-          animationDelay: delay || '0ms',
-        }}
-      >
-        {/* Mini Title Bar */}
-        <div 
-          style={{
-            background: '#2c1e11',
-            padding: '6px 10px',
-            display: 'flex',
-            alignItems: 'center',
-            borderBottom: '1px solid #3a2717',
-            position: 'relative',
-          }}
-        >
-          <div style={{ display: 'flex', gap: 4 }}>
-            <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#ff5f56' }} />
-            <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#ffbd2e' }} />
-            <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#27c93f' }} />
-          </div>
-          <div 
-            style={{
-              position: 'absolute',
-              inset: 0,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontSize: '0.6rem',
-              color: '#a6927d',
-              fontWeight: 500,
-            }}
-          >
-            {title}
-          </div>
-        </div>
-        {/* Mini Content */}
-        <div 
-          style={{
-            padding: 8,
-            flex: 1,
-            fontSize: '0.65rem',
-            lineHeight: '1.35',
-            color: '#ebdcb9',
-            overflow: 'hidden',
-            textAlign: 'left',
-          }}
-        >
-          {lines.map((line, idx) => (
-            <div key={idx} style={{ whiteSpace: 'pre', marginBottom: 2 }}>
-              {line}
-            </div>
-          ))}
-        </div>
-      </div>
-    </div>
+    <span style={{
+      display: 'inline-block', width: 2, height: tall ? 18 : 12,
+      background: 'var(--primary)', marginLeft: 2, flexShrink: 0, verticalAlign: 'middle',
+      borderRadius: 1,
+      animation: 'blink 1s step-end infinite',
+    }} />
   )
 }
 
 function LoginPage() {
   const { login, user } = useAuth()
   const navigate = useNavigate()
+  const search = useSearch({ from: '/login/' })
   const { theme, toggle } = useTheme()
   const [isRegister, setIsRegister] = useState(false)
   const [username, setUsername] = useState('')
@@ -348,6 +261,11 @@ function LoginPage() {
   const [successMsg, setSuccessMsg] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [showAbout, setShowAbout] = useState(false)
+  const [showForgot, setShowForgot] = useState(false)
+  const [forgotEmail, setForgotEmail] = useState('')
+  const [forgotLoading, setForgotLoading] = useState(false)
+  const [forgotMsg, setForgotMsg] = useState<string | null>(null)
+  const [forgotError, setForgotError] = useState<string | null>(null)
 
   const isDark = theme === 'dark'
   
@@ -382,6 +300,30 @@ function LoginPage() {
     navigate({ to: '/' })
   }
 
+  async function handleForgotPassword(e: React.FormEvent) {
+    e.preventDefault()
+    setForgotError(null)
+    setForgotMsg(null)
+    setForgotLoading(true)
+    try {
+      const res = await fetch('/api/auth/forgot-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: forgotEmail }),
+      })
+      if (res.ok) {
+        setForgotMsg('If an account with that email exists, a reset link has been sent.')
+      } else {
+        const data = await res.json()
+        setForgotError(data.error ?? 'Something went wrong')
+      }
+    } catch {
+      setForgotError('Network error. Please try again.')
+    } finally {
+      setForgotLoading(false)
+    }
+  }
+
   async function handleRegister(e: React.FormEvent) {
     e.preventDefault()
     setError(null)
@@ -399,7 +341,7 @@ function LoginPage() {
         setError(data.error || 'Registration failed')
         return
       }
-      setSuccessMsg('Registration successful! Your account is now pending admin approval.')
+      setSuccessMsg('Registration successful! You can now sign in.')
       setUsername('')
       setPassword('')
       setIsRegister(false)
@@ -449,106 +391,104 @@ function LoginPage() {
         {getThemeIcon(theme)}
       </button>
 
-      {/* Left Panel - Scattered Terminals & Homebrew Terminal Animation */}
-      <div 
-        className="hidden md:flex md:w-[55%] lg:w-[60%] flex-col justify-center items-center p-12 relative overflow-hidden"
+      {/* Left Panel — macOS glass preview */}
+      <div
+        className="hidden md:flex md:w-[55%] lg:w-[60%] flex-col justify-center items-center relative overflow-hidden"
         style={{
-          background: 'var(--bg)',
+          background: isDark
+            ? 'linear-gradient(135deg, #0f1117 0%, #111520 40%, #0d1a12 100%)'
+            : 'linear-gradient(135deg, #e8f5e9 0%, #f0f4ff 50%, #e8f0f5 100%)',
           borderRight: '1px solid var(--border)',
+          padding: '40px 48px',
         }}
       >
-        {/* Subtle retro overlay pattern */}
+        {/* Ambient glow blobs */}
         <div style={{
-          position: 'absolute', inset: 0, opacity: 0.03, pointerEvents: 'none',
-          backgroundImage: 'radial-gradient(var(--fg) 20%, transparent 20%)',
-          backgroundSize: '24px 24px',
-          zIndex: 2,
+          position: 'absolute', top: '-10%', left: '-5%',
+          width: 420, height: 420, borderRadius: '50%', pointerEvents: 'none',
+          background: isDark
+            ? 'radial-gradient(circle, rgba(74,222,128,0.10) 0%, transparent 70%)'
+            : 'radial-gradient(circle, rgba(22,163,74,0.12) 0%, transparent 70%)',
+        }} />
+        <div style={{
+          position: 'absolute', bottom: '0%', right: '-10%',
+          width: 380, height: 380, borderRadius: '50%', pointerEvents: 'none',
+          background: isDark
+            ? 'radial-gradient(circle, rgba(99,102,241,0.10) 0%, transparent 70%)'
+            : 'radial-gradient(circle, rgba(99,102,241,0.08) 0%, transparent 70%)',
+        }} />
+        <div style={{
+          position: 'absolute', top: '40%', right: '10%',
+          width: 240, height: 240, borderRadius: '50%', pointerEvents: 'none',
+          background: isDark
+            ? 'radial-gradient(circle, rgba(251,191,36,0.05) 0%, transparent 70%)'
+            : 'radial-gradient(circle, rgba(251,191,36,0.08) 0%, transparent 70%)',
         }} />
 
-        {/* Scattered background terminals */}
-        <StaticTerminal 
-          title="git-log.sh" 
-          lines={MOCK_GIT_LOG} 
-          opacity={0.15} 
-          width={240} 
-          height={160} 
-          top="6%" 
-          left="4%" 
-          transform="rotate(-4deg)" 
-          delay="100ms"
-        />
-        <StaticTerminal 
-          title="vitest-run.sh" 
-          lines={MOCK_TEST_LOG} 
-          opacity={0.25} 
-          width={280} 
-          height={150} 
-          bottom="8%" 
-          left="6%" 
-          transform="rotate(5deg)" 
-          delay="250ms"
-        />
-        <StaticTerminal 
-          title="docker-compose.log" 
-          lines={MOCK_DOCKER_LOG} 
-          opacity={0.12} 
-          width={270} 
-          height={140} 
-          top="10%" 
-          right="4%" 
-          transform="rotate(6deg)" 
-          delay="400ms"
-        />
-        <StaticTerminal 
-          title="npm-build.log" 
-          lines={MOCK_NPM_LOG} 
-          opacity={0.2} 
-          width={260} 
-          height={160} 
-          bottom="8%" 
-          right="6%" 
-          transform="rotate(-3deg)" 
-          delay="550ms"
-        />
+        {/* Noise texture */}
+        <div style={{
+          position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 1,
+          opacity: isDark ? 0.025 : 0.018,
+          backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='1'/%3E%3C/svg%3E")`,
+          backgroundSize: '180px 180px',
+        }} />
 
-        {/* Center Main Terminal */}
-        <div 
-          style={{ 
-            zIndex: 10, 
-            textAlign: 'center', 
-            width: '100%', 
-            maxWidth: 500,
-            animation: 'fadeInUp 0.8s cubic-bezier(0.16, 1, 0.3, 1) both',
-            animationDelay: '650ms',
-          }}
-        >
-          <h1 style={{
-            fontFamily: 'var(--font-heading)',
-            fontSize: '1.85rem',
-            fontWeight: 800,
-            color: 'var(--primary)',
-            marginBottom: 8,
-            textAlign: 'center',
-            letterSpacing: '-0.02em',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: '8px'
-          }}>
-            <Brain size={28} /> Mindspace
-          </h1>
-          <p style={{
-            fontFamily: 'var(--font-body)',
-            fontSize: '0.9rem',
-            color: 'var(--fg-muted)',
-            marginBottom: 32,
-            textAlign: 'center',
-            lineHeight: '1.5',
-          }}>
-            A premium collaborative workspace to capture ideas, structure thoughts, and organize your digital mind space.
-          </p>
+        <div style={{
+          zIndex: 10, width: '100%',
+          animation: 'fadeInUp 0.7s cubic-bezier(0.16, 1, 0.3, 1) both',
+          animationDelay: '150ms',
+          display: 'flex', flexDirection: 'column', gap: 28,
+        }}>
+          {/* Header */}
+          <div>
+            <h2 style={{
+              fontFamily: 'var(--font-heading)', fontSize: '1.65rem', fontWeight: 800,
+              letterSpacing: '-0.03em', margin: '0 0 8px',
+              color: isDark ? 'rgba(255,255,255,0.92)' : '#1a1a1a',
+              display: 'flex', alignItems: 'center', gap: 10,
+            }}>
+              <Brain size={26} style={{ color: 'var(--primary)' }} />
+              Your ideas, beautifully organised.
+            </h2>
+            <p style={{
+              fontSize: '0.875rem', margin: 0, lineHeight: 1.6,
+              color: isDark ? 'rgba(255,255,255,0.45)' : 'rgba(0,0,0,0.45)',
+              fontFamily: 'var(--font-body)',
+            }}>
+              Notes · Wiki · AI · Collaboration — all in one workspace.
+            </p>
+          </div>
 
-          <MindspaceTerminal />
+          {/* Glass window */}
+          <MiniAppPreview isDark={isDark} />
+
+          {/* Feature chips */}
+          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+            {[
+              { label: 'AI Summarization', Icon: Sparkles },
+              { label: 'Wiki Graph', Icon: Network },
+              { label: 'Live Collab', Icon: Users },
+              { label: 'PIN Lock', Icon: Lock },
+            ].map(({ label, Icon }) => (
+              <div key={label} style={{
+                display: 'flex', alignItems: 'center', gap: 6,
+                padding: '5px 11px',
+                borderRadius: 20,
+                background: isDark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.05)',
+                border: `1px solid ${isDark ? 'rgba(255,255,255,0.09)' : 'rgba(0,0,0,0.07)'}`,
+                backdropFilter: 'blur(8px)',
+                WebkitBackdropFilter: 'blur(8px)',
+              }}>
+                <Icon size={11} style={{ color: 'var(--primary)', flexShrink: 0 }} />
+                <span style={{
+                  fontSize: '0.7rem', fontFamily: 'var(--font-body)', fontWeight: 500,
+                  color: isDark ? 'rgba(255,255,255,0.55)' : 'rgba(0,0,0,0.5)',
+                }}>
+                  {label}
+                </span>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
 
@@ -596,9 +536,22 @@ function LoginPage() {
               {isRegister ? 'Create an account to get started' : 'Sign in to your account'}
             </p>
 
+            {/* OAuth Error Display */}
+            {search.error && (
+              <div style={{
+                padding: '9px 13px', background: 'rgba(224,49,49,0.08)',
+                border: '1px solid rgba(224,49,49,0.25)',
+                borderRadius: 8, fontSize: '0.8375rem', color: '#e03131',
+                marginBottom: 16
+              }}>
+                {search.error === 'oauth_failed' ? 'OAuth login failed. Please try again.' : search.error}
+              </div>
+            )}
+
             {/* Social Logins */}
             <button
               type="button"
+              onClick={() => authClient.signIn.social({ provider: 'google', callbackURL: '/' })}
               style={{
                 width: '100%',
                 display: 'flex',
@@ -627,6 +580,7 @@ function LoginPage() {
 
             <button
               type="button"
+              onClick={() => authClient.signIn.social({ provider: 'github', callbackURL: '/' })}
               style={{
                 width: '100%',
                 display: 'flex',
@@ -695,6 +649,7 @@ function LoginPage() {
                   {!isRegister && (
                     <button
                       type="button"
+                      onClick={() => { setShowForgot(true); setForgotMsg(null); setForgotError(null); setForgotEmail('') }}
                       style={{
                         background: 'none', border: 'none',
                         fontSize: '0.8125rem', color: textMuted,
@@ -815,6 +770,112 @@ function LoginPage() {
       </div>
 
       <AboutModal open={showAbout} onOpenChange={setShowAbout} />
+
+      {/* Forgot password modal */}
+      {showForgot && (
+        <div
+          onClick={() => setShowForgot(false)}
+          style={{
+            position: 'fixed', inset: 0, zIndex: 1000,
+            background: 'rgba(0,0,0,0.5)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            padding: 24,
+          }}
+        >
+          <div
+            onClick={e => e.stopPropagation()}
+            style={{
+              background: isDark ? '#18181b' : '#ffffff',
+              border: '1px solid var(--border)',
+              borderRadius: 16,
+              padding: '36px 32px',
+              width: '100%',
+              maxWidth: 400,
+              boxShadow: '0 8px 40px rgba(0,0,0,0.18)',
+            }}
+          >
+            <h3 style={{ fontSize: '1.125rem', fontWeight: 700, color: textTitle, marginBottom: 6 }}>
+              Reset your password
+            </h3>
+            <p style={{ fontSize: '0.875rem', color: textMuted, marginBottom: 20 }}>
+              Enter your account email and we'll send you a reset link.
+            </p>
+
+            {forgotMsg && (
+              <div style={{
+                padding: '9px 13px', borderRadius: 8, marginBottom: 16,
+                background: 'rgba(43,138,62,0.08)', border: '1px solid rgba(43,138,62,0.25)',
+                fontSize: '0.8375rem', color: '#2b8a3e',
+              }}>
+                {forgotMsg}
+              </div>
+            )}
+            {forgotError && (
+              <div style={{
+                padding: '9px 13px', borderRadius: 8, marginBottom: 16,
+                background: 'rgba(224,49,49,0.08)', border: '1px solid rgba(224,49,49,0.25)',
+                fontSize: '0.8375rem', color: '#e03131',
+              }}>
+                {forgotError}
+              </div>
+            )}
+
+            {!forgotMsg && (
+              <form onSubmit={handleForgotPassword} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: 600, color: textTitle, marginBottom: 8 }}>
+                    Email address
+                  </label>
+                  <input
+                    type="email"
+                    value={forgotEmail}
+                    onChange={e => setForgotEmail(e.target.value)}
+                    placeholder="you@example.com"
+                    required
+                    autoFocus
+                    style={{
+                      width: '100%', padding: '11px 16px', borderRadius: 8,
+                      border: `1px solid ${borderInput}`,
+                      background: bgInput, color: textInput,
+                      fontSize: '0.9375rem', fontFamily: 'var(--font-body)',
+                      outline: 'none', boxSizing: 'border-box',
+                    }}
+                    onFocus={e => { e.currentTarget.style.borderColor = borderFocus; e.currentTarget.style.boxShadow = `0 0 0 1px ${borderFocus}` }}
+                    onBlur={e => { e.currentTarget.style.borderColor = borderInput; e.currentTarget.style.boxShadow = 'none' }}
+                  />
+                </div>
+                <button
+                  type="submit"
+                  disabled={forgotLoading}
+                  style={{
+                    padding: '11px', borderRadius: 8, border: 'none',
+                    background: 'var(--primary)', color: 'var(--primary-fg)',
+                    fontWeight: 600, fontSize: '0.9375rem', fontFamily: 'var(--font-body)',
+                    cursor: forgotLoading ? 'not-allowed' : 'pointer',
+                    opacity: forgotLoading ? 0.7 : 1,
+                  }}
+                >
+                  {forgotLoading ? 'Sending…' : 'Send reset link'}
+                </button>
+              </form>
+            )}
+
+            <button
+              type="button"
+              onClick={() => setShowForgot(false)}
+              style={{
+                marginTop: 20, display: 'block', width: '100%',
+                background: 'none', border: 'none',
+                fontSize: '0.875rem', color: textMuted,
+                cursor: 'pointer', fontFamily: 'var(--font-body)',
+                textAlign: 'center',
+              }}
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
 
       <style>{`
         @keyframes blink {

@@ -1,20 +1,22 @@
 import type { IncomingMessage, ServerResponse } from 'node:http'
-import { createReadStream, existsSync } from 'node:fs'
+import { createReadStream } from 'node:fs'
 import { db, initDb } from '../shared/db'
-import { notes, attachments, users, organizations, userOrganizations, noteHistory, chatSessions, chatMessages } from '../../../drizzle/schema'
+import { notes, attachments, users, organizations, userOrganizations, noteHistory, chatSessions, chatMessages, betterAuthAccount, passwordResetTokens } from '../../../drizzle/schema'
 import { desc, eq, and, sql, or, inArray } from 'drizzle-orm'
 import { randomUUID } from 'crypto'
 import { saveFile, getFilePath, deleteFile } from '../shared/storage'
 import bcrypt from 'bcryptjs'
+import nodemailer from 'nodemailer'
+import { auth } from './auth-oauth'
 
 // Run DB initialization on module load to guarantee new tables exist in running dev server
 initDb().catch(err => console.error('[api.ts] DB initialization failed:', err))
 
 
 // Hono Imports
-import { Hono } from 'hono'
-import { getCookie, setCookie, deleteCookie } from 'hono/cookie'
-import { stream, streamSSE } from 'hono/streaming'
+import { Hono, type Context } from 'hono'
+import { deleteCookie, getSignedCookie, setSignedCookie } from 'hono/cookie'
+import { stream } from 'hono/streaming'
 import { createMiddleware } from 'hono/factory'
 import { getRequestListener } from '@hono/node-server'
 
@@ -40,11 +42,14 @@ app.onError((err, c) => {
   return c.json({ error: err.message }, 500)
 })
 
-// Helper to get session from Hono Context
-async function getSession(c: any) {
-  const sessionToken = getCookie(c, 'session')
-  if (!sessionToken) return null
-  const result = await db.execute(sql`SELECT user_id as "userId", username, role FROM sessions WHERE token = ${sessionToken}`)
+const COOKIE_SECRET = process.env.BETTER_AUTH_SECRET || 'dev-secret-change-in-production'
+
+async function getSession(c: Context<Env>) {
+  const sessionToken = await getSignedCookie(c, COOKIE_SECRET, 'session').catch(() => null)
+  const oauthToken = await getSignedCookie(c, COOKIE_SECRET, 'better-auth.session_token').catch(() => null)
+  const token = (sessionToken || null) ?? (oauthToken === false ? null : oauthToken)
+  if (!token) return null
+  const result = await db.execute(sql`SELECT user_id as "userId", username, role FROM sessions WHERE token = ${token}`)
   return (result.rows[0] as { userId: string; username: string; role: string } | undefined) ?? null
 }
 
@@ -108,53 +113,49 @@ const authMiddleware = createMiddleware<Env>(async (c, next) => {
 })
 
 const adminMiddleware = createMiddleware<Env>(async (c, next) => {
-  const session = await getSession(c)
-  if (!session) {
-    return c.json({ error: 'unauthenticated' }, 401)
-  }
-  if (session.role !== 'admin') {
-    return c.json({ error: 'forbidden' }, 403)
-  }
+  const session = c.get('session') ?? await getSession(c)
+  if (!session) return c.json({ error: 'unauthenticated' }, 401)
+  if (session.role !== 'admin') return c.json({ error: 'forbidden' }, 403)
   c.set('session', session)
   await next()
 })
 
+
 // --- AUTH ENDPOINTS ---
 
+// better-auth handles OAuth flows — only intercepts paths it knows, passes unknown paths through
+app.on(['GET', 'POST'], '/api/auth/*', async (c, next) => {
+  const res = await auth.handler(c.req.raw)
+  if (res.status !== 404) return res
+  await next()
+})
+
 app.post('/api/auth/login', async (c) => {
-  console.log('[Hono Login] Route reached!')
-  const body = await c.req.json().catch((err) => {
-    console.error('[Hono Login] Error parsing JSON body:', err)
-    return {}
-  }) as { username?: string; password?: string }
-  console.log('[Hono Login] Parsed body:', body)
+  const body = await c.req.json().catch(() => ({})) as { username?: string; password?: string }
   const { username, password } = body
   if (!username || !password) {
     return c.json({ error: 'username and password required' }, 400)
   }
   const [user] = await db.select().from(users).where(eq(users.username, username))
-  if (!user || !bcrypt.compareSync(password, user.passwordHash)) {
+  if (!user || !user.passwordHash || !bcrypt.compareSync(password, user.passwordHash)) {
     return c.json({ error: 'Invalid username or password' }, 401)
-  }
-  if (user.status === 'pending') {
-    return c.json({ error: 'Akun Anda sedang menunggu persetujuan admin.' }, 403)
-  }
-  if (user.status === 'rejected') {
-    return c.json({ error: 'Pendaftaran akun Anda ditolak oleh admin.' }, 403)
   }
   const token = randomUUID()
   await db.execute(sql`INSERT INTO sessions (token, user_id, username, role, created_at) VALUES (${token}, ${user.id}, ${user.username}, ${user.role}, ${Date.now()})`)
-  setCookie(c, 'session', token, { path: '/', httpOnly: true, sameSite: 'Strict' })
+  await setSignedCookie(c, 'session', token, COOKIE_SECRET, { path: '/', httpOnly: true, sameSite: 'Strict' })
   const orgs = await getUserOrganizations(user.id)
   return c.json({ userId: user.id, username: user.username, role: user.role, organizations: orgs })
 })
 
 app.post('/api/auth/logout', async (c) => {
-  const token = getCookie(c, 'session')
+  const sessionToken = await getSignedCookie(c, COOKIE_SECRET, 'session').catch(() => null)
+  const oauthToken = await getSignedCookie(c, COOKIE_SECRET, 'better-auth.session_token').catch(() => null)
+  const token = (sessionToken || null) ?? (oauthToken === false ? null : oauthToken)
   if (token) {
     await db.execute(sql`DELETE FROM sessions WHERE token = ${token}`)
   }
-  deleteCookie(c, 'session', { path: '/', httpOnly: true, sameSite: 'Strict' })
+  deleteCookie(c, 'session', { path: '/' })
+  deleteCookie(c, 'better-auth.session_token', { path: '/' })
   return c.json({ ok: true })
 })
 
@@ -163,8 +164,41 @@ app.get('/api/auth/me', async (c) => {
   if (!session) {
     return c.json({ error: 'unauthenticated' }, 401)
   }
+  const [user] = await db.select({ email: users.email, passwordHash: users.passwordHash }).from(users).where(eq(users.id, session.userId))
   const orgs = await getUserOrganizations(session.userId)
-  return c.json({ ...session, organizations: orgs })
+  const providers = await db
+    .select({ provider: betterAuthAccount.providerId })
+    .from(betterAuthAccount)
+    .where(eq(betterAuthAccount.userId, session.userId))
+  return c.json({
+    ...session,
+    email: user?.email ?? null,
+    hasPassword: !!user?.passwordHash,
+    connectedProviders: providers.map(p => p.provider),
+    organizations: orgs,
+  })
+})
+
+app.delete('/api/oauth/accounts/:provider', authMiddleware, async (c) => {
+  const session = c.get('session')
+  const provider = c.req.param('provider')
+
+  // Guard: refuse if this is the only auth method
+  const [user] = await db.select({ passwordHash: users.passwordHash }).from(users).where(eq(users.id, session.userId))
+  const remaining = await db
+    .select({ id: betterAuthAccount.id })
+    .from(betterAuthAccount)
+    .where(eq(betterAuthAccount.userId, session.userId))
+
+  if (!user?.passwordHash && remaining.length <= 1) {
+    return c.json({ error: 'Cannot disconnect your only login method. Set a password first.' }, 400)
+  }
+
+  await db
+    .delete(betterAuthAccount)
+    .where(and(eq(betterAuthAccount.userId, session.userId), eq(betterAuthAccount.providerId, provider)))
+
+  return c.json({ ok: true })
 })
 
 app.post('/api/auth/register', adminMiddleware, async (c) => {
@@ -201,8 +235,24 @@ app.post('/api/auth/public-register', async (c) => {
   }
   const hash = bcrypt.hashSync(password, 10)
   const id = randomUUID()
-  await db.insert(users).values({ id, username: cleanUsername, passwordHash: hash, role: 'viewer', status: 'pending', createdAt: Date.now() })
-  return c.json({ id, username: cleanUsername, status: 'pending' }, 201)
+  await db.insert(users).values({ id, username: cleanUsername, passwordHash: hash, role: 'viewer', status: 'approved', createdAt: Date.now() })
+  return c.json({ id, username: cleanUsername, status: 'approved' }, 201)
+})
+
+app.post('/api/auth/change-username', authMiddleware, async (c) => {
+  const session = c.get('session')
+  const body = await c.req.json().catch(() => ({})) as { username?: string }
+  const newUsername = body.username?.trim()
+  if (!newUsername) return c.json({ error: 'username required' }, 400)
+  if (!/^[a-zA-Z0-9_]{3,32}$/.test(newUsername)) {
+    return c.json({ error: 'Username must be 3–32 chars, letters/numbers/underscores only' }, 400)
+  }
+  const [existing] = await db.select({ id: users.id }).from(users).where(eq(users.username, newUsername)).limit(1)
+  if (existing) return c.json({ error: 'Username already taken' }, 409)
+  await db.update(users).set({ username: newUsername }).where(eq(users.id, session.userId))
+  // Update all sessions for this user
+  await db.execute(sql`UPDATE sessions SET username = ${newUsername} WHERE user_id = ${session.userId}`)
+  return c.json({ ok: true, username: newUsername })
 })
 
 app.post('/api/auth/change-password', authMiddleware, async (c) => {
@@ -216,7 +266,7 @@ app.post('/api/auth/change-password', authMiddleware, async (c) => {
   if (!user) {
     return c.json({ error: 'user not found' }, 404)
   }
-  if (!bcrypt.compareSync(oldPassword, user.passwordHash)) {
+  if (!user.passwordHash || !bcrypt.compareSync(oldPassword, user.passwordHash)) {
     return c.json({ error: 'Password lama salah' }, 400)
   }
   const hash = bcrypt.hashSync(newPassword, 10)
@@ -237,6 +287,87 @@ app.put('/api/auth/users/:id/reset-password', adminMiddleware, async (c) => {
   }
   const hash = bcrypt.hashSync(newPassword, 10)
   await db.update(users).set({ passwordHash: hash }).where(eq(users.id, userId))
+  return c.json({ ok: true })
+})
+
+function createMailTransport() {
+  return nodemailer.createTransport({
+    host: process.env.SMTP_HOST,
+    port: Number(process.env.SMTP_PORT ?? 587),
+    secure: process.env.SMTP_SECURE === 'true',
+    auth: {
+      user: process.env.SMTP_USER,
+      pass: process.env.SMTP_PASS,
+    },
+  })
+}
+
+app.post('/api/auth/forgot-password', async (c) => {
+  const body = await c.req.json().catch(() => ({})) as { email?: string }
+  const { email } = body
+  if (!email) return c.json({ error: 'email required' }, 400)
+
+  const [user] = await db.select({ id: users.id, email: users.email })
+    .from(users).where(eq(users.email, email.toLowerCase().trim())).limit(1)
+
+  // Always respond OK — don't leak whether email exists
+  if (!user || !user.email) return c.json({ ok: true })
+
+  // Invalidate any existing unused tokens for this user
+  await db.execute(sql`
+    UPDATE password_reset_tokens SET used_at = ${Date.now()}
+    WHERE user_id = ${user.id} AND used_at IS NULL
+  `)
+
+  const token = randomUUID()
+  const expiresAt = Date.now() + 10 * 60 * 1000 // 10 minutes
+  await db.insert(passwordResetTokens).values({
+    id: randomUUID(),
+    userId: user.id,
+    token,
+    expiresAt,
+    createdAt: Date.now(),
+  })
+
+  const baseUrl = process.env.BETTER_AUTH_URL || 'http://localhost:3000'
+  const resetLink = `${baseUrl}/reset-password?token=${token}`
+
+  if (!process.env.SMTP_HOST) {
+    // Dev: log link to console instead of sending email
+    console.log(`[forgot-password] Reset link for ${email}: ${resetLink}`)
+  } else {
+    const transporter = createMailTransport()
+    await transporter.sendMail({
+      from: process.env.SMTP_FROM || process.env.SMTP_USER,
+      to: user.email,
+      subject: 'Reset your password',
+      text: `Click the link below to reset your password. This link expires in 10 minutes.\n\n${resetLink}\n\nIf you didn't request this, ignore this email.`,
+      html: `<p>Click the link below to reset your password. This link expires in <strong>10 minutes</strong>.</p><p><a href="${resetLink}">${resetLink}</a></p><p>If you didn't request this, ignore this email.</p>`,
+    })
+  }
+
+  return c.json({ ok: true })
+})
+
+app.post('/api/password-reset/confirm', async (c) => {
+  const body = await c.req.json().catch(() => ({})) as { token?: string; password?: string }
+  const { token, password } = body
+  if (!token || !password) return c.json({ error: 'token and password required' }, 400)
+  if (password.length < 6) return c.json({ error: 'Password must be at least 6 characters' }, 400)
+
+  const [row] = await db.select().from(passwordResetTokens)
+    .where(eq(passwordResetTokens.token, token)).limit(1)
+
+  if (!row) return c.json({ error: 'invalid_token' }, 400)
+  if (row.usedAt) return c.json({ error: 'expired_token' }, 400)
+  if (row.expiresAt < Date.now()) return c.json({ error: 'expired_token' }, 400)
+
+  const hash = bcrypt.hashSync(password, 10)
+  await db.update(users).set({ passwordHash: hash }).where(eq(users.id, row.userId))
+  await db.execute(sql`
+    UPDATE password_reset_tokens SET used_at = ${Date.now()} WHERE token = ${token}
+  `)
+
   return c.json({ ok: true })
 })
 
@@ -1551,7 +1682,7 @@ app.delete('/api/documents/:documentId', authMiddleware, async (c) => {
       const errText = await forwardRes.text()
       return c.json({ error: `AI service error: ${errText}` }, forwardRes.status as any)
     }
-    return c.text('', 204)
+    return c.body(null, 204)
   } catch (err) {
     return c.json({ error: `Failed to delete document: ${String(err)}` }, 500)
   }

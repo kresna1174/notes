@@ -14,9 +14,11 @@ import { Route as DocumentsRouteImport } from './routes/documents'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as UsersIndexRouteImport } from './routes/users/index'
 import { Route as SearchIndexRouteImport } from './routes/search/index'
+import { Route as ResetPasswordIndexRouteImport } from './routes/reset-password/index'
 import { Route as OrganizationsIndexRouteImport } from './routes/organizations/index'
 import { Route as LoginIndexRouteImport } from './routes/login/index'
 import { Route as DocumentsIndexRouteImport } from './routes/documents/index'
+import { Route as ConnectAccountIndexRouteImport } from './routes/connect-account/index'
 import { Route as AskAgentIndexRouteImport } from './routes/ask-agent/index'
 import { Route as ShareTokenRouteImport } from './routes/share/$token'
 import { Route as PagesPageIdRouteImport } from './routes/pages/$pageId'
@@ -50,6 +52,11 @@ const SearchIndexRoute = SearchIndexRouteImport.update({
   path: '/search/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ResetPasswordIndexRoute = ResetPasswordIndexRouteImport.update({
+  id: '/reset-password/',
+  path: '/reset-password/',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const OrganizationsIndexRoute = OrganizationsIndexRouteImport.update({
   id: '/organizations/',
   path: '/organizations/',
@@ -64,6 +71,11 @@ const DocumentsIndexRoute = DocumentsIndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => DocumentsRoute,
+} as any)
+const ConnectAccountIndexRoute = ConnectAccountIndexRouteImport.update({
+  id: '/connect-account/',
+  path: '/connect-account/',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const AskAgentIndexRoute = AskAgentIndexRouteImport.update({
   id: '/ask-agent/',
@@ -112,9 +124,11 @@ export interface FileRoutesByFullPath {
   '/pages/$pageId': typeof PagesPageIdRoute
   '/share/$token': typeof ShareTokenRoute
   '/ask-agent/': typeof AskAgentIndexRoute
+  '/connect-account/': typeof ConnectAccountIndexRoute
   '/documents/': typeof DocumentsIndexRoute
   '/login/': typeof LoginIndexRoute
   '/organizations/': typeof OrganizationsIndexRoute
+  '/reset-password/': typeof ResetPasswordIndexRoute
   '/search/': typeof SearchIndexRoute
   '/users/': typeof UsersIndexRoute
 }
@@ -128,9 +142,11 @@ export interface FileRoutesByTo {
   '/pages/$pageId': typeof PagesPageIdRoute
   '/share/$token': typeof ShareTokenRoute
   '/ask-agent': typeof AskAgentIndexRoute
+  '/connect-account': typeof ConnectAccountIndexRoute
   '/documents': typeof DocumentsIndexRoute
   '/login': typeof LoginIndexRoute
   '/organizations': typeof OrganizationsIndexRoute
+  '/reset-password': typeof ResetPasswordIndexRoute
   '/search': typeof SearchIndexRoute
   '/users': typeof UsersIndexRoute
 }
@@ -146,9 +162,11 @@ export interface FileRoutesById {
   '/pages/$pageId': typeof PagesPageIdRoute
   '/share/$token': typeof ShareTokenRoute
   '/ask-agent/': typeof AskAgentIndexRoute
+  '/connect-account/': typeof ConnectAccountIndexRoute
   '/documents/': typeof DocumentsIndexRoute
   '/login/': typeof LoginIndexRoute
   '/organizations/': typeof OrganizationsIndexRoute
+  '/reset-password/': typeof ResetPasswordIndexRoute
   '/search/': typeof SearchIndexRoute
   '/users/': typeof UsersIndexRoute
 }
@@ -165,9 +183,11 @@ export interface FileRouteTypes {
     | '/pages/$pageId'
     | '/share/$token'
     | '/ask-agent/'
+    | '/connect-account/'
     | '/documents/'
     | '/login/'
     | '/organizations/'
+    | '/reset-password/'
     | '/search/'
     | '/users/'
   fileRoutesByTo: FileRoutesByTo
@@ -181,9 +201,11 @@ export interface FileRouteTypes {
     | '/pages/$pageId'
     | '/share/$token'
     | '/ask-agent'
+    | '/connect-account'
     | '/documents'
     | '/login'
     | '/organizations'
+    | '/reset-password'
     | '/search'
     | '/users'
   id:
@@ -198,9 +220,11 @@ export interface FileRouteTypes {
     | '/pages/$pageId'
     | '/share/$token'
     | '/ask-agent/'
+    | '/connect-account/'
     | '/documents/'
     | '/login/'
     | '/organizations/'
+    | '/reset-password/'
     | '/search/'
     | '/users/'
   fileRoutesById: FileRoutesById
@@ -213,8 +237,10 @@ export interface RootRouteChildren {
   PagesPageIdRoute: typeof PagesPageIdRoute
   ShareTokenRoute: typeof ShareTokenRoute
   AskAgentIndexRoute: typeof AskAgentIndexRoute
+  ConnectAccountIndexRoute: typeof ConnectAccountIndexRoute
   LoginIndexRoute: typeof LoginIndexRoute
   OrganizationsIndexRoute: typeof OrganizationsIndexRoute
+  ResetPasswordIndexRoute: typeof ResetPasswordIndexRoute
   SearchIndexRoute: typeof SearchIndexRoute
   UsersIndexRoute: typeof UsersIndexRoute
 }
@@ -256,6 +282,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SearchIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/reset-password/': {
+      id: '/reset-password/'
+      path: '/reset-password'
+      fullPath: '/reset-password/'
+      preLoaderRoute: typeof ResetPasswordIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/organizations/': {
       id: '/organizations/'
       path: '/organizations'
@@ -276,6 +309,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/documents/'
       preLoaderRoute: typeof DocumentsIndexRouteImport
       parentRoute: typeof DocumentsRoute
+    }
+    '/connect-account/': {
+      id: '/connect-account/'
+      path: '/connect-account'
+      fullPath: '/connect-account/'
+      preLoaderRoute: typeof ConnectAccountIndexRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/ask-agent/': {
       id: '/ask-agent/'
@@ -355,8 +395,10 @@ const rootRouteChildren: RootRouteChildren = {
   PagesPageIdRoute: PagesPageIdRoute,
   ShareTokenRoute: ShareTokenRoute,
   AskAgentIndexRoute: AskAgentIndexRoute,
+  ConnectAccountIndexRoute: ConnectAccountIndexRoute,
   LoginIndexRoute: LoginIndexRoute,
   OrganizationsIndexRoute: OrganizationsIndexRoute,
+  ResetPasswordIndexRoute: ResetPasswordIndexRoute,
   SearchIndexRoute: SearchIndexRoute,
   UsersIndexRoute: UsersIndexRoute,
 }
