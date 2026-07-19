@@ -1902,6 +1902,43 @@ app.delete('/api/wiki/pages/*', authMiddleware, async (c) => {
   }
 })
 
+// POST /api/ai/notes-index/:noteId — trigger note indexing
+app.post('/api/ai/notes-index/:noteId', authMiddleware, async (c) => {
+  try {
+    const noteId = c.req.param('noteId')
+    const body = await c.req.json()
+    const forwardRes = await fetch(`${AI_AGENT_URL}/api/notes-index/${noteId}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    })
+    if (!forwardRes.ok) {
+      const errText = await forwardRes.text()
+      return c.json({ error: `AI service error: ${errText}` }, forwardRes.status as any)
+    }
+    return c.json(await forwardRes.json())
+  } catch (err) {
+    return c.json({ error: `Failed to index note: ${String(err)}` }, 500)
+  }
+})
+
+// DELETE /api/ai/notes-index/:noteId — remove note from index
+app.delete('/api/ai/notes-index/:noteId', authMiddleware, async (c) => {
+  try {
+    const noteId = c.req.param('noteId')
+    const forwardRes = await fetch(`${AI_AGENT_URL}/api/notes-index/${noteId}`, {
+      method: 'DELETE',
+    })
+    if (!forwardRes.ok) {
+      const errText = await forwardRes.text()
+      return c.json({ error: `AI service error: ${errText}` }, forwardRes.status as any)
+    }
+    return c.json(await forwardRes.json())
+  } catch (err) {
+    return c.json({ error: `Failed to remove note index: ${String(err)}` }, 500)
+  }
+})
+
 // Hono handler wrapper for backward compatibility with Vite middleware and server.ts
 const nodeHandler = getRequestListener(app.fetch)
 

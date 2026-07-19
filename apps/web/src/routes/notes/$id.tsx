@@ -3,7 +3,7 @@ import { Sidebar } from '#/modules/sidebar'
 import { Editor, PinLockModal, VersionHistory, SearchPalette } from '#/modules/editor'
 import { ChatBot } from '#/modules/chat'
 import { useState, useEffect } from 'react'
-import { Check, Loader2, Circle, PanelLeftClose, PanelLeftOpen } from 'lucide-react'
+import { Check, Loader2, Circle, PanelLeftClose, PanelLeftOpen, Database } from 'lucide-react'
 
 export const Route = createFileRoute('/notes/$id')({
   loader: async ({ params }) => {
@@ -37,6 +37,8 @@ function NoteLoadingSkeleton() {
 
 type SaveStatus = 'saved' | 'saving' | 'unsaved' | 'generating'
 
+type IndexStatus = 'idle' | 'indexing' | 'indexed' | 'error'
+
 function SaveIndicator({ status, sidebarOpen, isMobile, historyOpen }: { status: SaveStatus; sidebarOpen: boolean; isMobile: boolean; historyOpen: boolean }) {
   if (isMobile && sidebarOpen) return null
 
@@ -66,6 +68,98 @@ function SaveIndicator({ status, sidebarOpen, isMobile, historyOpen }: { status:
       {status === 'saving' && <><Loader2 size={12} className="animate-spin" /> Saving…</>}
       {status === 'generating' && <><Loader2 size={12} className="animate-spin" /> Thinking…</>}
       {status === 'unsaved' && <><Circle size={10} fill="currentColor" strokeWidth={0} /> Unsaved</>}
+    </div>
+  )
+}
+
+function IndexButton({
+  noteId,
+  noteTitle,
+  noteContent,
+  saveStatus,
+  sidebarOpen,
+  isMobile,
+  historyOpen,
+}: {
+  noteId: string
+  noteTitle: string
+  noteContent: string
+  saveStatus: SaveStatus
+  sidebarOpen: boolean
+  isMobile: boolean
+  historyOpen: boolean
+}) {
+  const [status, setStatus] = useState<IndexStatus>('idle')
+
+  if (isMobile && sidebarOpen) return null
+
+  const bottomOffset = historyOpen ? 280 + 12 : 20
+  const isDisabled = saveStatus !== 'saved' || status === 'indexing'
+
+  const handleIndex = async () => {
+    if (isDisabled) return
+    setStatus('indexing')
+    try {
+      const res = await fetch(`/api/ai/notes-index/${noteId}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title: noteTitle, content: noteContent, user_id: '' }),
+      })
+      if (!res.ok) throw new Error('Failed')
+      setStatus('indexed')
+    } catch {
+      setStatus('error')
+    } finally {
+      setTimeout(() => setStatus('idle'), 3000)
+    }
+  }
+
+  const color =
+    status === 'indexed' ? '#22c55e' :
+    status === 'error' ? '#ef4444' :
+    isDisabled ? 'var(--fg-subtle)' :
+    'var(--fg-muted)'
+
+  return (
+    <div
+      onClick={handleIndex}
+      title={
+        saveStatus !== 'saved' ? 'Save the note first before indexing' :
+        status === 'indexing' ? 'Indexing…' :
+        status === 'indexed' ? 'Indexed to RAG ✓' :
+        status === 'error' ? 'Indexing failed — try again' :
+        'Index this note to RAG search'
+      }
+      style={{
+        position: 'absolute',
+        bottom: bottomOffset,
+        right: sidebarOpen ? 404 + 120 : 24 + 120,
+        display: 'flex',
+        alignItems: 'center',
+        gap: 6,
+        fontSize: '0.75rem',
+        fontFamily: 'var(--font-body)',
+        color,
+        background: 'var(--save-bg)',
+        border: '1px solid var(--border)',
+        borderRadius: 20,
+        padding: '5px 12px',
+        boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
+        transition: 'right 0.2s ease, bottom 0.2s ease, color 0.2s',
+        cursor: isDisabled ? 'default' : 'pointer',
+        zIndex: 50,
+        userSelect: 'none',
+      }}
+    >
+      {status === 'indexing' ? (
+        <><Loader2 size={12} className="animate-spin" /> Indexing…</>
+      ) : status === 'indexed' ? (
+        <><Check size={12} strokeWidth={2.5} /> Indexed</>
+      ) : status === 'error' ? (
+        <><Database size={12} /> Failed</>
+      ) : (
+        <><Database size={12} /> Index</>
+      )}
     </div>
   )
 }
@@ -263,7 +357,20 @@ function NotePageComponent() {
             </button>
           </div>
         )}
-        {note && isContentVisible && <SaveIndicator status={saveStatus} sidebarOpen={chatOpen} isMobile={isMobile} historyOpen={historyOpen} />}
+        {note && isContentVisible && (
+          <>
+            <SaveIndicator status={saveStatus} sidebarOpen={chatOpen} isMobile={isMobile} historyOpen={historyOpen} />
+            <IndexButton
+              noteId={note.id}
+              noteTitle={note.title}
+              noteContent={note.content}
+              saveStatus={saveStatus}
+              sidebarOpen={chatOpen}
+              isMobile={isMobile}
+              historyOpen={historyOpen}
+            />
+          </>
+        )}
       </main>
 
       {showUnlockModal && (
