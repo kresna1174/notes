@@ -37,6 +37,7 @@ from modules.pages.router import router as pages_router
 from modules.queries.router import router as queries_router
 from modules.wiki.router import router as wiki_router
 import modules.wiki.models  # noqa: F401 — registers WikiPage / WikiIngestLog with Base.metadata
+import modules.notes_index.models  # noqa: F401 — registers NoteIndex with SQLModel.metadata
 
 
 @asynccontextmanager
