@@ -6,6 +6,7 @@ import { DefaultChatTransport } from 'ai'
 import { marked } from 'marked'
 import { listDocuments } from '#/modules/shared/ragApi'
 import { notifyDocumentsChanged } from '#/modules/shared/ui/UploadMenu'
+import { ClarifyFlow, parseClarifyBlocks, stripClarifyBlocks } from '#/modules/shared/ui/ClarifyFlow'
 
 interface ChatBotProps {
   noteId?: string
@@ -76,144 +77,7 @@ function Markdown({ text, style }: { text: string; style?: React.CSSProperties }
   )
 }
 
-// ── Clarify options parser ───────────────────────────────────
-interface ClarifyQuestion {
-  question: string
-  options: { label: string; value: string }[]
-}
-
-function parseClarifyBlocks(text: string): ClarifyQuestion[] {
-  const blocks: ClarifyQuestion[] = []
-  // Split on blank lines to find question groups
-  const segments = text.split(/\n{2,}/)
-
-  for (const seg of segments) {
-    const lines = seg.trim().split('\n').map(l => l.trim()).filter(Boolean)
-    if (lines.length < 2) continue
-
-    // Detect option lines: starts with A. B. C. D. (up to F.)
-    const optionRegex = /^([A-F])\.\s+(.+)$/
-    const optLines = lines.filter(l => optionRegex.test(l))
-    if (optLines.length < 2) continue
-
-    // First non-option line before the options = question
-    const firstOptionIdx = lines.findIndex(l => optionRegex.test(l))
-    const question = lines.slice(0, firstOptionIdx).join(' ').replace(/[?？]\s*$/, '').trim()
-    if (!question) continue
-
-    const options = optLines.map(l => {
-      const m = l.match(optionRegex)!
-      return { label: m[2], value: m[2] }
-    })
-
-    blocks.push({ question, options })
-  }
-
-  return blocks
-}
-
-// Strip clarify blocks from the prose so they don't double-render
-function stripClarifyBlocks(text: string): string {
-  return text
-    .split(/\n{2,}/)
-    .filter(seg => {
-      const lines = seg.trim().split('\n').map(l => l.trim()).filter(Boolean)
-      const optionCount = lines.filter(l => /^[A-F]\.\s+/.test(l)).length
-      return optionCount < 2
-    })
-    .join('\n\n')
-    .trim()
-}
-
-// ── Clarify UI block ─────────────────────────────────────────
-function ClarifyBlock({
-  question,
-  options,
-  onSelect,
-}: {
-  question: string
-  options: { label: string; value: string }[]
-  onSelect: (val: string) => void
-}) {
-  const isOther = (label: string) => /^lainnya|^other/i.test(label)
-  const [customMode, setCustomMode] = useState(false)
-  const [customValue, setCustomValue] = useState('')
-  const customInputRef = useRef<HTMLInputElement>(null)
-
-  const submitCustom = () => {
-    const v = customValue.trim()
-    if (v) { onSelect(v); setCustomValue(''); setCustomMode(false) }
-  }
-
-  return (
-    <div style={{ margin: '8px 0', padding: '10px 12px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--muted)' }}>
-      <p style={{ margin: '0 0 8px', fontSize: '0.8rem', fontWeight: 600, color: 'var(--fg)', lineHeight: 1.4 }}>
-        {question}?
-      </p>
-      {customMode ? (
-        <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-          <input
-            ref={customInputRef}
-            autoFocus
-            value={customValue}
-            onChange={e => setCustomValue(e.target.value)}
-            onKeyDown={e => { if (e.key === 'Enter') submitCustom(); if (e.key === 'Escape') setCustomMode(false) }}
-            placeholder="Ketik jawabanmu…"
-            style={{ flex: 1, padding: '5px 8px', borderRadius: 6, border: '1px solid var(--primary)', background: 'var(--bg)', color: 'var(--fg)', fontSize: '0.78rem', outline: 'none' }}
-          />
-          <button
-            onClick={submitCustom}
-            disabled={!customValue.trim()}
-            style={{ padding: '5px 10px', borderRadius: 6, background: 'var(--primary)', color: 'var(--primary-fg)', border: 'none', fontSize: '0.76rem', fontWeight: 600, cursor: customValue.trim() ? 'pointer' : 'default', opacity: customValue.trim() ? 1 : 0.5 }}
-          >
-            Kirim
-          </button>
-          <button
-            onClick={() => setCustomMode(false)}
-            style={{ padding: '5px 8px', borderRadius: 6, background: 'none', color: 'var(--fg-subtle)', border: '1px solid var(--border)', fontSize: '0.76rem', cursor: 'pointer' }}
-          >
-            Batal
-          </button>
-        </div>
-      ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-          {options.map((opt, i) => (
-            <button
-              key={i}
-              onClick={() => isOther(opt.label) ? setCustomMode(true) : onSelect(opt.value)}
-              style={{
-                textAlign: 'left',
-                padding: '6px 10px',
-                borderRadius: 6,
-                border: '1px solid var(--border)',
-                background: 'var(--bg)',
-                color: isOther(opt.label) ? 'var(--fg-subtle)' : 'var(--fg)',
-                fontSize: '0.78rem',
-                cursor: 'pointer',
-                fontStyle: isOther(opt.label) ? 'italic' : 'normal',
-                transition: 'background 0.12s, border-color 0.12s',
-              }}
-              onMouseEnter={e => { e.currentTarget.style.background = 'var(--accent)'; e.currentTarget.style.borderColor = 'var(--primary)' }}
-              onMouseLeave={e => { e.currentTarget.style.background = 'var(--bg)'; e.currentTarget.style.borderColor = 'var(--border)' }}
-            >
-              {opt.label}
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
-  )
-}
-
-// ── Answered question summary chip ───────────────────────────
-function ClarifyAnswered({ question, answer }: { question: string; answer: string }) {
-  return (
-    <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, padding: '5px 10px', borderRadius: 6, background: 'var(--muted)', border: '1px solid var(--border)', opacity: 0.7 }}>
-      <span style={{ fontSize: '0.74rem', color: 'var(--fg-subtle)', flex: 1 }}>{question}</span>
-      <span style={{ fontSize: '0.74rem', color: 'var(--fg)', fontWeight: 600 }}>✓ {answer}</span>
-    </div>
-  )
-}
+// ClarifyFlow, parseClarifyBlocks, stripClarifyBlocks imported from shared/ui/ClarifyFlow
 
 // ── Notion-style toggle block ────────────────────────────────
 function ToggleBlock({
@@ -601,8 +465,6 @@ export function ChatBot({
   const [mentionTriggerIndex, setMentionTriggerIndex] = useState<number>(-1)
   const [showClearConfirm, setShowClearConfirm] = useState(false)
 
-  // clarifyAnswers[msgId] = { [questionText]: answerText }
-  const [clarifyAnswers, setClarifyAnswers] = useState<Record<string, Record<string, string>>>({})
 
   useEffect(() => {
     const fetchDocs = () => {
@@ -1245,25 +1107,6 @@ export function ChatBot({
                   const clarifyBlocks = parseClarifyBlocks(textContent)
                   const hasClarify = clarifyBlocks.length > 0
                   const proseText = hasClarify ? stripClarifyBlocks(textContent) : textContent
-                  const msgAnswers = clarifyAnswers[msg.id] || {}
-                  // how many questions answered so far
-                  const answeredCount = Object.keys(msgAnswers).length
-                  // current question to show (sequential)
-                  const currentBlock = hasClarify ? clarifyBlocks[answeredCount] : null
-
-                  const handleClarifyAnswer = (question: string, answer: string) => {
-                    const next = { ...msgAnswers, [question]: answer }
-                    setClarifyAnswers(prev => ({ ...prev, [msg.id]: next }))
-
-                    if (Object.keys(next).length >= clarifyBlocks.length) {
-                      // all answered — send combined summary
-                      const summary = clarifyBlocks
-                        .map(b => `${b.question}: ${next[b.question]}`)
-                        .join('\n')
-                      sendMessage({ text: summary })
-                    }
-                    // else: wait for next question to appear
-                  }
 
                   return (
                     <>
@@ -1274,20 +1117,15 @@ export function ChatBot({
                         />
                       )}
                       {hasClarify && isLastMsg && !isLoading && (
-                        <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 6 }}>
-                          {/* Answered questions — shown as greyed chips */}
-                          {clarifyBlocks.slice(0, answeredCount).map((block, bi) => (
-                            <ClarifyAnswered key={bi} question={block.question} answer={msgAnswers[block.question]} />
-                          ))}
-                          {/* Current unanswered question */}
-                          {currentBlock && (
-                            <ClarifyBlock
-                              question={currentBlock.question}
-                              options={currentBlock.options}
-                              onSelect={val => handleClarifyAnswer(currentBlock.question, val)}
-                            />
-                          )}
-                        </div>
+                        <ClarifyFlow
+                          blocks={clarifyBlocks}
+                          onComplete={answers => {
+                            const summary = clarifyBlocks
+                              .map(b => `${b.question}: ${answers[b.question]}`)
+                              .join('\n')
+                            sendMessage({ text: summary })
+                          }}
+                        />
                       )}
                     </>
                   )

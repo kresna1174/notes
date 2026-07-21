@@ -36,6 +36,7 @@ import { ToggleBlock } from './ToggleBlock'
 import { AiDraftBlock } from './AiDraftBlock'
 import { DragHandle } from './DragHandle'
 import { NoteIcon } from '../shared/ui'
+import { ClarifyFlow, parseClarifyBlocks } from '../shared/ui/ClarifyFlow'
 import { useEffect, useRef, useState, useMemo } from 'react'
 import { Eye, EyeOff, Lock, LockOpen, Share2, FileUp, Paperclip, Sparkles, Smile, Image as ImageIcon, Clock, Download, Loader2 } from 'lucide-react'
 import { ExportModal } from './ExportModal'
@@ -724,6 +725,8 @@ export function Editor({ note, onUpdate, onSaveStatusChange, onLockChange, share
   const [aiPromptText, setAiPromptText] = useState('')
   const [aiLoading, setAiLoading] = useState(false)
   const [aiPromptCoords, setAiPromptCoords] = useState<{ top: number; left: number } | null>(null)
+  const [aiClarifyBlocks, setAiClarifyBlocks] = useState<ReturnType<typeof parseClarifyBlocks>>([])
+  const aiPendingActionRef = useRef<{ prompt: string; action?: string; from?: number; to?: number; agentKey?: string } | null>(null)
 
   useEffect(() => {
     function handleOpenAi() {
@@ -925,6 +928,21 @@ export function Editor({ note, onUpdate, onSaveStatusChange, onLockChange, share
       // If stream error occurred and no text was generated, show error
       if (streamError && !fullText && !pendingToolContent) {
         throw new Error(streamError)
+      }
+
+      // Check if streamed text is a clarify question — intercept before inserting
+      const detectedClarify = parseClarifyBlocks(fullText)
+      if (detectedClarify.length > 0 && !pendingToolContent) {
+        // Undo the streamed text that was inserted into the doc
+        if (fullText) {
+          const end = editor.state.selection.from
+          editor.chain().focus().deleteRange({ from: startPos, to: end }).run()
+        }
+        aiPendingActionRef.current = { prompt, action, from, to, agentKey }
+        setAiClarifyBlocks(detectedClarify)
+        setAiLoading(false)
+        setAiPromptActive(true)
+        return
       }
 
       // Case 1: AI streamed text directly — replace the streamed chars with parsed HTML
@@ -1723,6 +1741,28 @@ export function Editor({ note, onUpdate, onSaveStatusChange, onLockChange, share
                 <Loader2 className="animate-spin" size={14} color="var(--fg-subtle)" />
                 <span style={{ fontSize: '0.78rem', color: 'var(--fg-subtle)' }}>Thinking...</span>
               </div>
+            ) : aiClarifyBlocks.length > 0 ? (
+              <ClarifyFlow
+                blocks={aiClarifyBlocks}
+                onComplete={answers => {
+                  const details = aiClarifyBlocks
+                    .map(b => `${b.question}: ${answers[b.question]}`)
+                    .join('\n')
+                  const pending = aiPendingActionRef.current
+                  setAiClarifyBlocks([])
+                  aiPendingActionRef.current = null
+                  setAiPromptActive(false)
+                  if (pending) {
+                    handleAiGenerate(
+                      `${pending.prompt}\n\n${details}`,
+                      pending.action as any,
+                      pending.from,
+                      pending.to,
+                      pending.agentKey
+                    )
+                  }
+                }}
+              />
             ) : (
               <>
                 <textarea
