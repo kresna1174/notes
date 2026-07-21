@@ -76,6 +76,106 @@ function Markdown({ text, style }: { text: string; style?: React.CSSProperties }
   )
 }
 
+// ── Clarify options parser ───────────────────────────────────
+interface ClarifyQuestion {
+  question: string
+  options: { label: string; value: string }[]
+}
+
+function parseClarifyBlocks(text: string): ClarifyQuestion[] {
+  const blocks: ClarifyQuestion[] = []
+  // Split on blank lines to find question groups
+  const segments = text.split(/\n{2,}/)
+
+  for (const seg of segments) {
+    const lines = seg.trim().split('\n').map(l => l.trim()).filter(Boolean)
+    if (lines.length < 2) continue
+
+    // Detect option lines: starts with A. B. C. D. (up to F.)
+    const optionRegex = /^([A-F])\.\s+(.+)$/
+    const optLines = lines.filter(l => optionRegex.test(l))
+    if (optLines.length < 2) continue
+
+    // First non-option line before the options = question
+    const firstOptionIdx = lines.findIndex(l => optionRegex.test(l))
+    const question = lines.slice(0, firstOptionIdx).join(' ').replace(/[?？]\s*$/, '').trim()
+    if (!question) continue
+
+    const options = optLines.map(l => {
+      const m = l.match(optionRegex)!
+      return { label: m[2], value: m[2] }
+    })
+
+    blocks.push({ question, options })
+  }
+
+  return blocks
+}
+
+// Strip clarify blocks from the prose so they don't double-render
+function stripClarifyBlocks(text: string): string {
+  return text
+    .split(/\n{2,}/)
+    .filter(seg => {
+      const lines = seg.trim().split('\n').map(l => l.trim()).filter(Boolean)
+      const optionCount = lines.filter(l => /^[A-F]\.\s+/.test(l)).length
+      return optionCount < 2
+    })
+    .join('\n\n')
+    .trim()
+}
+
+// ── Clarify UI block ─────────────────────────────────────────
+function ClarifyBlock({
+  question,
+  options,
+  onSelect,
+}: {
+  question: string
+  options: { label: string; value: string }[]
+  onSelect: (val: string) => void
+}) {
+  const isOther = (label: string) => /^lainnya|^other/i.test(label)
+
+  return (
+    <div style={{ margin: '8px 0', padding: '10px 12px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--muted)' }}>
+      <p style={{ margin: '0 0 8px', fontSize: '0.8rem', fontWeight: 600, color: 'var(--fg)', lineHeight: 1.4 }}>
+        {question}?
+      </p>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+        {options.map((opt, i) => (
+          <button
+            key={i}
+            onClick={() => onSelect(isOther(opt.label) ? '' : opt.value)}
+            style={{
+              textAlign: 'left',
+              padding: '6px 10px',
+              borderRadius: 6,
+              border: '1px solid var(--border)',
+              background: 'var(--bg)',
+              color: isOther(opt.label) ? 'var(--fg-subtle)' : 'var(--fg)',
+              fontSize: '0.78rem',
+              cursor: 'pointer',
+              fontStyle: isOther(opt.label) ? 'italic' : 'normal',
+              transition: 'background 0.12s, border-color 0.12s',
+            }}
+            onMouseEnter={e => {
+              e.currentTarget.style.background = 'var(--accent)'
+              e.currentTarget.style.borderColor = 'var(--primary)'
+            }}
+            onMouseLeave={e => {
+              e.currentTarget.style.background = 'var(--bg)'
+              e.currentTarget.style.borderColor = 'var(--border)'
+            }}
+          >
+            {opt.label}
+          </button>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 // ── Notion-style toggle block ────────────────────────────────
 function ToggleBlock({
   icon,
@@ -1098,17 +1198,45 @@ export function ChatBot({
                   </div>
                 )}
 
-                {/* Assistant prose text — no bubble */}
-                {hasText && (
-                  <Markdown
-                    text={textContent}
-                    style={{
-                      fontSize: '0.84rem',
-                      lineHeight: 1.65,
-                      color: 'var(--fg)',
-                    }}
-                  />
-                )}
+                {/* Assistant prose text + clarify options */}
+                {hasText && (() => {
+                  const clarifyBlocks = parseClarifyBlocks(textContent)
+                  const isLastAssistant = isLastMsg
+                  const proseText = clarifyBlocks.length > 0 ? stripClarifyBlocks(textContent) : textContent
+
+                  const handleClarifySelect = (question: string, value: string) => {
+                    if (value === '') {
+                      // "Lainnya" — focus textarea with question prefilled
+                      setInputValue(`${question}: `)
+                      setTimeout(() => textareaRef.current?.focus(), 50)
+                    } else {
+                      sendMessage({ text: value })
+                    }
+                  }
+
+                  return (
+                    <>
+                      {proseText && (
+                        <Markdown
+                          text={proseText}
+                          style={{ fontSize: '0.84rem', lineHeight: 1.65, color: 'var(--fg)' }}
+                        />
+                      )}
+                      {clarifyBlocks.length > 0 && isLastAssistant && !isLoading && (
+                        <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 10 }}>
+                          {clarifyBlocks.map((block, bi) => (
+                            <ClarifyBlock
+                              key={bi}
+                              question={block.question}
+                              options={block.options}
+                              onSelect={val => handleClarifySelect(block.question, val)}
+                            />
+                          ))}
+                        </div>
+                      )}
+                    </>
+                  )
+                })()}
 
                 {/* Token metrics — live timer while streaming, static after */}
                 {(hasText || isMessageLoading) && (() => {
