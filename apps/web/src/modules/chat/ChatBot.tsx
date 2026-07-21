@@ -1,5 +1,10 @@
 import { useState, useEffect, useRef } from 'react'
-import { Loader2, RotateCcw, ChevronRight, X, ArrowUp, Paperclip, BookOpen, FileText, Image as ImageIcon, Brain } from 'lucide-react'
+import {
+  Loader2, RotateCcw, ChevronRight, X, ArrowUp, Paperclip, BookOpen, FileText,
+  Image as ImageIcon, Brain, PenLine, FilePlus, Search, Globe, Link, AlignLeft,
+  Tag, Code2, List, FileSearch, Youtube, Database, Cpu, Check,
+  NotebookPen, BookMarked, ScrollText, Trash2, MessageCircle,
+} from 'lucide-react'
 import { ConfirmDialog } from '#/modules/shared/ui'
 import { useChat } from '@ai-sdk/react'
 import { DefaultChatTransport } from 'ai'
@@ -229,55 +234,35 @@ function ToolCallBlock({ item, noteId, lastUserPrompt }: { item: any; noteId: st
   const [isAuto, setIsAuto] = useState(false)
 
   const toolMeta: Record<string, { label: string; icon: React.ReactNode }> = {
-    write_notes: {
-      label: 'Updating note',
-      icon: <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>,
-    },
-    create_new_note: {
-      label: 'Creating note',
-      icon: <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg>,
-    },
-    update_note_direct: {
-      label: 'Editing note',
-      icon: <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>,
-    },
-    search_web: {
-      label: 'Searching the web',
-      icon: <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>,
-    },
-    extract_web: {
-      label: 'Extracting web content',
-      icon: <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>,
-    },
-    crawl_web: {
-      label: 'Crawling site',
-      icon: <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>,
-    },
-    summarize_expert: {
-      label: 'Summarizing',
-      icon: <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="21" y1="10" x2="7" y2="10"/><line x1="21" y1="6" x2="3" y2="6"/><line x1="21" y1="14" x2="3" y2="14"/><line x1="21" y1="18" x2="7" y2="18"/></svg>,
-    },
-    tagger_expert: {
-      label: 'Extracting tags',
-      icon: <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>,
-    },
-    execute_python_code: {
-      label: 'Running code',
-      icon: <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>,
-    },
-    list_rag_documents: {
-      label: 'Listing reference documents',
-      icon: <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>,
-    },
-    search_rag_documents: {
-      label: 'Searching document library',
-      icon: <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><circle cx="11.5" cy="13.5" r="2.5"/><line x1="16" y1="18" x2="13.3" y2="15.3"/></svg>,
-    },
+    write_notes:           { label: 'Updating note',              icon: <PenLine size={13} strokeWidth={1.75} /> },
+    create_new_note:       { label: 'Creating note',              icon: <FilePlus size={13} strokeWidth={1.75} /> },
+    update_note_direct:    { label: 'Editing note',               icon: <NotebookPen size={13} strokeWidth={1.75} /> },
+    search_web:            { label: 'Searching the web',          icon: <Search size={13} strokeWidth={1.75} /> },
+    extract_web:           { label: 'Extracting web content',     icon: <Link size={13} strokeWidth={1.75} /> },
+    crawl_web:             { label: 'Crawling site',              icon: <Globe size={13} strokeWidth={1.75} /> },
+    find_web_photos:       { label: 'Finding photos',             icon: <ImageIcon size={13} strokeWidth={1.75} /> },
+    find_youtube_videos:   { label: 'Searching YouTube',          icon: <Youtube size={13} strokeWidth={1.75} /> },
+    summarize_expert:      { label: 'Summarizing',                icon: <AlignLeft size={13} strokeWidth={1.75} /> },
+    tagger_expert:         { label: 'Extracting tags',            icon: <Tag size={13} strokeWidth={1.75} /> },
+    writer_expert:         { label: 'Writing content',            icon: <PenLine size={13} strokeWidth={1.75} /> },
+    researcher_expert:     { label: 'Researching',                icon: <BookMarked size={13} strokeWidth={1.75} /> },
+    editor_expert:         { label: 'Editing content',            icon: <NotebookPen size={13} strokeWidth={1.75} /> },
+    translator_expert:     { label: 'Translating',                icon: <MessageCircle size={13} strokeWidth={1.75} /> },
+    code_analyst_expert:   { label: 'Analyzing data',             icon: <Code2 size={13} strokeWidth={1.75} /> },
+    execute_python_code:   { label: 'Running code',               icon: <Code2 size={13} strokeWidth={1.75} /> },
+    list_rag_documents:    { label: 'Listing documents',          icon: <List size={13} strokeWidth={1.75} /> },
+    search_rag_documents:  { label: 'Searching documents',        icon: <FileSearch size={13} strokeWidth={1.75} /> },
+    search_knowledge:      { label: 'Searching knowledge base',   icon: <Database size={13} strokeWidth={1.75} /> },
+    remember_user_fact:    { label: 'Saving to memory',           icon: <Brain size={13} strokeWidth={1.75} /> },
+    forget_user_fact:      { label: 'Removing from memory',       icon: <Trash2 size={13} strokeWidth={1.75} /> },
+    query_wiki:            { label: 'Querying wiki',              icon: <ScrollText size={13} strokeWidth={1.75} /> },
+    ingest_note_to_wiki:   { label: 'Adding to wiki',             icon: <BookOpen size={13} strokeWidth={1.75} /> },
+    read_wiki_index:       { label: 'Reading wiki index',         icon: <ScrollText size={13} strokeWidth={1.75} /> },
   }
 
   const fallbackMeta = {
     label: item.toolName.replace(/_/g, ' '),
-    icon: <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M4.93 4.93a10 10 0 0 0 0 14.14"/></svg>,
+    icon: <Cpu size={13} strokeWidth={1.75} />,
   }
 
   const { label, icon } = toolMeta[item.toolName] ?? fallbackMeta
@@ -425,11 +410,14 @@ function ToolCallBlock({ item, noteId, lastUserPrompt }: { item: any; noteId: st
                   </button>
                 </div>
               ) : approvalState === 'approved' ? (
-                <span style={{ fontSize: '0.7rem', color: '#22c55e', fontWeight: 500 }}>
-                  ✓ {item.toolName === 'update_note_direct' ? 'Applied directly' : `Applied ${isAuto ? 'automatically' : ''}`}
+                <span style={{ fontSize: '0.7rem', color: '#22c55e', fontWeight: 500, display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <Check size={11} strokeWidth={2.5} />
+                  {item.toolName === 'update_note_direct' ? 'Applied directly' : `Applied ${isAuto ? 'automatically' : ''}`}
                 </span>
               ) : (
-                <span style={{ fontSize: '0.7rem', color: '#ef4444' }}>✗ Rejected</span>
+                <span style={{ fontSize: '0.7rem', color: '#ef4444', display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <X size={11} strokeWidth={2.5} /> Rejected
+                </span>
               )}
             </div>
           )}
@@ -501,7 +489,7 @@ export function ChatBot({
   const sessionIdRef = useRef(sessionId)
   sessionIdRef.current = sessionId
 
-  const transportRef = useRef<DefaultChatTransport | null>(null)
+  const transportRef = useRef<DefaultChatTransport<any> | null>(null)
   if (!transportRef.current) {
     transportRef.current = new DefaultChatTransport({
       api: '/api/ai/chat/stream',
@@ -514,7 +502,7 @@ export function ChatBot({
     })
   }
 
-  const { messages, setMessages, sendMessage, status, error } = useChat({
+  const { messages, setMessages, sendMessage, status } = useChat({
     id: sessionId,
     transport: transportRef.current,
     onError: (err) => {
@@ -756,13 +744,13 @@ export function ChatBot({
   }
 
   const quickPrompts = isRagMode ? [
-    { label: '✦ Summarize pinned documents', text: 'Summarize the key points from the pinned documents.' },
-    { label: '✦ Find main topics', text: 'What are the main topics covered in the pinned documents?' },
-    { label: '✦ List key facts', text: 'List the most important facts from the pinned documents.' },
+    { label: 'Summarize pinned documents', text: 'Summarize the key points from the pinned documents.' },
+    { label: 'Find main topics', text: 'What are the main topics covered in the pinned documents?' },
+    { label: 'List key facts', text: 'List the most important facts from the pinned documents.' },
   ] : [
-    { label: '✦ Summarize this note', text: 'Tolong panggil summarize_expert untuk meringkas seluruh isi catatan ini.' },
-    { label: '✦ Create automatic tags', text: 'Tolong panggil tagger_expert untuk merekomendasikan tag berdasarkan isi catatan ini.' },
-    { label: '✦ Find additional ideas', text: 'Berikan 3 ide tambahan yang bisa ditambahkan ke catatan ini.' },
+    { label: 'Summarize this note', text: 'Tolong panggil summarize_expert untuk meringkas seluruh isi catatan ini.' },
+    { label: 'Create automatic tags', text: 'Tolong panggil tagger_expert untuk merekomendasikan tag berdasarkan isi catatan ini.' },
+    { label: 'Find additional ideas', text: 'Berikan 3 ide tambahan yang bisa ditambahkan ke catatan ini.' },
   ]
 
   const hasUserMessage = messages.some((m: any) => m.role === 'user')
