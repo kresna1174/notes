@@ -1,17 +1,6 @@
 import { createFileRoute, useNavigate, useSearch } from '@tanstack/react-router'
-import { useState, useEffect, useSyncExternalStore } from 'react'
-
-function useIsDesktop() {
-  return useSyncExternalStore(
-    cb => {
-      const mq = window.matchMedia('(min-width: 768px)')
-      mq.addEventListener('change', cb)
-      return () => mq.removeEventListener('change', cb)
-    },
-    () => window.matchMedia('(min-width: 768px)').matches,
-    () => true,
-  )
-}
+import { useState, useEffect } from 'react'
+import { useIsDesktop } from '#/modules/shared'
 import { useAuth } from '#/modules/shared/auth'
 import { useTheme } from '#/modules/shared/theme'
 import { Eye, EyeOff, Sun, Moon, Brain, Map, Lightbulb, BarChart2, KeyRound, Calendar, Network, Users, Lock, Sparkles } from 'lucide-react'
