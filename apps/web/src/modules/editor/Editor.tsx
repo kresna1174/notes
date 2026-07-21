@@ -40,7 +40,7 @@ import { ClarifyFlow, parseClarifyBlocks } from '../shared/ui/ClarifyFlow'
 import { useEffect, useRef, useState, useMemo } from 'react'
 import { Eye, EyeOff, Lock, LockOpen, Share2, FileUp, Paperclip, Sparkles, Smile, Image as ImageIcon, Clock, Download, Loader2 } from 'lucide-react'
 import { ExportModal } from './ExportModal'
-import { WikiIngestButton } from '../wiki'
+// import { WikiIngestButton } from '../wiki' // hidden — feature on hold
 import { marked } from 'marked'
 import mammoth from 'mammoth'
 import * as XLSX from 'xlsx'
@@ -242,7 +242,7 @@ export const DragDropPlugin = Extension.create({
 interface EditorProps {
   note: Note
   onUpdate: (fields: { title?: string; content?: string; coverImage?: string | null; icon?: string | null }) => Promise<void>
-  onSaveStatusChange?: (status: 'saved' | 'saving' | 'unsaved') => void
+  onSaveStatusChange?: (status: 'saved' | 'saving' | 'unsaved' | 'generating') => void
   onLockChange?: (isLocked: boolean) => void
   shareTrigger?: number
   chatOpen?: boolean
@@ -1441,12 +1441,7 @@ export function Editor({ note, onUpdate, onSaveStatusChange, onLockChange, share
                 <Download size={14} />
               </button>
 
-              <WikiIngestButton
-                noteId={note.id}
-                noteTitle={title || note.title || 'Untitled'}
-                noteContent={note.content || ''}
-                compact
-              />
+              {/* WikiIngestButton hidden — feature on hold */}
 
               <input
                 ref={attachInputRef}

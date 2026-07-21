@@ -3,7 +3,7 @@ import { useNavigate } from '@tanstack/react-router'
 import { ScrollArea } from '../shared/ui'
 import { NoteTree } from './NoteTree'
 import { SearchBar } from './SearchBar'
-import { Plus, LogOut, Users, Shield, Eye, Info, Menu, X, KeyRound, Brain, ChevronDown, Check, FileStack, BookOpen, Settings } from 'lucide-react'
+import { Plus, LogOut, Users, Shield, Eye, Info, Menu, X, KeyRound, Brain, ChevronDown, Check, FileStack, Settings } from 'lucide-react'
 import { FontPicker } from './FontPicker'
 import { ThemeToggle } from './ThemeToggle'
 import { useAuth } from '../shared/auth'
@@ -446,19 +446,7 @@ export function Sidebar({ activeNoteId, onShareNote, notesUpdateTrigger }: Sideb
             </button>
           )}
 
-          <button
-            onClick={() => navigateAndClose({ to: '/wiki' })}
-            style={{
-              display: 'flex', alignItems: 'center', gap: 8, width: '100%',
-              padding: '7px 10px', borderRadius: 7, border: 'none',
-              background: 'transparent', cursor: 'pointer', marginBottom: 4,
-              fontSize: '0.8125rem', color: C.fgMuted, fontFamily: 'var(--font-body)',
-            }}
-            onMouseEnter={e => { e.currentTarget.style.background = C.accent; e.currentTarget.style.color = C.primary }}
-            onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = C.fgMuted }}
-          >
-            <BookOpen size={14} /> Wiki
-          </button>
+          {/* Wiki menu hidden — feature on hold */}
 
           <button
             onClick={() => navigateAndClose({ to: '/connect-account' })}
