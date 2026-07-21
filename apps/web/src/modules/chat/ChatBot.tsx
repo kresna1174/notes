@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { Loader2, RotateCcw, ChevronRight, X, ArrowUp, Paperclip, BookOpen, FileText, Image as ImageIcon } from 'lucide-react'
+import { Loader2, RotateCcw, ChevronRight, X, ArrowUp, Paperclip, BookOpen, FileText, Image as ImageIcon, Brain } from 'lucide-react'
 import { ConfirmDialog } from '#/modules/shared/ui'
 import { useChat } from '@ai-sdk/react'
 import { DefaultChatTransport } from 'ai'
@@ -321,7 +321,15 @@ function ToolCallBlock({ item, noteId, lastUserPrompt }: { item: any; noteId: st
       }).catch(console.error)
     }
 
-    window.dispatchEvent(new CustomEvent('note-updated-by-ai', { detail: { title: args.title, content: args.content } }))
+    // args.content is raw markdown from LLM (pre-execution); convert to HTML for TipTap
+    let content = args.content || ''
+    try {
+      if (content && !content.trim().startsWith('<')) {
+        content = await marked.parse(content, { breaks: true, gfm: true })
+      }
+    } catch {}
+
+    window.dispatchEvent(new CustomEvent('note-updated-by-ai', { detail: { title: args.title, content } }))
   }
 
   const handleReject = async () => {
@@ -1089,7 +1097,7 @@ export function ChatBot({
                 {hasReasoning && (
                   <div style={{ marginBottom: hasText ? 8 : 0 }}>
                     <ToggleBlock
-                      icon="💭"
+                      icon={<Brain size={13} />}
                       label={isMessageLoading && !hasText ? 'Thinking…' : 'Reasoning'}
                       defaultOpen={false}
                       isActive={isMessageLoading && !hasText}

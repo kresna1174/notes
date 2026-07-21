@@ -73,33 +73,167 @@ async def chat(request: ChatRequest):
 # ── Streaming chat ───────────────────────────────────────────────────────────
 
 async def _build_agent_with_memory(agent_key: str | None, message: str, user_id: str | None):
-    """Resolve agent and inject persistent user memory into its system prompt."""
+    """Resolve agent, refresh its prompt from Langfuse, and inject relevant user memory.
+
+    Prompt is fetched from Langfuse per-request (with 60s TTL cache) so changes
+    made in the Langfuse dashboard take effect without restarting the server.
+    Memory is filtered by semantic relevance to avoid polluting the prompt.
+    """
     from agents import Agent
     from modules.memory.methods import get_all_memories, format_memory_for_prompt, ensure_table
+    from core.langfuse_client import get_prompt
+    from core.prompt import (
+        MAIN_ASSISTANT_PROMPT, WRITER_PROMPT, RESEARCHER_PROMPT,
+        TRANSLATOR_PROMPT, CODE_ANALYST_PROMPT, EDITOR_PROMPT,
+        SUMMARIZER_PROMPT, TAGGER_PROMPT,
+    )
+
+    _PROMPT_FALLBACKS = {
+        "NotesParentAssistant": ("main_assistant_prompt", MAIN_ASSISTANT_PROMPT),
+        "WriterSubAgent": ("writer_prompt", WRITER_PROMPT),
+        "ResearcherSubAgent": ("researcher_prompt", RESEARCHER_PROMPT),
+        "TranslatorSubAgent": ("translator_prompt", TRANSLATOR_PROMPT),
+        "CodeAnalystSubAgent": ("code_analyst_prompt", CODE_ANALYST_PROMPT),
+        "EditorSubAgent": ("editor_prompt", EDITOR_PROMPT),
+        "SummarizerSubAgent": ("summarizer_prompt", SUMMARIZER_PROMPT),
+        "TaggerSubAgent": ("tagger_prompt", TAGGER_PROMPT),
+    }
 
     base_agent = await resolve_agent_async(agent_key, message)
 
-    if not user_id:
+    # Refresh prompt from Langfuse (TTL cached — no network hit on every request)
+    prompt_key, fallback = _PROMPT_FALLBACKS.get(base_agent.name, (None, None))
+    fresh_instructions = get_prompt(prompt_key, fallback=fallback) if prompt_key else base_agent.instructions
+
+    # Build memory block
+    memory_block = ""
+    if user_id:
+        try:
+            await ensure_table()
+            all_memories = await get_all_memories(user_id)
+            if all_memories:
+                relevant_memories = await _filter_relevant_memories(all_memories, message)
+                memory_block = format_memory_for_prompt(relevant_memories)
+        except Exception as e:
+            logger.warning(f"Failed to load user memory: {e}")
+
+    final_instructions = f"{memory_block}\n\n{fresh_instructions}" if memory_block else fresh_instructions
+
+    # Only clone if something changed
+    if final_instructions == base_agent.instructions:
         return base_agent
+
+    return Agent(
+        name=base_agent.name,
+        instructions=final_instructions,
+        model=base_agent.model,
+        model_settings=base_agent.model_settings,
+        tools=base_agent.tools,
+    )
+
+
+async def _filter_relevant_memories(
+    memories: dict[str, str],
+    message: str,
+    top_k: int = 8,
+    min_score: float = 0.3,
+) -> dict[str, str]:
+    """Return the top-k memories most semantically similar to the current message.
+
+    Falls back to returning all memories if embedding fails — fail-open so
+    memory injection always works even without embeddings.
+    """
+    if len(memories) <= top_k:
+        return memories
 
     try:
-        await ensure_table()
-        memories = await get_all_memories(user_id)
-        memory_block = format_memory_for_prompt(memories)
-        if not memory_block:
-            return base_agent
+        from modules.rag.methods import generate_embeddings, generate_query_embedding
 
-        # Clone agent with injected memory prepended to instructions
-        return Agent(
-            name=base_agent.name,
-            instructions=f"{memory_block}\n\n{base_agent.instructions}",
-            model=base_agent.model,
-            model_settings=base_agent.model_settings,
-            tools=base_agent.tools,
+        keys = list(memories.keys())
+        # Embed each memory as "key: value" for richer signal
+        memory_texts = [f"{k}: {v}" for k, v in memories.items()]
+
+        query_vec, memory_vecs = await asyncio.gather(
+            generate_query_embedding(message),
+            generate_embeddings(memory_texts),
         )
+
+        if not query_vec or not memory_vecs:
+            return memories
+
+        def _cos(a: list[float], b: list[float]) -> float:
+            dot = sum(x * y for x, y in zip(a, b))
+            na = sum(x * x for x in a) ** 0.5
+            nb = sum(x * x for x in b) ** 0.5
+            return dot / (na * nb) if na and nb else 0.0
+
+        scored = sorted(
+            ((keys[i], _cos(query_vec, memory_vecs[i])) for i in range(len(keys))),
+            key=lambda x: x[1],
+            reverse=True,
+        )
+
+        selected = {k: memories[k] for k, score in scored[:top_k] if score >= min_score}
+        return selected if selected else memories
+
     except Exception as e:
-        logger.warning(f"Failed to load user memory: {e}")
-        return base_agent
+        logger.warning(f"Memory relevance filtering failed, using all memories: {e}")
+        return memories
+
+
+async def _summarize_old_history(session_id: str, db_url: str) -> str | None:
+    """Summarize oldest messages when session approaches the 50-message limit.
+
+    Returns a summary string to prepend to the current message as context,
+    or None if the session is short enough that no summary is needed.
+    """
+    try:
+        check_session = SQLAlchemySession.from_url(
+            session_id=session_id,
+            url=db_url,
+            create_tables=False,
+            session_settings=SessionSettings(limit=100),
+        )
+        all_items = await check_session.get_items()
+
+        if len(all_items) < 40:
+            return None
+
+        # Collect oldest user/assistant text messages for summarization
+        text_messages = []
+        for item in all_items[:-20]:  # skip most recent 20, summarize the rest
+            role = getattr(item, "role", None) or (item.get("role") if isinstance(item, dict) else None)
+            content = getattr(item, "content", None) or (item.get("content") if isinstance(item, dict) else None)
+            if role in ("user", "assistant") and content:
+                text = content if isinstance(content, str) else " ".join(
+                    p.get("text", "") for p in content if isinstance(p, dict) and p.get("type") == "text"
+                )
+                if text.strip():
+                    text_messages.append(f"{role.upper()}: {text[:500]}")
+
+        if not text_messages:
+            return None
+
+        from agents import Runner
+        from modules.chat.agent_defs import summarizer_agent
+
+        history_text = "\n\n".join(text_messages[-30:])  # cap at 30 msgs for summary input
+        summary_prompt = (
+            f"Summarize the key points from this conversation history in 3-5 bullet points. "
+            f"Focus on: user's goals, clarifications given, decisions made, content context.\n\n"
+            f"{history_text}"
+        )
+        result = await Runner.run(summarizer_agent, summary_prompt, max_turns=1)
+        summary = result.final_output or ""
+
+        if not summary.strip():
+            return None
+
+        return f"[CONVERSATION CONTEXT — earlier messages summarized]\n{summary}\n[END CONTEXT]"
+
+    except Exception as e:
+        logger.warning(f"History summarization failed: {e}")
+        return None
 
 
 async def chat_event_generator(message: str, session_id: str, user_id: str | None = None, agent_key: str | None = None):
@@ -108,6 +242,11 @@ async def chat_event_generator(message: str, session_id: str, user_id: str | Non
     # Resolve which agent to use (with persistent memory injection)
     agent = await _build_agent_with_memory(agent_key, message, user_id)
     logger.info(f"Using agent: {agent.name} (key={agent_key})")
+
+    # Prepend history summary if session is long (prevents context loss on truncation)
+    history_summary = await _summarize_old_history(session_id, db_url)
+    if history_summary:
+        message = f"{history_summary}\n\n{message}"
 
     # The root agent is the one directly invoked — its text always goes to text-delta.
     # Only sub-agents delegated by the root get routed to reasoning-delta.

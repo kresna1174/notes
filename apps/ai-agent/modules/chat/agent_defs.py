@@ -48,7 +48,7 @@ summarizer_agent = Agent(
     instructions=SUMMARIZER_PROMPT,
     model=get_model(),
     model_settings=default_model_settings,
-    tools=[],  # Summarizer does not need tools — it only produces text.
+    tools=[],
 )
 
 tagger_agent = Agent(
@@ -56,7 +56,7 @@ tagger_agent = Agent(
     instructions=TAGGER_PROMPT,
     model=get_model(),
     model_settings=default_model_settings,
-    tools=[],  # Tagger only produces text.
+    tools=[],
 )
 
 writer_agent = Agent(
@@ -64,7 +64,7 @@ writer_agent = Agent(
     instructions=WRITER_PROMPT,
     model=get_model(),
     model_settings=default_model_settings,
-    tools=ALL_TOOLS,  # Writer can research, write notes, and query RAG.
+    tools=ALL_TOOLS,
 )
 
 researcher_agent = Agent(
@@ -72,7 +72,7 @@ researcher_agent = Agent(
     instructions=RESEARCHER_PROMPT,
     model=get_model(),
     model_settings=default_model_settings,
-    tools=ALL_TOOLS,  # Researcher can search, save findings, run code, and query RAG.
+    tools=ALL_TOOLS,
 )
 
 translator_agent = Agent(
@@ -80,7 +80,7 @@ translator_agent = Agent(
     instructions=TRANSLATOR_PROMPT,
     model=get_model(),
     model_settings=default_model_settings,
-    tools=NOTE_TOOLS,  # Translator can directly update the note with translated text.
+    tools=NOTE_TOOLS,
 )
 
 code_analyst_agent = Agent(
@@ -88,7 +88,7 @@ code_analyst_agent = Agent(
     instructions=CODE_ANALYST_PROMPT,
     model=get_model(),
     model_settings=default_model_settings,
-    tools=ALL_TOOLS,  # Code analyst can run code, research, write notes, and query RAG.
+    tools=ALL_TOOLS,
 )
 
 editor_agent = Agent(
@@ -96,10 +96,7 @@ editor_agent = Agent(
     instructions=EDITOR_PROMPT,
     model=get_model(),
     model_settings=default_model_settings,
-    # update_note_direct is included so the model doesn't error if it tries to call it
-    # (session history may contain prior note-tool calls). The frontend intercepts
-    # tool-input-available and inserts the content directly at cursor — no approval dialog.
-    tools=[update_note_direct, execute_python_code] + WEB_TOOLS + RAG_TOOLS,
+    tools=[update_note_direct, execute_python_code, search_knowledge] + WEB_TOOLS + RAG_TOOLS,
 )
 
 
@@ -111,7 +108,7 @@ parent_agent = Agent(
     model=get_model(),
     model_settings=default_model_settings,
     tools=[
-        # Sub-agents exposed as tools
+        # Sub-agents exposed as tools — all writing goes through sub-agents, not direct note tools
         summarizer_agent.as_tool(
             tool_name="summarize_expert",
             tool_description="Delegate to summarize note content into concise bullet points.",
@@ -122,11 +119,11 @@ parent_agent = Agent(
         ),
         writer_agent.as_tool(
             tool_name="writer_expert",
-            tool_description="Delegate to draft, expand, or restructure written content for a note.",
+            tool_description="Delegate to draft, expand, or restructure written content for a note. Always pass conversation context and user requirements.",
         ),
         researcher_agent.as_tool(
             tool_name="researcher_expert",
-            tool_description="Delegate to research a topic via web search and compile findings.",
+            tool_description="Delegate to research a topic and compile findings. Always pass the research question and any context the user provided.",
         ),
         translator_agent.as_tool(
             tool_name="translator_expert",
@@ -140,8 +137,15 @@ parent_agent = Agent(
             tool_name="editor_expert",
             tool_description="Delegate to refine, proofread, or improve existing text content.",
         ),
-        # Direct tools for the parent agent
-        *ALL_TOOLS,
+        # Note tools at parent level so approval/direct-update events surface to frontend
+        *NOTE_TOOLS,
+        # Other tools available directly to parent
+        *WEB_TOOLS,
+        *RAG_TOOLS,
+        *WIKI_TOOLS,
+        *MEMORY_TOOLS,
+        search_knowledge,
+        execute_python_code,
     ],
 )
 
@@ -191,13 +195,40 @@ def get_agent(key: str | None) -> Agent:
 # Pre-computes agent description embeddings at startup, routes by cosine similarity.
 
 _AGENT_DESCRIPTIONS: dict[str, str] = {
-    "writer": "write draft compose create content article blog post essay report documentation note",
-    "researcher": "research search find information look up explain what is tell me about topic",
-    "translator": "translate terjemahkan convert language ubah bahasa inggris indonesia",
-    "code_analyst": "analyze data create chart plot graph visualize python code execute run calculate",
-    "editor": "fix grammar proofread improve refine edit perbaiki tulisan",
-    "summarizer": "summarize summary ringkas ringkasan shorten condense",
-    "tagger": "add tags extract tags generate tags keyword label kategorikan",
+    "writer": (
+        "write draft compose create content article blog post essay report documentation note "
+        "tulis buat bikin draft konten artikel blog esai laporan dokumentasi catatan "
+        "tolong tulis buatkan tuliskan rangkum dalam tulisan"
+    ),
+    "researcher": (
+        "research search find information look up explain what is tell me about topic "
+        "riset cari temukan informasi cari tahu jelaskan apa itu tentang topik "
+        "tolong cari cariin coba cari bagaimana cara kenapa mengapa"
+    ),
+    "translator": (
+        "translate terjemahkan convert language ubah bahasa inggris indonesia "
+        "alih bahasa terjemahan translate ke english ke indonesia ke bahasa"
+    ),
+    "code_analyst": (
+        "analyze data create chart plot graph visualize python code execute run calculate "
+        "analisis data buat grafik chart visualisasi python kode eksekusi hitung kalkulasi "
+        "buatkan grafik tampilkan data dalam chart"
+    ),
+    "editor": (
+        "fix grammar proofread improve refine edit perbaiki tulisan "
+        "perbaiki grammar periksa edit revisi perhalus rapikan tulisan "
+        "cek tulisan perbaiki kalimat"
+    ),
+    "summarizer": (
+        "summarize summary shorten condense brief overview "
+        "ringkas ringkasan rangkum ringkasan singkat ikhtisar "
+        "tolong ringkaskan"
+    ),
+    "tagger": (
+        "add tags extract tags generate tags keyword label categorize "
+        "tambah tag buat tag ekstrak tag kata kunci label kategorikan "
+        "berikan tag"
+    ),
 }
 
 _SIMILARITY_THRESHOLD = 0.55
