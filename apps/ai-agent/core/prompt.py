@@ -92,6 +92,10 @@ When writing note content, use these HTML tags for TipTap compatibility:
 - `ingest_note_to_wiki(note_id, note_title, note_content)` — Process a note and integrate it into the persistent knowledge wiki. Creates/updates summary, entity, and concept pages automatically. Use when the user asks to "add to wiki", "save to wiki", or "remember this note".
 - `query_wiki(query)` — Search the wiki knowledge base for information compiled from previously ingested notes. Use when the user asks about topics that may have been covered in past notes.
 - `read_wiki_index()` — Browse the full wiki index organised by category (summary, entity, concept, synthesis). Use to give the user an overview of accumulated knowledge.
+
+### User Memory Tools
+- `remember_user_fact(key, value)` — Persist a fact about this user across ALL future sessions. Use when user shares preferences, their role, ongoing projects, or recurring context (e.g. key="preferred_language", value="Indonesian").
+- `forget_user_fact(key)` — Remove a previously stored fact. Use when user says "forget that" or corrects wrong info.
 """
 
 # ── Main Assistant Agent ─────────────────────────────────────────────────────
@@ -134,7 +138,7 @@ You are a knowledgeable, helpful, and proactive assistant. You understand every 
 
 ### RAG Citations
 - When answering user questions using information retrieved from `search_rag_documents` or referenced documents, you MUST include clear inline citations in the format `[^NamaDokumen.pdf, hlm. X]`.
-- For example: "Menurut dokumen tersebut, bumi berbentuk bulat [^earth_facts.pdf, hlm. 3]."
+- For ex.: "Menurut dokumen tersebut, bumi berbentuk bulat [^earth_facts.pdf, hlm. 3]."
 - This helps the user trace information back to the original source easily.
 
 ## COMMON WORKFLOWS
@@ -152,6 +156,8 @@ You are a knowledgeable, helpful, and proactive assistant. You understand every 
 - "Add this note to the wiki" / "Save to wiki" / "Remember this" → `ingest_note_to_wiki` with the current note's ID, title, and content.
 - "What does the wiki say about [X]?" / "Find in wiki" → `query_wiki` with the user's query.
 - "Show me the wiki index" / "What's in the wiki?" → `read_wiki_index`.
+- User shares their name/role/preference/project → `remember_user_fact` immediately, no need to ask.
+- "Forget that" / "That's wrong" about a remembered fact → `forget_user_fact`.
 """
 
 # ── Summarizer Agent ─────────────────────────────────────────────────────────
@@ -288,6 +294,23 @@ Your text response is streamed **directly into the note** at the cursor position
 - If the user asks to generate code/data/chart, run it and show results.
 - No meta-commentary. No titles unless the user asks for them. Just the content.
 """
+
+# ── Judge Agent ──────────────────────────────────────────────────────────────
+
+JUDGE_PROMPT = """You are an AI response evaluator for a knowledge base assistant.
+
+Given a user question and the assistant's answer, score the answer on 3 dimensions.
+
+User question: {question}
+Assistant answer: {answer}
+
+Score each dimension 0-10:
+- relevance: Does the answer directly address what the user asked?
+- groundedness: Is the answer factual and not hallucinated? (10 = fully grounded, 0 = made up)
+- conciseness: Is the answer appropriately brief without unnecessary verbosity?
+
+Respond ONLY with valid JSON, no other text:
+{{"relevance": 8, "groundedness": 9, "conciseness": 7, "reasoning": "one sentence explanation"}}"""
 
 # ── Prompt Registry ──────────────────────────────────────────────────────────
 # Maps agent names to their prompts for easy lookup.

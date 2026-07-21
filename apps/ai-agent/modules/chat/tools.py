@@ -500,12 +500,65 @@ def search_rag_documents(query: str, document_id: str | None = None, n_results: 
         return f"Error searching RAG documents: {str(e)}"
 
 
+def _rrf_fuse(
+    semantic_hits: list[tuple[str, dict, float]],
+    bm25_hits: list[tuple[str, float]],
+    top_k: int,
+    k: int = 60,
+) -> list[tuple[str, dict, float]]:
+    """Reciprocal Rank Fusion: combine semantic + BM25 rankings into one ranked list."""
+    # Build lookup: text → metadata (from semantic hits)
+    meta_map: dict[str, dict] = {text: meta for text, meta, _ in semantic_hits}
+
+    # Semantic rank scores
+    sem_rank: dict[str, float] = {text: 1.0 / (k + i + 1) for i, (text, _, _) in enumerate(semantic_hits)}
+
+    # BM25 rank scores
+    bm25_rank: dict[str, float] = {text: 1.0 / (k + i + 1) for i, (text, _) in enumerate(bm25_hits)}
+
+    # Union of all texts
+    all_texts = set(sem_rank) | set(bm25_rank)
+    fused = {t: sem_rank.get(t, 0.0) + bm25_rank.get(t, 0.0) for t in all_texts}
+
+    ranked = sorted(fused.items(), key=lambda x: x[1], reverse=True)[:top_k]
+    return [(text, meta_map.get(text, {}), score) for text, score in ranked]
+
+
+def _hybrid_search_collection(collection, query: str, n_results: int) -> list[tuple[str, dict, float]]:
+    """Pull candidates from ChromaDB then re-rank with BM25, fuse via RRF."""
+    from modules.rag.methods import BM25Retriever
+
+    candidate_k = min(n_results * 4, 50)
+    try:
+        raw = collection.query(
+            query_texts=[query],
+            n_results=candidate_k,
+            include=["documents", "metadatas", "distances"],
+        )
+    except Exception:
+        return []
+
+    docs = (raw.get("documents") or [[]])[0]
+    metas = (raw.get("metadatas") or [[]])[0]
+    dists = (raw.get("distances") or [[]])[0]
+
+    if not docs:
+        return []
+
+    semantic_hits = list(zip(docs, metas, dists))
+
+    bm25 = BM25Retriever(docs)
+    bm25_hits = bm25.retrieve(query, top_k=candidate_k)
+
+    return _rrf_fuse(semantic_hits, bm25_hits, top_k=n_results)
+
+
 @function_tool
 def search_knowledge(query: str, n_results: int = 5) -> str:
     """
     Search across all user knowledge: uploaded RAG documents and indexed notes.
     Always use this when the user asks about their content, notes, or documents.
-    Returns merged results labelled by source (document or note).
+    Uses hybrid search (semantic + BM25) with Reciprocal Rank Fusion for better accuracy.
 
     Args:
         query: The search term or question.
@@ -515,40 +568,26 @@ def search_knowledge(query: str, n_results: int = 5) -> str:
 
     output = []
 
-    # Search RAG documents (documents_v2)
+    # Search RAG documents (documents_v2) — hybrid
     try:
         with chroma_lock:
-            doc_raw = get_collection().query(
-                query_texts=[query],
-                n_results=n_results,
-                include=["documents", "metadatas", "distances"],
-            )
-        doc_docs = (doc_raw.get("documents") or [[]])[0]
-        doc_metas = (doc_raw.get("metadatas") or [[]])[0]
-        doc_dists = (doc_raw.get("distances") or [[]])[0]
-        for doc, meta, dist in zip(doc_docs, doc_metas, doc_dists):
+            doc_hits = _hybrid_search_collection(get_collection(), query, n_results)
+        for text, meta, score in doc_hits:
             output.append(
                 f"[Source: Document — {meta.get('document_name', 'Unknown')}, "
-                f"Page {meta.get('page_number', 0) + 1}, Distance: {dist:.4f}]\n{doc}"
+                f"Page {meta.get('page_number', 0) + 1}, Score: {score:.4f}]\n{text}"
             )
     except Exception as e:
         output.append(f"[Document search error: {e}]")
 
-    # Search indexed notes (note_pages)
+    # Search indexed notes (note_pages) — hybrid
     try:
         with chroma_lock:
-            note_raw = get_notes_collection().query(
-                query_texts=[query],
-                n_results=n_results,
-                include=["documents", "metadatas", "distances"],
-            )
-        note_docs = (note_raw.get("documents") or [[]])[0]
-        note_metas = (note_raw.get("metadatas") or [[]])[0]
-        note_dists = (note_raw.get("distances") or [[]])[0]
-        for doc, meta, dist in zip(note_docs, note_metas, note_dists):
+            note_hits = _hybrid_search_collection(get_notes_collection(), query, n_results)
+        for text, meta, score in note_hits:
             output.append(
                 f"[Source: Note — \"{meta.get('note_title', 'Untitled')}\", "
-                f"Distance: {dist:.4f}]\n{doc}"
+                f"Score: {score:.4f}]\n{text}"
             )
     except Exception as e:
         output.append(f"[Note search error: {e}]")
@@ -557,6 +596,47 @@ def search_knowledge(query: str, n_results: int = 5) -> str:
         return "No relevant results found in documents or notes."
 
     return "\n\n---\n\n".join(output)
+
+
+# ── User memory tools ────────────────────────────────────────────────────────
+
+@function_tool
+async def remember_user_fact(ctx: RunContextWrapper[dict], key: str, value: str) -> str:
+    """
+    Save a persistent fact about this user that will be remembered across all future sessions.
+    Use this when the user shares preferences, context, or important personal info
+    (e.g. preferred language, job role, ongoing projects, recurring topics).
+
+    Args:
+        key: Short label for the fact (e.g. "preferred_language", "job_role", "current_project").
+        value: The fact to remember (e.g. "Indonesian", "software engineer", "building a notes app").
+    """
+    from modules.memory.methods import upsert_memory, ensure_table
+    user_id = (ctx.context or {}).get("user_id") or "anonymous"
+    try:
+        await ensure_table()
+        await upsert_memory(user_id, key, value)
+        return f"Remembered: {key} = {value}"
+    except Exception as e:
+        return f"Failed to save memory: {e}"
+
+
+@function_tool
+async def forget_user_fact(ctx: RunContextWrapper[dict], key: str) -> str:
+    """
+    Delete a previously saved fact about this user.
+
+    Args:
+        key: The key of the fact to forget.
+    """
+    from modules.memory.methods import delete_memory, ensure_table
+    user_id = (ctx.context or {}).get("user_id") or "anonymous"
+    try:
+        await ensure_table()
+        deleted = await delete_memory(user_id, key)
+        return f"Forgot: {key}" if deleted else f"No memory found for key: {key}"
+    except Exception as e:
+        return f"Failed to delete memory: {e}"
 
 
 # ── Wiki tools ────────────────────────────────────────────────────────────────

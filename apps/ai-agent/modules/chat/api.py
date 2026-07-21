@@ -16,6 +16,7 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 from agents import Runner, ToolCallItem, ToolCallOutputItem
 from agents.extensions.memory import SQLAlchemySession
+from agents.extensions.memory.sqlalchemy_session import SessionSettings
 
 from core.database import engine, get_db, build_async_url
 from core.models import SubAgentTask, SessionTokenUsage
@@ -24,9 +25,10 @@ from modules.chat.schemas import (
     ChatRequest, ChatStreamRequest, ChatAttachment, SummarizeRequest,
     TagsRequest, ApproveRejectRequest, DiagramRequest,
 )
-from modules.chat.agent_defs import parent_agent, resolve_agent, get_agent, AGENT_REGISTRY, DIRECT_SELECT_AGENTS
+from modules.chat.agent_defs import parent_agent, resolve_agent, resolve_agent_async, get_agent, AGENT_REGISTRY, DIRECT_SELECT_AGENTS
 from modules.chat.helpers import normalize_content, sse, vercel_data, safe_jsonable, parse_attachment
 from modules.chat.guard import check_input_guardrail
+from core.rate_limiter import check_rate_limit
 from modules.rag.methods import chunk_text, BM25Retriever, ChromaVectorStore
 
 logger = logging.getLogger("ai-agent")
@@ -45,14 +47,17 @@ def _register_routes(app):
 @router.post("/api/chat")
 async def chat(request: ChatRequest):
     db_url = build_async_url(os.getenv("DATABASE_URL", "sqlite+aiosqlite:///sessions.db"))
+    identifier = request.user_id or request.session_id
+    await check_rate_limit(identifier, action="chat", limit=30, window=60)
     try:
         session = SQLAlchemySession.from_url(
             session_id=request.session_id,
             url=db_url,
             create_tables=True,
+            session_settings=SessionSettings(limit=50),
         )
 
-        agent = resolve_agent(request.agent, request.message)
+        agent = await resolve_agent_async(request.agent, request.message)
         context = {"session_id": request.session_id, "user_id": request.user_id}
         result = await Runner.run(agent, request.message, session=session, context=context, max_turns=50)
 
@@ -67,11 +72,41 @@ async def chat(request: ChatRequest):
 
 # ── Streaming chat ───────────────────────────────────────────────────────────
 
+async def _build_agent_with_memory(agent_key: str | None, message: str, user_id: str | None):
+    """Resolve agent and inject persistent user memory into its system prompt."""
+    from agents import Agent
+    from modules.memory.methods import get_all_memories, format_memory_for_prompt, ensure_table
+
+    base_agent = await resolve_agent_async(agent_key, message)
+
+    if not user_id:
+        return base_agent
+
+    try:
+        await ensure_table()
+        memories = await get_all_memories(user_id)
+        memory_block = format_memory_for_prompt(memories)
+        if not memory_block:
+            return base_agent
+
+        # Clone agent with injected memory prepended to instructions
+        return Agent(
+            name=base_agent.name,
+            instructions=f"{memory_block}\n\n{base_agent.instructions}",
+            model=base_agent.model,
+            model_settings=base_agent.model_settings,
+            tools=base_agent.tools,
+        )
+    except Exception as e:
+        logger.warning(f"Failed to load user memory: {e}")
+        return base_agent
+
+
 async def chat_event_generator(message: str, session_id: str, user_id: str | None = None, agent_key: str | None = None):
     db_url = build_async_url(os.getenv("DATABASE_URL", "sqlite+aiosqlite:///sessions.db"))
 
-    # Resolve which agent to use
-    agent = resolve_agent(agent_key, message)
+    # Resolve which agent to use (with persistent memory injection)
+    agent = await _build_agent_with_memory(agent_key, message, user_id)
     logger.info(f"Using agent: {agent.name} (key={agent_key})")
 
     # The root agent is the one directly invoked — its text always goes to text-delta.
@@ -82,6 +117,16 @@ async def chat_event_generator(message: str, session_id: str, user_id: str | Non
     current_reasoning_id = None
     current_text_id = None
     text_open = False
+    final_output_parts: list[str] = []
+
+    # Capture OTel trace_id for Langfuse scoring
+    try:
+        from opentelemetry import trace as otel_trace
+        _span = otel_trace.get_current_span()
+        _ctx = _span.get_span_context()
+        trace_id = format(_ctx.trace_id, '032x') if _ctx.is_valid else None
+    except Exception:
+        trace_id = None
 
     try:
         session = SQLAlchemySession.from_url(
@@ -260,6 +305,8 @@ async def chat_event_generator(message: str, session_id: str, user_id: str | Non
                             "id": current_text_id,
                             "delta": data.delta,
                         })
+                        if active_agent == root_agent_name:
+                            final_output_parts.append(data.delta)
 
             elif event.type == "run_item_stream_event":
                 item = event.item
@@ -337,6 +384,12 @@ async def chat_event_generator(message: str, session_id: str, user_id: str | Non
         if text_open:
             yield sse({"type": "text-end", "id": current_text_id})
 
+        # Dispatch LLM-as-judge in background
+        final_answer = "".join(final_output_parts)
+        if final_answer:
+            from modules.judge.methods import run_judge
+            asyncio.create_task(run_judge(message, final_answer, trace_id))
+
         yield sse({"type": "finish-step"})
         yield sse({"type": "finish"})
         yield "data: [DONE]\n\n"
@@ -383,6 +436,10 @@ async def chat_stream(request: ChatStreamRequest):
             user_message = "".join(parts_text)
 
         logger.info(f"Extracted user_message: {user_message[:100]!r}")
+
+    # Rate limit — per user_id if present, else session_id
+    _rl_identifier = request.user_id or request.session_id
+    await check_rate_limit(_rl_identifier, action="chat_stream", limit=20, window=60)
 
     # Input Guardrail check
     _clean_for_check = re.sub(
@@ -657,6 +714,7 @@ async def get_chat_history(session_id: str):
             session_id=session_id,
             url=db_url,
             create_tables=True,
+            session_settings=SessionSettings(limit=50),
         )
         items = await session.get_items()
 

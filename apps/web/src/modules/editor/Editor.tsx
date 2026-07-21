@@ -5,6 +5,7 @@ import Heading from '@tiptap/extension-heading'
 import { Collaboration } from '@tiptap/extension-collaboration'
 import { CollaborationCaret } from '@tiptap/extension-collaboration-caret'
 import * as Y from 'yjs'
+import { prosemirrorJSONToYXmlFragment } from 'y-prosemirror'
 import { WebsocketProvider } from 'y-websocket'
 import { useAuth } from '../shared/auth'
 import { Table } from '@tiptap/extension-table'
@@ -680,27 +681,28 @@ export function Editor({ note, onUpdate, onSaveStatusChange, onLockChange, share
   }, [ydoc, provider, currentUser])
 
   useEffect(() => {
-    if (!editor) return
-    const handleSync = (isSynced: boolean) => {
-      if (isSynced) {
-        const isDocEmpty = ydoc.getXmlFragment('default').length === 0
-        if (isDocEmpty && note.content) {
-          try {
-            const json = JSON.parse(note.content)
-            editor.commands.setContent(json, { emitUpdate: false })
-          } catch (e) {
-            console.error('Failed to parse initial content', e)
-          }
-        }
+    if (!editor || !note.content) return
+
+    function injectContent() {
+      const fragment = ydoc.getXmlFragment('default')
+      if (fragment.length > 0) return
+      try {
+        const json = JSON.parse(note.content)
+        prosemirrorJSONToYXmlFragment(editor!.schema, json, fragment)
+      } catch (e) {
+        console.error('Failed to parse initial content', e)
       }
     }
+
+    // Inject immediately without waiting for WS sync
+    injectContent()
+
+    // Also handle case where WS syncs after inject (server doc may overwrite)
+    const handleSync = (isSynced: boolean) => {
+      if (isSynced) injectContent()
+    }
     provider.on('sync', handleSync)
-    if (provider.synced) {
-      handleSync(true)
-    }
-    return () => {
-      provider.off('sync', handleSync)
-    }
+    return () => { provider.off('sync', handleSync) }
   }, [editor, provider, ydoc, note.content])
 
   const [editDiagramData, setEditDiagramData] = useState<{ id: string; initialData: string } | null>(null)

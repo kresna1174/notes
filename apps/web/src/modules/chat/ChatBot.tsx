@@ -675,14 +675,14 @@ export function ChatBot({
   const uploadFile = async (file: File) => {
     setIsUploadingFile(true)
     try {
-      const activeNoteId = isRagMode ? '00000000-0000-0000-0000-000000000000' : noteId
-      if (!activeNoteId) {
+      const activeNoteId = isRagMode ? null : noteId
+      if (!isRagMode && !activeNoteId) {
         throw new Error('No active note context found for attachment.')
       }
 
       const form = new FormData()
       form.append('file', file)
-      form.append('noteId', activeNoteId)
+      if (activeNoteId) form.append('noteId', activeNoteId)
 
       const res = await fetch('/api/attachments', {
         method: 'POST',

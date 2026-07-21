@@ -1,4 +1,3 @@
-import os
 from threading import RLock
 
 import chromadb
@@ -9,7 +8,6 @@ from chromadb.api import ClientAPI
 from core.settings import settings
 
 _client: ClientAPI | None = None
-_client_pid: int | None = None
 chroma_lock = RLock()
 
 
@@ -46,14 +44,14 @@ class OpenRouterEmbeddingFunction(EmbeddingFunction):
 
 
 def get_client() -> ClientAPI:
-    global _client, _client_pid
+    global _client
 
     with chroma_lock:
-        current_pid = os.getpid()
-        if _client is None or _client_pid != current_pid:
-            settings.ensure_storage()
-            _client = chromadb.PersistentClient(path=str(settings.chroma_dir))
-            _client_pid = current_pid
+        if _client is None:
+            _client = chromadb.HttpClient(
+                host=settings.chroma_host,
+                port=settings.chroma_port,
+            )
 
         return _client
 

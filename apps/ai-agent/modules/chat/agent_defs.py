@@ -19,6 +19,7 @@ from core.prompt import (
     TRANSLATOR_PROMPT,
     CODE_ANALYST_PROMPT,
     EDITOR_PROMPT,
+    JUDGE_PROMPT,
 )
 from modules.chat.tools import (
     write_notes, update_note_direct,
@@ -27,6 +28,7 @@ from modules.chat.tools import (
     list_rag_documents, search_rag_documents,
     query_wiki, ingest_note_to_wiki, read_wiki_index,
     search_knowledge,
+    remember_user_fact, forget_user_fact,
 )
 
 # ── Shared toolsets ──────────────────────────────────────────────────────────
@@ -35,7 +37,8 @@ NOTE_TOOLS = [write_notes, update_note_direct]
 WEB_TOOLS = [search_web, extract_web, crawl_web, find_web_photos, find_youtube_videos]
 RAG_TOOLS = [list_rag_documents, search_rag_documents]
 WIKI_TOOLS = [query_wiki, ingest_note_to_wiki, read_wiki_index]
-ALL_TOOLS = NOTE_TOOLS + WEB_TOOLS + RAG_TOOLS + WIKI_TOOLS + [execute_python_code, search_knowledge]
+MEMORY_TOOLS = [remember_user_fact, forget_user_fact]
+ALL_TOOLS = NOTE_TOOLS + WEB_TOOLS + RAG_TOOLS + WIKI_TOOLS + MEMORY_TOOLS + [execute_python_code, search_knowledge]
 
 
 # ── Sub-Agents ───────────────────────────────────────────────────────────────
@@ -143,6 +146,16 @@ parent_agent = Agent(
 )
 
 
+# ── Judge Agent (background evaluator, not user-facing) ──────────────────────
+
+judge_agent = Agent(
+    name="JudgeAgent",
+    instructions=JUDGE_PROMPT,
+    model=get_model(),
+    model_settings=default_model_settings,
+    tools=[],
+)
+
 # ── Agent Registry ───────────────────────────────────────────────────────────
 # Maps agent keys to their Agent instances for dynamic lookup.
 
@@ -173,80 +186,79 @@ def get_agent(key: str | None) -> Agent:
     return AGENT_REGISTRY.get(key, parent_agent)
 
 
-# ── Intent Detection ─────────────────────────────────────────────────────────
-# Keyword-based intent routing for "auto" mode.
-# When agent="auto", the system uses these patterns to pick the best sub-agent.
+# ── Semantic Router ───────────────────────────────────────────────────────────
+# Embedding-based intent routing for "auto" mode.
+# Pre-computes agent description embeddings at startup, routes by cosine similarity.
 
-_INTENT_PATTERNS: dict[str, list[str]] = {
-    "writer": [
-        "write", "draft", "create a note about", "compose", "blog post",
-        "article", "documentation", "meeting notes", "report", "essay",
-        "bikin catatan", "tulis", "buat artikel", "draft",
-    ],
-    "researcher": [
-        "search for", "research", "find information", "look up",
-        "what is", "explain", "tell me about", "find out",
-        "cari info", "cari tentang", "jelaskan", "apa itu",
-    ],
-    "translator": [
-        "translate", "terjemahkan", "translate to", "ubah ke bahasa",
-    ],
-    "code_analyst": [
-        "analyze data", "create chart", "plot", "graph", " visualize",
-        "python code", "run code", "execute code", "generate chart",
-        "analisis data", "buat chart", "buat grafik", "jalankan kode",
-    ],
-    "editor": [
-        "fix grammar", "proofread", "improve", "refine", "edit this",
-        "perbaiki grammar", "perbaiki tulisan", "improve writing",
-    ],
-    "summarizer": [
-        "summarize", "summary", "ringkas", "ringkasan", "buatin summary",
-    ],
-    "tagger": [
-        "add tags", "extract tags", "generate tags", "tag this",
-        "tambahin tag", "ambilin tag",
-    ],
+_AGENT_DESCRIPTIONS: dict[str, str] = {
+    "writer": "write draft compose create content article blog post essay report documentation note",
+    "researcher": "research search find information look up explain what is tell me about topic",
+    "translator": "translate terjemahkan convert language ubah bahasa inggris indonesia",
+    "code_analyst": "analyze data create chart plot graph visualize python code execute run calculate",
+    "editor": "fix grammar proofread improve refine edit perbaiki tulisan",
+    "summarizer": "summarize summary ringkas ringkasan shorten condense",
+    "tagger": "add tags extract tags generate tags keyword label kategorikan",
 }
 
+_SIMILARITY_THRESHOLD = 0.55
 
-def detect_intent(message: str) -> str | None:
-    """Detect the best agent based on keyword patterns in the user message.
+_agent_embeddings: dict[str, list[float]] = {}
+_embeddings_ready = False
 
-    Returns the agent key if a strong intent match is found, else None.
-    """
-    msg_lower = message.lower()
 
-    # Check each agent's patterns
-    scores: dict[str, int] = {}
-    for agent_key, patterns in _INTENT_PATTERNS.items():
-        score = 0
-        for pattern in patterns:
-            if pattern in msg_lower:
-                score += 1
-        if score > 0:
-            scores[agent_key] = score
+def _cosine_similarity(a: list[float], b: list[float]) -> float:
+    dot = sum(x * y for x, y in zip(a, b))
+    norm_a = sum(x * x for x in a) ** 0.5
+    norm_b = sum(x * x for x in b) ** 0.5
+    return dot / (norm_a * norm_b) if norm_a and norm_b else 0.0
 
-    if not scores:
+
+async def _ensure_agent_embeddings() -> bool:
+    global _embeddings_ready
+    if _embeddings_ready:
+        return True
+    try:
+        from modules.rag.methods import generate_embeddings
+        keys = list(_AGENT_DESCRIPTIONS.keys())
+        vecs = await generate_embeddings([_AGENT_DESCRIPTIONS[k] for k in keys])
+        if not vecs:
+            return False
+        for key, vec in zip(keys, vecs):
+            _agent_embeddings[key] = vec
+        _embeddings_ready = True
+        return True
+    except Exception:
+        return False
+
+
+async def detect_intent_semantic(message: str) -> str | None:
+    """Route message to best agent via embedding cosine similarity."""
+    if not await _ensure_agent_embeddings() or not _agent_embeddings:
         return None
+    try:
+        from modules.rag.methods import generate_query_embedding
+        query_vec = await generate_query_embedding(message)
+        if not query_vec:
+            return None
+        scores = {k: _cosine_similarity(query_vec, v) for k, v in _agent_embeddings.items()}
+        best_key = max(scores, key=scores.get)
+        if scores[best_key] >= _SIMILARITY_THRESHOLD:
+            return best_key
+    except Exception:
+        pass
+    return None
 
-    # Return the agent with the highest pattern match count
-    return max(scores, key=scores.get)
+
+async def resolve_agent_async(agent_key: str | None, message: str) -> Agent:
+    """Async resolve with semantic routing — use this in async contexts."""
+    if agent_key and agent_key != "auto":
+        return get_agent(agent_key)
+    detected = await detect_intent_semantic(message)
+    return get_agent(detected) if detected else parent_agent
 
 
 def resolve_agent(agent_key: str | None, message: str) -> Agent:
-    """Resolve which agent to use based on explicit key or auto-detection.
-
-    - If agent_key is explicitly set (not "auto"), use that agent.
-    - If agent_key is "auto" or None, detect intent from the message.
-    - Fall back to parent agent if no match.
-    """
+    """Sync fallback — no semantic routing. Use resolve_agent_async in async contexts."""
     if agent_key and agent_key != "auto":
         return get_agent(agent_key)
-
-    # Auto-detect intent
-    detected = detect_intent(message)
-    if detected:
-        return get_agent(detected)
-
     return parent_agent
