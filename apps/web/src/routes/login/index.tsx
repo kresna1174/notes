@@ -1,5 +1,17 @@
 import { createFileRoute, useNavigate, useSearch } from '@tanstack/react-router'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useSyncExternalStore } from 'react'
+
+function useIsDesktop() {
+  return useSyncExternalStore(
+    cb => {
+      const mq = window.matchMedia('(min-width: 768px)')
+      mq.addEventListener('change', cb)
+      return () => mq.removeEventListener('change', cb)
+    },
+    () => window.matchMedia('(min-width: 768px)').matches,
+    () => true,
+  )
+}
 import { useAuth } from '#/modules/shared/auth'
 import { useTheme } from '#/modules/shared/theme'
 import { Eye, EyeOff, Sun, Moon, Brain, Map, Lightbulb, BarChart2, KeyRound, Calendar, Network, Users, Lock, Sparkles } from 'lucide-react'
@@ -262,6 +274,7 @@ function LoginPage() {
   const [forgotError, setForgotError] = useState<string | null>(null)
 
   const isDark = theme === 'dark'
+  const isDesktop = useIsDesktop()
   
   const textTitle = 'var(--fg)'
   const textMuted = 'var(--fg-muted)'
@@ -360,7 +373,8 @@ function LoginPage() {
       {/* Floating Theme Toggle */}
       <button
         onClick={toggle}
-        title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+        aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+        aria-pressed={theme === 'dark'}
         style={{
           position: 'absolute',
           top: 20,
@@ -424,7 +438,7 @@ function LoginPage() {
           </div>
 
           {/* Glass window */}
-          <MiniAppPreview isDark={isDark} />
+          {isDesktop && <MiniAppPreview isDark={isDark} />}
 
           {/* Feature chips */}
           <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
@@ -623,7 +637,7 @@ function LoginPage() {
                         fontSize: '0.8125rem', color: textMuted,
                         cursor: 'pointer', fontFamily: 'var(--font-body)',
                         transition: 'color 0.2s',
-                        padding: 0,
+                        padding: '4px 0',
                       }}
                       onMouseEnter={e => e.currentTarget.style.color = textTitle}
                       onMouseLeave={e => e.currentTarget.style.color = textMuted}
