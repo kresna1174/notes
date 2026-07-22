@@ -495,6 +495,7 @@ export function ChatBot({
       api: '/api/ai/chat/stream',
       body: () => ({
         session_id: sessionIdRef.current,
+        note_id: noteStateRef.current.noteId ?? null,
         note_title: noteStateRef.current.noteTitle,
         note_content: noteStateRef.current.noteContent,
         attachments: attachmentsRef.current,

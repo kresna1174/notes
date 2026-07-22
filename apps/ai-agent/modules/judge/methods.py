@@ -70,12 +70,13 @@ async def run_judge(
     answer: str,
     trace_id: str | None,
     tool_results: list[dict] | None = None,
+    note_id: str | None = None,
+    session_id: str | None = None,
 ) -> None:
     """Run LLM-as-judge in background and post scores to Langfuse.
 
-    tool_results: list of {tool: str, output: any} collected during the turn.
-    Judge reads this context before scoring — if context is empty and the
-    answer makes factual claims, it flags context_missing and skips scoring.
+    Judge agent actively gathers context (note content, session history, knowledge search)
+    before scoring. tool_results are pre-collected from the turn for efficiency.
     """
     if not answer.strip():
         return
@@ -85,8 +86,18 @@ async def run_judge(
         from core.prompt import JUDGE_PROMPT
 
         context_str = _format_context(tool_results or [])
+
+        # Append note_id / session_id hints so the judge knows which IDs to query
+        meta_lines = []
+        if note_id:
+            meta_lines.append(f"note_id for context: {note_id}")
+        if session_id:
+            meta_lines.append(f"session_id for context: {session_id}")
+        if meta_lines:
+            context_str = context_str + "\n\n" + "\n".join(meta_lines)
+
         prompt = JUDGE_PROMPT.format(question=question, answer=answer, context=context_str)
-        result = await Runner.run(judge_agent, prompt, max_turns=1)
+        result = await Runner.run(judge_agent, prompt, max_turns=5)
         raw = result.final_output or ""
 
         scores = _parse_scores(raw)

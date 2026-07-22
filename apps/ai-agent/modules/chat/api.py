@@ -236,7 +236,7 @@ async def _summarize_old_history(session_id: str, db_url: str) -> str | None:
         return None
 
 
-async def chat_event_generator(message: str, session_id: str, user_id: str | None = None, agent_key: str | None = None):
+async def chat_event_generator(message: str, session_id: str, user_id: str | None = None, agent_key: str | None = None, note_id: str | None = None):
     db_url = build_async_url(os.getenv("DATABASE_URL", "sqlite+aiosqlite:///sessions.db"))
 
     # Resolve which agent to use (with persistent memory injection)
@@ -532,7 +532,7 @@ async def chat_event_generator(message: str, session_id: str, user_id: str | Non
         final_answer = "".join(final_output_parts)
         if final_answer:
             from modules.judge.methods import run_judge
-            asyncio.create_task(run_judge(message, final_answer, trace_id, judge_tool_results))
+            asyncio.create_task(run_judge(message, final_answer, trace_id, judge_tool_results, note_id, session_id))
 
         yield sse({"type": "finish-step"})
         yield sse({"type": "finish"})
@@ -713,7 +713,7 @@ async def chat_stream(request: ChatStreamRequest):
             user_message = f"{context_str}Pertanyaan/Instruksi User: {user_message}"
 
     return StreamingResponse(
-        chat_event_generator(user_message, request.session_id, request.user_id, agent_key=request.agent),
+        chat_event_generator(user_message, request.session_id, request.user_id, agent_key=request.agent, note_id=request.note_id),
         media_type="text/event-stream",
         headers = {
             "Content-Type": "text/event-stream",

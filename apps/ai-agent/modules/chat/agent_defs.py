@@ -152,12 +152,14 @@ parent_agent = Agent(
 
 # ── Judge Agent (background evaluator, not user-facing) ──────────────────────
 
+from modules.judge.tools import get_note_content, get_session_history
+
 judge_agent = Agent(
     name="JudgeAgent",
     instructions=JUDGE_PROMPT,
     model=get_model(),
     model_settings=default_model_settings,
-    tools=[],
+    tools=[get_note_content, get_session_history, search_knowledge],
 )
 
 # ── Agent Registry ───────────────────────────────────────────────────────────
