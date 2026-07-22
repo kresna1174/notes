@@ -49,8 +49,34 @@ async def _post_score(client: httpx.AsyncClient, auth: str, trace_id: str, name:
         logger.warning(f"[judge] Langfuse score POST error: {e}")
 
 
-async def run_judge(question: str, answer: str, trace_id: str | None) -> None:
-    """Run LLM-as-judge in background and post scores to Langfuse."""
+def _format_context(tool_results: list[dict]) -> str:
+    """Serialize collected tool results into a readable context block for the judge."""
+    if not tool_results:
+        return "No tool results — the assistant answered without retrieving external data."
+    parts = []
+    for i, item in enumerate(tool_results, 1):
+        tool = item.get("tool", "unknown")
+        output = item.get("output", "")
+        if isinstance(output, dict):
+            output = json.dumps(output, ensure_ascii=False)
+        elif not isinstance(output, str):
+            output = str(output)
+        parts.append(f"[{i}] Tool: {tool}\n{output[:1000]}")
+    return "\n\n".join(parts)
+
+
+async def run_judge(
+    question: str,
+    answer: str,
+    trace_id: str | None,
+    tool_results: list[dict] | None = None,
+) -> None:
+    """Run LLM-as-judge in background and post scores to Langfuse.
+
+    tool_results: list of {tool: str, output: any} collected during the turn.
+    Judge reads this context before scoring — if context is empty and the
+    answer makes factual claims, it flags context_missing and skips scoring.
+    """
     if not answer.strip():
         return
 
@@ -58,7 +84,8 @@ async def run_judge(question: str, answer: str, trace_id: str | None) -> None:
         from modules.chat.agent_defs import judge_agent
         from core.prompt import JUDGE_PROMPT
 
-        prompt = JUDGE_PROMPT.format(question=question, answer=answer)
+        context_str = _format_context(tool_results or [])
+        prompt = JUDGE_PROMPT.format(question=question, answer=answer, context=context_str)
         result = await Runner.run(judge_agent, prompt, max_turns=1)
         raw = result.final_output or ""
 
@@ -67,12 +94,22 @@ async def run_judge(question: str, answer: str, trace_id: str | None) -> None:
             logger.warning(f"[judge] Could not parse scores from: {raw[:200]}")
             return
 
+        context_missing = bool(scores.get("context_missing", False))
+        reasoning = str(scores.get("reasoning", ""))
+
+        if context_missing:
+            logger.info(f"[judge] Skipping scores — context_missing flagged. Reason: {reasoning}")
+            return
+
         relevance = _clamp(scores.get("relevance", 5))
         groundedness = _clamp(scores.get("groundedness", 5))
         conciseness = _clamp(scores.get("conciseness", 5))
-        reasoning = str(scores.get("reasoning", ""))
+        context_coverage = _clamp(scores.get("context_coverage", 5))
 
-        logger.info(f"[judge] scores: relevance={relevance} groundedness={groundedness} conciseness={conciseness}")
+        logger.info(
+            f"[judge] scores: relevance={relevance} groundedness={groundedness} "
+            f"conciseness={conciseness} context_coverage={context_coverage}"
+        )
 
         if not trace_id or not settings.langfuse_public_key or not settings.langfuse_secret_key:
             return
@@ -85,6 +122,7 @@ async def run_judge(question: str, answer: str, trace_id: str | None) -> None:
             await _post_score(client, auth, trace_id, "relevance", relevance, reasoning)
             await _post_score(client, auth, trace_id, "groundedness", groundedness)
             await _post_score(client, auth, trace_id, "conciseness", conciseness)
+            await _post_score(client, auth, trace_id, "context_coverage", context_coverage)
 
     except Exception as e:
         logger.warning(f"[judge] Failed: {e}")

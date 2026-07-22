@@ -257,6 +257,7 @@ async def chat_event_generator(message: str, session_id: str, user_id: str | Non
     current_text_id = None
     text_open = False
     final_output_parts: list[str] = []
+    judge_tool_results: list[dict] = []  # context collected for judge
 
     # Capture OTel trace_id for Langfuse scoring
     try:
@@ -517,6 +518,10 @@ async def chat_event_generator(message: str, session_id: str, user_id: str | Non
                         "output": safe_jsonable(output_val),
                     })
 
+                    # Collect tool result for judge context (cap at 10 tools)
+                    if len(judge_tool_results) < 10:
+                        judge_tool_results.append({"tool": tool_name, "output": output_val})
+
         if current_reasoning_id:
             yield sse({"type": "reasoning-end", "id": current_reasoning_id})
 
@@ -527,7 +532,7 @@ async def chat_event_generator(message: str, session_id: str, user_id: str | Non
         final_answer = "".join(final_output_parts)
         if final_answer:
             from modules.judge.methods import run_judge
-            asyncio.create_task(run_judge(message, final_answer, trace_id))
+            asyncio.create_task(run_judge(message, final_answer, trace_id, judge_tool_results))
 
         yield sse({"type": "finish-step"})
         yield sse({"type": "finish"})

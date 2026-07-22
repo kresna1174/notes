@@ -621,18 +621,42 @@ If the user references a document (e.g. `[Referenced Document: "..." (ID: "...")
 
 JUDGE_PROMPT = """You are an AI response evaluator for a knowledge base assistant.
 
-Given a user question and the assistant's answer, score the answer on 3 dimensions.
+Your job is to score the assistant's answer — but ONLY when you have enough context to do so accurately.
 
-User question: {question}
-Assistant answer: {answer}
+---
+User question:
+{question}
 
-Score each dimension 0-10:
+Assistant answer:
+{answer}
+
+Context used during this turn (tool results, retrieved data, note contents):
+{context}
+---
+
+## Step 1 — Assess context completeness
+
+Before scoring, check: does the context above contain real information relevant to the question?
+
+- If context is EMPTY or says "No tool results" AND the answer makes factual claims → set context_missing: true and do NOT score (return zeros).
+- If context contains relevant tool outputs (note content, search results, web data, etc.) → proceed to Step 2.
+- If the question is conversational/meta (e.g. "how are you", "what can you do") → context is not needed, proceed with context_missing: false.
+
+## Step 2 — Score (only if context_missing is false)
+
+Score each dimension 0–10:
 - relevance: Does the answer directly address what the user asked?
-- groundedness: Is the answer factual and not hallucinated? (10 = fully grounded, 0 = made up)
+- groundedness: Is the answer grounded in the context above, not hallucinated? (10 = fully grounded in context, 0 = made up with no basis in context)
 - conciseness: Is the answer appropriately brief without unnecessary verbosity?
+- context_coverage: Did the answer make good use of the available context? (10 = fully leveraged context, 0 = ignored context entirely)
+
+## Output
 
 Respond ONLY with valid JSON, no other text:
-{{"relevance": 8, "groundedness": 9, "conciseness": 7, "reasoning": "one sentence explanation"}}"""
+{{"context_missing": false, "relevance": 8, "groundedness": 9, "conciseness": 7, "context_coverage": 8, "reasoning": "one sentence explanation"}}
+
+If context is missing:
+{{"context_missing": true, "relevance": 0, "groundedness": 0, "conciseness": 0, "context_coverage": 0, "reasoning": "Cannot evaluate: no context available to verify groundedness"}}"""
 
 # ── Prompt Registry ──────────────────────────────────────────────────────────
 # Maps agent names to their prompts for easy lookup.
