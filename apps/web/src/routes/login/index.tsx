@@ -1,5 +1,6 @@
 import { createFileRoute, useNavigate, useSearch } from '@tanstack/react-router'
 import { useState, useEffect } from 'react'
+import { useIsDesktop } from '#/modules/shared'
 import { useAuth } from '#/modules/shared/auth'
 import { useTheme } from '#/modules/shared/theme'
 import { Eye, EyeOff, Sun, Moon, Brain, Map, Lightbulb, BarChart2, KeyRound, Calendar, Network, Users, Lock, Sparkles } from 'lucide-react'
@@ -130,8 +131,6 @@ function MiniAppPreview({ isDark }: { isDark: boolean }) {
       {/* macOS titlebar */}
       <div style={{
         background: titlebarGlass,
-        backdropFilter: 'blur(20px)',
-        WebkitBackdropFilter: 'blur(20px)',
         borderBottom: `1px solid ${glassBorder}`,
         padding: '11px 14px',
         display: 'flex',
@@ -167,8 +166,6 @@ function MiniAppPreview({ isDark }: { isDark: boolean }) {
           width: 175,
           borderRight: `1px solid ${glassBorder}`,
           background: sidebarGlass,
-          backdropFilter: 'blur(16px)',
-          WebkitBackdropFilter: 'blur(16px)',
           display: 'flex',
           flexDirection: 'column',
           padding: '10px 0',
@@ -221,8 +218,6 @@ function MiniAppPreview({ isDark }: { isDark: boolean }) {
         <div style={{
           flex: 1,
           background: editorGlass,
-          backdropFilter: 'blur(20px)',
-          WebkitBackdropFilter: 'blur(20px)',
           padding: '28px 28px',
           overflowY: 'hidden',
           display: 'flex',
@@ -268,6 +263,7 @@ function LoginPage() {
   const [forgotError, setForgotError] = useState<string | null>(null)
 
   const isDark = theme === 'dark'
+  const isDesktop = useIsDesktop()
   
   const textTitle = 'var(--fg)'
   const textMuted = 'var(--fg-muted)'
@@ -366,7 +362,8 @@ function LoginPage() {
       {/* Floating Theme Toggle */}
       <button
         onClick={toggle}
-        title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+        aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+        aria-pressed={theme === 'dark'}
         style={{
           position: 'absolute',
           top: 20,
@@ -402,36 +399,6 @@ function LoginPage() {
           padding: '40px 48px',
         }}
       >
-        {/* Ambient glow blobs */}
-        <div style={{
-          position: 'absolute', top: '-10%', left: '-5%',
-          width: 420, height: 420, borderRadius: '50%', pointerEvents: 'none',
-          background: isDark
-            ? 'radial-gradient(circle, rgba(74,222,128,0.10) 0%, transparent 70%)'
-            : 'radial-gradient(circle, rgba(22,163,74,0.12) 0%, transparent 70%)',
-        }} />
-        <div style={{
-          position: 'absolute', bottom: '0%', right: '-10%',
-          width: 380, height: 380, borderRadius: '50%', pointerEvents: 'none',
-          background: isDark
-            ? 'radial-gradient(circle, rgba(99,102,241,0.10) 0%, transparent 70%)'
-            : 'radial-gradient(circle, rgba(99,102,241,0.08) 0%, transparent 70%)',
-        }} />
-        <div style={{
-          position: 'absolute', top: '40%', right: '10%',
-          width: 240, height: 240, borderRadius: '50%', pointerEvents: 'none',
-          background: isDark
-            ? 'radial-gradient(circle, rgba(251,191,36,0.05) 0%, transparent 70%)'
-            : 'radial-gradient(circle, rgba(251,191,36,0.08) 0%, transparent 70%)',
-        }} />
-
-        {/* Noise texture */}
-        <div style={{
-          position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 1,
-          opacity: isDark ? 0.025 : 0.018,
-          backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='1'/%3E%3C/svg%3E")`,
-          backgroundSize: '180px 180px',
-        }} />
 
         <div style={{
           zIndex: 10, width: '100%',
@@ -460,7 +427,7 @@ function LoginPage() {
           </div>
 
           {/* Glass window */}
-          <MiniAppPreview isDark={isDark} />
+          {isDesktop && <MiniAppPreview isDark={isDark} />}
 
           {/* Feature chips */}
           <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
@@ -473,16 +440,14 @@ function LoginPage() {
               <div key={label} style={{
                 display: 'flex', alignItems: 'center', gap: 6,
                 padding: '5px 11px',
-                borderRadius: 20,
-                background: isDark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.05)',
-                border: `1px solid ${isDark ? 'rgba(255,255,255,0.09)' : 'rgba(0,0,0,0.07)'}`,
-                backdropFilter: 'blur(8px)',
-                WebkitBackdropFilter: 'blur(8px)',
+                borderRadius: 6,
+                background: 'var(--muted)',
+                border: '1px solid var(--border)',
               }}>
                 <Icon size={11} style={{ color: 'var(--primary)', flexShrink: 0 }} />
                 <span style={{
                   fontSize: '0.7rem', fontFamily: 'var(--font-body)', fontWeight: 500,
-                  color: isDark ? 'rgba(255,255,255,0.55)' : 'rgba(0,0,0,0.5)',
+                  color: 'var(--fg-muted)',
                 }}>
                   {label}
                 </span>
@@ -507,8 +472,7 @@ function LoginPage() {
           style={{ 
             width: '100%', 
             maxWidth: 400,
-            animation: 'fadeInUp 0.8s cubic-bezier(0.16, 1, 0.3, 1) both',
-            animationDelay: '780ms',
+            animation: 'fadeInUp 0.5s cubic-bezier(0.16, 1, 0.3, 1) both',
           }}
         >
           <div 
@@ -538,7 +502,7 @@ function LoginPage() {
 
             {/* OAuth Error Display */}
             {search.error && (
-              <div style={{
+              <div role="alert" style={{
                 padding: '9px 13px', background: 'rgba(224,49,49,0.08)',
                 border: '1px solid rgba(224,49,49,0.25)',
                 borderRadius: 8, fontSize: '0.8375rem', color: '#e03131',
@@ -568,11 +532,14 @@ function LoginPage() {
                 cursor: 'pointer',
                 marginBottom: 12,
                 transition: 'background 0.2s',
+                outline: 'none',
               }}
               onMouseEnter={e => e.currentTarget.style.background = bgSocialHover}
               onMouseLeave={e => e.currentTarget.style.background = bgSocial}
+              onFocus={e => { e.currentTarget.style.borderColor = borderFocus; e.currentTarget.style.boxShadow = `0 0 0 1px ${borderFocus}` }}
+              onBlur={e => { e.currentTarget.style.borderColor = borderSocial; e.currentTarget.style.boxShadow = 'none' }}
             >
-              <svg width="16" height="16" viewBox="0 0 24 24">
+              <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24">
                 <path fill={textTitle} d="M12.24 10.285V13.4h6.887c-.275 1.565-1.88 4.604-6.887 4.604-4.33 0-7.859-3.578-7.859-8s3.53-8 7.859-8c2.46 0 4.105 1.025 5.047 1.926l2.427-2.334C17.955 2.192 15.34 1 12.24 1 6.033 1 1 6.033 1 12.24s5.033 11.24 11.24 11.24c6.478 0 10.793-4.537 10.793-10.982 0-.74-.08-1.302-.176-1.865H12.24z"/>
               </svg>
               Continue with Google
@@ -597,11 +564,14 @@ function LoginPage() {
                 cursor: 'pointer',
                 marginBottom: 20,
                 transition: 'background 0.2s',
+                outline: 'none',
               }}
               onMouseEnter={e => e.currentTarget.style.background = bgSocialHover}
               onMouseLeave={e => e.currentTarget.style.background = bgSocial}
+              onFocus={e => { e.currentTarget.style.borderColor = borderFocus; e.currentTarget.style.boxShadow = `0 0 0 1px ${borderFocus}` }}
+              onBlur={e => { e.currentTarget.style.borderColor = borderSocial; e.currentTarget.style.boxShadow = 'none' }}
             >
-              <svg width="16" height="16" fill="currentColor" viewBox="0 0 24 24">
+              <svg aria-hidden="true" width="16" height="16" fill="currentColor" viewBox="0 0 24 24">
                 <path d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12"/>
               </svg>
               Continue with GitHub
@@ -615,7 +585,7 @@ function LoginPage() {
             </div>
 
             {successMsg && (
-              <div style={{
+              <div role="alert" style={{
                 padding: '9px 13px', background: 'rgba(43,138,62,0.08)',
                 border: '1px solid rgba(43,138,62,0.25)',
                 borderRadius: 8, fontSize: '0.8375rem', color: '#2b8a3e',
@@ -627,14 +597,15 @@ function LoginPage() {
 
             <form onSubmit={isRegister ? handleRegister : handleSubmit} autoComplete="off" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
               <div>
-                <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: 600, color: textTitle, marginBottom: 8 }}>
+                <label htmlFor="login-username" style={{ display: 'block', fontSize: '0.875rem', fontWeight: 600, color: textTitle, marginBottom: 8 }}>
                   Username
                 </label>
                 <input
+                  id="login-username"
                   autoFocus type="text" value={username} required
                   onChange={e => setUsername(e.target.value)}
                   placeholder="Enter your username"
-                  autoComplete="off"
+                  autoComplete="username"
                   style={inputBase}
                   onFocus={e => { e.currentTarget.style.borderColor = borderFocus; e.currentTarget.style.boxShadow = `0 0 0 1px ${borderFocus}` }}
                   onBlur={e => { e.currentTarget.style.borderColor = borderInput; e.currentTarget.style.boxShadow = 'none' }}
@@ -643,7 +614,7 @@ function LoginPage() {
 
               <div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                  <label style={{ fontSize: '0.875rem', fontWeight: 600, color: textTitle }}>
+                  <label htmlFor="login-password" style={{ fontSize: '0.875rem', fontWeight: 600, color: textTitle }}>
                     Password
                   </label>
                   {!isRegister && (
@@ -655,7 +626,7 @@ function LoginPage() {
                         fontSize: '0.8125rem', color: textMuted,
                         cursor: 'pointer', fontFamily: 'var(--font-body)',
                         transition: 'color 0.2s',
-                        padding: 0,
+                        padding: '4px 0',
                       }}
                       onMouseEnter={e => e.currentTarget.style.color = textTitle}
                       onMouseLeave={e => e.currentTarget.style.color = textMuted}
@@ -666,19 +637,22 @@ function LoginPage() {
                 </div>
                 <div style={{ position: 'relative' }}>
                   <input
+                    id="login-password"
                     type={showPw ? 'text' : 'password'} value={password} required
                     onChange={e => setPassword(e.target.value)}
                     placeholder="Enter your password"
-                    autoComplete="new-password"
+                    autoComplete={isRegister ? 'new-password' : 'current-password'}
                     style={{ ...inputBase, padding: '12px 40px 12px 16px' }}
                     onFocus={e => { e.currentTarget.style.borderColor = borderFocus; e.currentTarget.style.boxShadow = `0 0 0 1px ${borderFocus}` }}
                     onBlur={e => { e.currentTarget.style.borderColor = borderInput; e.currentTarget.style.boxShadow = 'none' }}
                   />
                   <button
                     type="button" onClick={() => setShowPw(v => !v)}
+                    aria-label={showPw ? 'Hide password' : 'Show password'}
+                    aria-pressed={showPw}
                     style={{
                       position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)',
-                      background: 'none', border: 'none', cursor: 'pointer', padding: 4,
+                      background: 'none', border: 'none', cursor: 'pointer', padding: 8,
                       color: 'var(--fg-subtle)', display: 'flex', alignItems: 'center',
                     }}
                   >
@@ -688,7 +662,7 @@ function LoginPage() {
               </div>
 
               {error && (
-                <div style={{
+                <div role="alert" style={{
                   padding: '9px 13px', background: 'rgba(224,49,49,0.08)',
                   border: '1px solid rgba(224,49,49,0.25)',
                   borderRadius: 8, fontSize: '0.8375rem', color: '#e03131',
@@ -775,6 +749,7 @@ function LoginPage() {
       {showForgot && (
         <div
           onClick={() => setShowForgot(false)}
+          onKeyDown={e => { if (e.key === 'Escape') setShowForgot(false) }}
           style={{
             position: 'fixed', inset: 0, zIndex: 1000,
             background: 'rgba(0,0,0,0.5)',
@@ -783,6 +758,9 @@ function LoginPage() {
           }}
         >
           <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="forgot-pw-title"
             onClick={e => e.stopPropagation()}
             style={{
               background: isDark ? '#18181b' : '#ffffff',
@@ -794,7 +772,7 @@ function LoginPage() {
               boxShadow: '0 8px 40px rgba(0,0,0,0.18)',
             }}
           >
-            <h3 style={{ fontSize: '1.125rem', fontWeight: 700, color: textTitle, marginBottom: 6 }}>
+            <h3 id="forgot-pw-title" style={{ fontSize: '1.125rem', fontWeight: 700, color: textTitle, marginBottom: 6 }}>
               Reset your password
             </h3>
             <p style={{ fontSize: '0.875rem', color: textMuted, marginBottom: 20 }}>
@@ -823,10 +801,11 @@ function LoginPage() {
             {!forgotMsg && (
               <form onSubmit={handleForgotPassword} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: 600, color: textTitle, marginBottom: 8 }}>
+                  <label htmlFor="forgot-email" style={{ display: 'block', fontSize: '0.875rem', fontWeight: 600, color: textTitle, marginBottom: 8 }}>
                     Email address
                   </label>
                   <input
+                    id="forgot-email"
                     type="email"
                     value={forgotEmail}
                     onChange={e => setForgotEmail(e.target.value)}

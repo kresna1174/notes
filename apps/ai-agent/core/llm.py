@@ -1,6 +1,42 @@
 import os
 from agents.extensions.models.any_llm_model import AnyLLMModel
 from agents import ModelSettings
+from core.settings import settings
+
+# ── Langfuse observability via OpenTelemetry + OpenInference ─────────────────
+def _setup_langfuse():
+    if not settings.langfuse_public_key or not settings.langfuse_secret_key:
+        return
+    try:
+        import base64
+        from opentelemetry.sdk.trace import TracerProvider
+        from opentelemetry.sdk.trace.export import BatchSpanProcessor
+        from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
+        from opentelemetry import trace
+        from openinference.instrumentation.openai_agents import OpenAIAgentsInstrumentor
+
+        auth = base64.b64encode(
+            f"{settings.langfuse_public_key}:{settings.langfuse_secret_key}".encode()
+        ).decode()
+
+        exporter = OTLPSpanExporter(
+            endpoint=f"{settings.langfuse_host}/api/public/otel/v1/traces",
+            headers={
+                "Authorization": f"Basic {auth}",
+                "x-langfuse-ingestion-version": "4",
+            },
+        )
+
+        provider = TracerProvider()
+        provider.add_span_processor(BatchSpanProcessor(exporter))
+        trace.set_tracer_provider(provider)
+
+        OpenAIAgentsInstrumentor().instrument(tracer_provider=provider)
+        print("[langfuse] OpenAI Agents instrumentation enabled")
+    except Exception as e:
+        print(f"[langfuse] Failed to setup instrumentation: {e}")
+
+_setup_langfuse()
 
 # ── Monkeypatch ChatCompletionChunk to prevent OpenRouter 'error' finish_reason crashes ──
 try:
@@ -42,9 +78,6 @@ try:
     ChatCompletionChunk.model_validate = patched_model_validate
 except Exception:
     pass
-
-# Disable tracing to avoid connection issues with OpenAI dashboard
-os.environ["OPENAI_AGENTS_DISABLE_TRACING"] = "1"
 
 # Initialize AnyLLMModel for OpenRouter
 openrouter_model = AnyLLMModel(

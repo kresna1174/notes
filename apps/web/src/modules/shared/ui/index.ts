@@ -13,5 +13,7 @@ export { UploadMenu } from './UploadMenu';
 export { RagLayout } from './RagLayout';
 export { RagDocPanel } from './RagDocPanel';
 export { ConfirmDialog } from './ConfirmDialog';
+export { ClarifyFlow, parseClarifyBlocks, stripClarifyBlocks } from './ClarifyFlow';
+export type { ClarifyQuestion } from './ClarifyFlow';
 
 

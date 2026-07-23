@@ -5,6 +5,7 @@ import Heading from '@tiptap/extension-heading'
 import { Collaboration } from '@tiptap/extension-collaboration'
 import { CollaborationCaret } from '@tiptap/extension-collaboration-caret'
 import * as Y from 'yjs'
+import { prosemirrorJSONToYXmlFragment } from 'y-prosemirror'
 import { WebsocketProvider } from 'y-websocket'
 import { useAuth } from '../shared/auth'
 import { Table } from '@tiptap/extension-table'
@@ -35,10 +36,11 @@ import { ToggleBlock } from './ToggleBlock'
 import { AiDraftBlock } from './AiDraftBlock'
 import { DragHandle } from './DragHandle'
 import { NoteIcon } from '../shared/ui'
+import { ClarifyFlow, parseClarifyBlocks } from '../shared/ui/ClarifyFlow'
 import { useEffect, useRef, useState, useMemo } from 'react'
 import { Eye, EyeOff, Lock, LockOpen, Share2, FileUp, Paperclip, Sparkles, Smile, Image as ImageIcon, Clock, Download, Loader2 } from 'lucide-react'
 import { ExportModal } from './ExportModal'
-import { WikiIngestButton } from '../wiki'
+// import { WikiIngestButton } from '../wiki' // hidden — feature on hold
 import { marked } from 'marked'
 import mammoth from 'mammoth'
 import * as XLSX from 'xlsx'
@@ -240,7 +242,7 @@ export const DragDropPlugin = Extension.create({
 interface EditorProps {
   note: Note
   onUpdate: (fields: { title?: string; content?: string; coverImage?: string | null; icon?: string | null }) => Promise<void>
-  onSaveStatusChange?: (status: 'saved' | 'saving' | 'unsaved') => void
+  onSaveStatusChange?: (status: 'saved' | 'saving' | 'unsaved' | 'generating') => void
   onLockChange?: (isLocked: boolean) => void
   shareTrigger?: number
   chatOpen?: boolean
@@ -680,27 +682,28 @@ export function Editor({ note, onUpdate, onSaveStatusChange, onLockChange, share
   }, [ydoc, provider, currentUser])
 
   useEffect(() => {
-    if (!editor) return
-    const handleSync = (isSynced: boolean) => {
-      if (isSynced) {
-        const isDocEmpty = ydoc.getXmlFragment('default').length === 0
-        if (isDocEmpty && note.content) {
-          try {
-            const json = JSON.parse(note.content)
-            editor.commands.setContent(json, { emitUpdate: false })
-          } catch (e) {
-            console.error('Failed to parse initial content', e)
-          }
-        }
+    if (!editor || !note.content) return
+
+    function injectContent() {
+      const fragment = ydoc.getXmlFragment('default')
+      if (fragment.length > 0) return
+      try {
+        const json = JSON.parse(note.content)
+        prosemirrorJSONToYXmlFragment(editor!.schema, json, fragment)
+      } catch (e) {
+        console.error('Failed to parse initial content', e)
       }
     }
+
+    // Inject immediately without waiting for WS sync
+    injectContent()
+
+    // Also handle case where WS syncs after inject (server doc may overwrite)
+    const handleSync = (isSynced: boolean) => {
+      if (isSynced) injectContent()
+    }
     provider.on('sync', handleSync)
-    if (provider.synced) {
-      handleSync(true)
-    }
-    return () => {
-      provider.off('sync', handleSync)
-    }
+    return () => { provider.off('sync', handleSync) }
   }, [editor, provider, ydoc, note.content])
 
   const [editDiagramData, setEditDiagramData] = useState<{ id: string; initialData: string } | null>(null)
@@ -722,6 +725,8 @@ export function Editor({ note, onUpdate, onSaveStatusChange, onLockChange, share
   const [aiPromptText, setAiPromptText] = useState('')
   const [aiLoading, setAiLoading] = useState(false)
   const [aiPromptCoords, setAiPromptCoords] = useState<{ top: number; left: number } | null>(null)
+  const [aiClarifyBlocks, setAiClarifyBlocks] = useState<ReturnType<typeof parseClarifyBlocks>>([])
+  const aiPendingActionRef = useRef<{ prompt: string; action?: string; from?: number; to?: number; agentKey?: string } | null>(null)
 
   useEffect(() => {
     function handleOpenAi() {
@@ -923,6 +928,21 @@ export function Editor({ note, onUpdate, onSaveStatusChange, onLockChange, share
       // If stream error occurred and no text was generated, show error
       if (streamError && !fullText && !pendingToolContent) {
         throw new Error(streamError)
+      }
+
+      // Check if streamed text is a clarify question — intercept before inserting
+      const detectedClarify = parseClarifyBlocks(fullText)
+      if (detectedClarify.length > 0 && !pendingToolContent) {
+        // Undo the streamed text that was inserted into the doc
+        if (fullText) {
+          const end = editor.state.selection.from
+          editor.chain().focus().deleteRange({ from: startPos, to: end }).run()
+        }
+        aiPendingActionRef.current = { prompt, action, from, to, agentKey }
+        setAiClarifyBlocks(detectedClarify)
+        setAiLoading(false)
+        setAiPromptActive(true)
+        return
       }
 
       // Case 1: AI streamed text directly — replace the streamed chars with parsed HTML
@@ -1421,12 +1441,7 @@ export function Editor({ note, onUpdate, onSaveStatusChange, onLockChange, share
                 <Download size={14} />
               </button>
 
-              <WikiIngestButton
-                noteId={note.id}
-                noteTitle={title || note.title || 'Untitled'}
-                noteContent={note.content || ''}
-                compact
-              />
+              {/* WikiIngestButton hidden — feature on hold */}
 
               <input
                 ref={attachInputRef}
@@ -1721,6 +1736,28 @@ export function Editor({ note, onUpdate, onSaveStatusChange, onLockChange, share
                 <Loader2 className="animate-spin" size={14} color="var(--fg-subtle)" />
                 <span style={{ fontSize: '0.78rem', color: 'var(--fg-subtle)' }}>Thinking...</span>
               </div>
+            ) : aiClarifyBlocks.length > 0 ? (
+              <ClarifyFlow
+                blocks={aiClarifyBlocks}
+                onComplete={answers => {
+                  const details = aiClarifyBlocks
+                    .map(b => `${b.question}: ${answers[b.question]}`)
+                    .join('\n')
+                  const pending = aiPendingActionRef.current
+                  setAiClarifyBlocks([])
+                  aiPendingActionRef.current = null
+                  setAiPromptActive(false)
+                  if (pending) {
+                    handleAiGenerate(
+                      `${pending.prompt}\n\n${details}`,
+                      pending.action as any,
+                      pending.from,
+                      pending.to,
+                      pending.agentKey
+                    )
+                  }
+                }}
+              />
             ) : (
               <>
                 <textarea

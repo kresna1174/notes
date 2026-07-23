@@ -3,10 +3,11 @@ import { useNavigate } from '@tanstack/react-router'
 import { ScrollArea } from '../shared/ui'
 import { NoteTree } from './NoteTree'
 import { SearchBar } from './SearchBar'
-import { Plus, LogOut, Users, Shield, Eye, Info, Menu, X, KeyRound, Brain, ChevronDown, Check, FileStack, BookOpen, Settings } from 'lucide-react'
+import { Plus, LogOut, Users, Shield, Eye, Info, Menu, X, KeyRound, Brain, ChevronDown, Check, FileStack, Settings } from 'lucide-react'
 import { FontPicker } from './FontPicker'
 import { ThemeToggle } from './ThemeToggle'
 import { useAuth } from '../shared/auth'
+import { useIsDesktop } from '../shared'
 import { AboutModal } from '../auth'
 import { ChangePasswordModal } from '../auth'
 
@@ -35,17 +36,8 @@ export function Sidebar({ activeNoteId, onShareNote, notesUpdateTrigger }: Sideb
 
 
   // Mobile states
-  const [isMobile, setIsMobile] = useState(false)
+  const isMobile = !useIsDesktop()
   const [isOpen, setIsOpen] = useState(false)
-
-  useEffect(() => {
-    function checkMobile() {
-      setIsMobile(window.innerWidth < 768)
-    }
-    checkMobile()
-    window.addEventListener('resize', checkMobile)
-    return () => window.removeEventListener('resize', checkMobile)
-  }, [])
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -168,7 +160,8 @@ export function Sidebar({ activeNoteId, onShareNote, notesUpdateTrigger }: Sideb
       {isMobile && (
         <button
           onClick={() => setIsOpen(true)}
-          title="Show sidebar"
+          aria-label="Show sidebar"
+          aria-expanded={isOpen}
           style={{
             position: 'fixed',
             top: 16,
@@ -196,6 +189,8 @@ export function Sidebar({ activeNoteId, onShareNote, notesUpdateTrigger }: Sideb
       {isMobile && (
         <div
           onClick={() => setIsOpen(false)}
+          onKeyDown={e => { if (e.key === 'Escape') setIsOpen(false) }}
+          aria-hidden="true"
           style={{
             position: 'fixed',
             inset: 0,
@@ -238,7 +233,7 @@ export function Sidebar({ activeNoteId, onShareNote, notesUpdateTrigger }: Sideb
             {isMobile && (
               <button
                 onClick={() => setIsOpen(false)}
-                title="Hide sidebar"
+                aria-label="Hide sidebar"
                 style={{
                   display: 'flex',
                   alignItems: 'center',
@@ -278,6 +273,9 @@ export function Sidebar({ activeNoteId, onShareNote, notesUpdateTrigger }: Sideb
               {/* Trigger button */}
               <button
                 onClick={() => setScopeDropdownOpen(v => !v)}
+                aria-haspopup="listbox"
+                aria-expanded={scopeDropdownOpen}
+                aria-label={`Workspace: ${selected.label}`}
                 style={{
                   width: '100%', boxSizing: 'border-box',
                   display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8,
@@ -298,16 +296,21 @@ export function Sidebar({ activeNoteId, onShareNote, notesUpdateTrigger }: Sideb
               </button>
               {/* Dropdown panel */}
               {scopeDropdownOpen && (
-                <div style={{
-                  position: 'absolute', top: 'calc(100% + 4px)', left: 0, right: 0,
-                  background: 'var(--bg)', border: '1px solid var(--border)',
-                  borderRadius: 10, zIndex: 100, overflow: 'hidden',
-                  boxShadow: '0 8px 24px rgba(0,0,0,0.15)',
-                  padding: '4px',
-                }}>
+                <div
+                  role="listbox"
+                  aria-label="Workspace"
+                  style={{
+                    position: 'absolute', top: 'calc(100% + 4px)', left: 0, right: 0,
+                    background: 'var(--bg)', border: '1px solid var(--border)',
+                    borderRadius: 10, zIndex: 100, overflow: 'hidden',
+                    boxShadow: '0 8px 24px rgba(0,0,0,0.15)',
+                    padding: '4px',
+                  }}>
                   {workspaceOptions.map(opt => (
                     <button
                       key={opt.value}
+                      role="option"
+                      aria-selected={activeScope === opt.value}
                       onClick={() => { setActiveScope(opt.value); setSearchResults(null); setScopeDropdownOpen(false) }}
                       style={{
                         width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
@@ -446,26 +449,14 @@ export function Sidebar({ activeNoteId, onShareNote, notesUpdateTrigger }: Sideb
             </button>
           )}
 
-          <button
-            onClick={() => navigateAndClose({ to: '/wiki' })}
-            style={{
-              display: 'flex', alignItems: 'center', gap: 8, width: '100%',
-              padding: '7px 10px', borderRadius: 7, border: 'none',
-              background: 'transparent', cursor: 'pointer', marginBottom: 4,
-              fontSize: '0.8125rem', color: C.fgMuted, fontFamily: 'var(--font-body)',
-            }}
-            onMouseEnter={e => { e.currentTarget.style.background = C.accent; e.currentTarget.style.color = C.primary }}
-            onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = C.fgMuted }}
-          >
-            <BookOpen size={14} /> Wiki
-          </button>
+          {/* Wiki menu hidden — feature on hold */}
 
           <button
             onClick={() => navigateAndClose({ to: '/connect-account' })}
             style={{
               display: 'flex', alignItems: 'center', gap: 8, width: '100%',
-              padding: '7px 10px', borderRadius: 7, border: 'none',
-              background: 'transparent', cursor: 'pointer', marginBottom: 4,
+              padding: '10px 10px', borderRadius: 7, border: 'none',
+              background: 'transparent', cursor: 'pointer', marginBottom: 2,
               fontSize: '0.8125rem', color: C.fgMuted, fontFamily: 'var(--font-body)',
             }}
             onMouseEnter={e => { e.currentTarget.style.background = C.accent; e.currentTarget.style.color = C.primary }}
@@ -478,8 +469,8 @@ export function Sidebar({ activeNoteId, onShareNote, notesUpdateTrigger }: Sideb
             onClick={() => navigateAndClose({ to: '/documents' })}
             style={{
               display: 'flex', alignItems: 'center', gap: 8, width: '100%',
-              padding: '7px 10px', borderRadius: 7, border: 'none',
-              background: 'transparent', cursor: 'pointer', marginBottom: 4,
+              padding: '10px 10px', borderRadius: 7, border: 'none',
+              background: 'transparent', cursor: 'pointer', marginBottom: 2,
               fontSize: '0.8125rem', color: C.fgMuted, fontFamily: 'var(--font-body)',
             }}
             onMouseEnter={e => { e.currentTarget.style.background = C.accent; e.currentTarget.style.color = C.primary }}
@@ -492,8 +483,8 @@ export function Sidebar({ activeNoteId, onShareNote, notesUpdateTrigger }: Sideb
             onClick={() => setShowChangePassword(true)}
             style={{
               display: 'flex', alignItems: 'center', gap: 8, width: '100%',
-              padding: '7px 10px', borderRadius: 7, border: 'none',
-              background: 'transparent', cursor: 'pointer', marginBottom: 4,
+              padding: '10px 10px', borderRadius: 7, border: 'none',
+              background: 'transparent', cursor: 'pointer', marginBottom: 2,
               fontSize: '0.8125rem', color: C.fgMuted, fontFamily: 'var(--font-body)',
             }}
             onMouseEnter={e => { e.currentTarget.style.background = C.accent; e.currentTarget.style.color = C.primary }}
@@ -505,8 +496,8 @@ export function Sidebar({ activeNoteId, onShareNote, notesUpdateTrigger }: Sideb
             onClick={() => setShowAbout(true)}
             style={{
               display: 'flex', alignItems: 'center', gap: 8, width: '100%',
-              padding: '7px 10px', borderRadius: 7, border: 'none',
-              background: 'transparent', cursor: 'pointer', marginBottom: 4,
+              padding: '10px 10px', borderRadius: 7, border: 'none',
+              background: 'transparent', cursor: 'pointer', marginBottom: 2,
               fontSize: '0.8125rem', color: C.fgMuted, fontFamily: 'var(--font-body)',
             }}
             onMouseEnter={e => { e.currentTarget.style.background = C.accent; e.currentTarget.style.color = C.primary }}
@@ -535,7 +526,7 @@ export function Sidebar({ activeNoteId, onShareNote, notesUpdateTrigger }: Sideb
             </div>
             <button
               onClick={async () => { await logout(); navigateAndClose({ to: '/login' }) }}
-              title="Logout"
+              aria-label="Logout"
               style={{
                 width: 28, height: 28, flexShrink: 0,
                 display: 'flex', alignItems: 'center', justifyContent: 'center',

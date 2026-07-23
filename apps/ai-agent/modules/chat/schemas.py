@@ -18,6 +18,7 @@ class ChatStreamRequest(BaseModel):
     message: str | None = None
     messages: list[dict] | None = None
     session_id: str = "default"
+    note_id: str | None = None
     note_title: str | None = None
     note_content: str | None = None
     user_id: str | None = None

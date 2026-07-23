@@ -13,6 +13,11 @@ from ddgs import DDGS
 from agents import function_tool, RunContextWrapper
 
 
+def tool_error(code: str, message: str) -> str:
+    """Return a structured JSON error string so agents can detect failure reliably."""
+    return json.dumps({"error": True, "code": code, "message": message})
+
+
 def format_as_tiptap(text: str) -> str:
     """
     Check if the text is already JSON. If not, convert it from Markdown to HTML
@@ -125,14 +130,14 @@ async def search_web(query: str, max_results: int = 5) -> str:
 
         results = await asyncio.to_thread(_run)
         if not results:
-            return f"No results found for query: {query}"
+            return tool_error("no_results", f"No results found for query: {query}")
 
         output = []
         for r in results:
             output.append(f"Title: {r.get('title')}\nURL: {r.get('href')}\nSnippet: {r.get('body')}\n")
         return "\n---\n".join(output)
     except Exception as e:
-        return f"Error performing web search: {str(e)}"
+        return tool_error("search_failed", str(e))
 
 
 @function_tool
@@ -152,7 +157,7 @@ async def find_web_photos(query: str, max_results: int = 5) -> str:
 
         results = await asyncio.to_thread(_run)
         if not results:
-            return f"No photos found for query: {query}"
+            return tool_error("no_results", f"No photos found for query: {query}")
 
         output = []
         for idx, r in enumerate(results, 1):
@@ -163,7 +168,7 @@ async def find_web_photos(query: str, max_results: int = 5) -> str:
                 output.append(f"Title: {title}\nImage URL: {img_url}\nPage URL: {page_url}\n")
         return "\n---\n".join(output)
     except Exception as e:
-        return f"Error performing photo search: {str(e)}"
+        return tool_error("photo_search_failed", str(e))
 
 
 @function_tool
@@ -187,7 +192,7 @@ async def find_youtube_videos(query: str, max_results: int = 5) -> str:
 
         results = await asyncio.to_thread(_run)
         if not results:
-            return f"No YouTube videos found for query: {query}"
+            return tool_error("no_results", f"No YouTube videos found for query: {query}")
 
         output = []
         for idx, r in enumerate(results, 1):
@@ -199,7 +204,7 @@ async def find_youtube_videos(query: str, max_results: int = 5) -> str:
                 output.append(f"Title: {title}\nVideo URL: {video_url}\nEmbed URL: {embed_url}\nPublisher: {publisher}\n")
         return "\n---\n".join(output)
     except Exception as e:
-        return f"Error performing YouTube search: {str(e)}"
+        return tool_error("youtube_search_failed", str(e))
 
 
 @function_tool
@@ -217,10 +222,10 @@ async def extract_web(url: str) -> str:
 
         res = await asyncio.to_thread(_run)
         if not res or not res.get("content"):
-            return f"Could not extract content from URL: {url}"
+            return tool_error("extract_failed", f"Could not extract content from URL: {url}")
         return f"URL: {res.get('url')}\n\nContent:\n{res.get('content')}"
     except Exception as e:
-        return f"Error extracting web content: {str(e)}"
+        return tool_error("extract_failed", str(e))
 
 
 @function_tool
@@ -281,7 +286,7 @@ async def crawl_web(url: str, max_pages: int = 5) -> str:
 
         return f"Crawled {len(visited)} pages from {domain}:\n\n" + "\n---\n".join(results)
     except Exception as e:
-        return f"Error crawling website: {str(e)}"
+        return tool_error("crawl_failed", str(e))
 
 
 def is_code_safe(code: str) -> tuple[bool, str]:
@@ -461,7 +466,7 @@ def list_rag_documents() -> str:
             for doc in docs
         ], default=str)
     except Exception as e:
-        return f"Error listing RAG documents: {str(e)}"
+        return tool_error("list_documents_failed", str(e))
 
 
 @function_tool
@@ -493,11 +498,150 @@ def search_rag_documents(query: str, document_id: str | None = None, n_results: 
             )
             
         if not output:
-            return "No relevant paragraphs found in RAG database."
-            
+            return tool_error("no_results", "No relevant paragraphs found in RAG database.")
+
         return "\n---\n".join(output)
     except Exception as e:
-        return f"Error searching RAG documents: {str(e)}"
+        return tool_error("rag_search_failed", str(e))
+
+
+def _rrf_fuse(
+    semantic_hits: list[tuple[str, dict, float]],
+    bm25_hits: list[tuple[str, float]],
+    top_k: int,
+    k: int = 60,
+) -> list[tuple[str, dict, float]]:
+    """Reciprocal Rank Fusion: combine semantic + BM25 rankings into one ranked list."""
+    # Build lookup: text → metadata (from semantic hits)
+    meta_map: dict[str, dict] = {text: meta for text, meta, _ in semantic_hits}
+
+    # Semantic rank scores
+    sem_rank: dict[str, float] = {text: 1.0 / (k + i + 1) for i, (text, _, _) in enumerate(semantic_hits)}
+
+    # BM25 rank scores
+    bm25_rank: dict[str, float] = {text: 1.0 / (k + i + 1) for i, (text, _) in enumerate(bm25_hits)}
+
+    # Union of all texts
+    all_texts = set(sem_rank) | set(bm25_rank)
+    fused = {t: sem_rank.get(t, 0.0) + bm25_rank.get(t, 0.0) for t in all_texts}
+
+    ranked = sorted(fused.items(), key=lambda x: x[1], reverse=True)[:top_k]
+    return [(text, meta_map.get(text, {}), score) for text, score in ranked]
+
+
+def _hybrid_search_collection(collection, query: str, n_results: int) -> list[tuple[str, dict, float]]:
+    """Pull candidates from ChromaDB then re-rank with BM25, fuse via RRF."""
+    from modules.rag.methods import BM25Retriever
+
+    candidate_k = min(n_results * 4, 50)
+    try:
+        raw = collection.query(
+            query_texts=[query],
+            n_results=candidate_k,
+            include=["documents", "metadatas", "distances"],
+        )
+    except Exception:
+        return []
+
+    docs = (raw.get("documents") or [[]])[0]
+    metas = (raw.get("metadatas") or [[]])[0]
+    dists = (raw.get("distances") or [[]])[0]
+
+    if not docs:
+        return []
+
+    semantic_hits = list(zip(docs, metas, dists))
+
+    bm25 = BM25Retriever(docs)
+    bm25_hits = bm25.retrieve(query, top_k=candidate_k)
+
+    return _rrf_fuse(semantic_hits, bm25_hits, top_k=n_results)
+
+
+@function_tool
+def search_knowledge(query: str, n_results: int = 5) -> str:
+    """
+    Search across all user knowledge: uploaded RAG documents and indexed notes.
+    Always use this when the user asks about their content, notes, or documents.
+    Uses hybrid search (semantic + BM25) with Reciprocal Rank Fusion for better accuracy.
+
+    Args:
+        query: The search term or question.
+        n_results: Max results per source (default 5).
+    """
+    from utils.chroma import chroma_lock, get_collection, get_notes_collection
+
+    output = []
+
+    # Search RAG documents (documents_v2) — hybrid
+    try:
+        with chroma_lock:
+            doc_hits = _hybrid_search_collection(get_collection(), query, n_results)
+        for text, meta, score in doc_hits:
+            output.append(
+                f"[Source: Document — {meta.get('document_name', 'Unknown')}, "
+                f"Page {meta.get('page_number', 0) + 1}, Score: {score:.4f}]\n{text}"
+            )
+    except Exception as e:
+        output.append(f"[Document search error: {e}]")
+
+    # Search indexed notes (note_pages) — hybrid
+    try:
+        with chroma_lock:
+            note_hits = _hybrid_search_collection(get_notes_collection(), query, n_results)
+        for text, meta, score in note_hits:
+            output.append(
+                f"[Source: Note — \"{meta.get('note_title', 'Untitled')}\", "
+                f"Score: {score:.4f}]\n{text}"
+            )
+    except Exception as e:
+        output.append(f"[Note search error: {e}]")
+
+    if not output:
+        return tool_error("no_results", "No relevant results found in documents or notes.")
+
+    return "\n\n---\n\n".join(output)
+
+
+# ── User memory tools ────────────────────────────────────────────────────────
+
+@function_tool
+async def remember_user_fact(ctx: RunContextWrapper[dict], key: str, value: str) -> str:
+    """
+    Save a persistent fact about this user that will be remembered across all future sessions.
+    Use this when the user shares preferences, context, or important personal info
+    (e.g. preferred language, job role, ongoing projects, recurring topics).
+
+    Args:
+        key: Short label for the fact (e.g. "preferred_language", "job_role", "current_project").
+        value: The fact to remember (e.g. "Indonesian", "software engineer", "building a notes app").
+    """
+    from modules.memory.methods import upsert_memory, ensure_table
+    user_id = (ctx.context or {}).get("user_id") or "anonymous"
+    try:
+        await ensure_table()
+        await upsert_memory(user_id, key, value)
+        return f"Remembered: {key} = {value}"
+    except Exception as e:
+        return tool_error("memory_save_failed", str(e))
+
+
+@function_tool
+async def forget_user_fact(ctx: RunContextWrapper[dict], key: str) -> str:
+    """
+    Delete a previously saved fact about this user.
+
+    Args:
+        key: The key of the fact to forget.
+    """
+    from modules.memory.methods import delete_memory, ensure_table
+    user_id = (ctx.context or {}).get("user_id") or "anonymous"
+    try:
+        await ensure_table()
+        deleted = await delete_memory(user_id, key)
+        return f"Forgot: {key}" if deleted else f"No memory found for key: {key}"
+    except Exception as e:
+        return tool_error("memory_delete_failed", str(e))
 
 
 # ── Wiki tools ────────────────────────────────────────────────────────────────
@@ -521,7 +665,7 @@ async def query_wiki(ctx: RunContextWrapper[dict], query: str) -> str:
             results = await wiki_methods.search_wiki_pages(db, query)
 
         if not results:
-            return f"No wiki pages found matching '{query}'."
+            return tool_error("no_results", f"No wiki pages found matching '{query}'.")
 
         output_parts = [f"Wiki search results for: **{query}**\n"]
         for i, r in enumerate(results[:8], 1):
@@ -531,7 +675,7 @@ async def query_wiki(ctx: RunContextWrapper[dict], query: str) -> str:
             )
         return "\n".join(output_parts)
     except Exception as e:
-        return f"Error searching wiki: {str(e)}"
+        return tool_error("wiki_search_failed", str(e))
 
 
 @function_tool
@@ -596,7 +740,7 @@ async def ingest_note_to_wiki(
 
         return f"✓ Wiki ingest complete for **{note_title}**.\n  {agent_summary}"
     except Exception as e:
-        return f"Error ingesting note into wiki: {str(e)}"
+        return tool_error("wiki_ingest_failed", str(e))
 
 
 @function_tool
@@ -638,5 +782,5 @@ async def read_wiki_index(ctx: RunContextWrapper[dict]) -> str:
 
         return "\n".join(lines)
     except Exception as e:
-        return f"Error reading wiki index: {str(e)}"
+        return tool_error("wiki_index_failed", str(e))
 

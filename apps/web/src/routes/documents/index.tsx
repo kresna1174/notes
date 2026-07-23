@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from '@tanstack/react-router'
-import { Library, FileStack, Search, MessageSquare, Trash2, Send, Sparkles, X, ChevronRight, FileText, ArrowLeft } from 'lucide-react'
+import { Library, FileStack, Search, MessageSquare, Trash2, Send, Sparkles, X, ChevronRight } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
 import ReactMarkdown from 'react-markdown'
 
@@ -7,6 +7,7 @@ import { Sidebar } from '#/modules/sidebar'
 import { UploadMenu } from '#/modules/shared/ui/UploadMenu'
 import { ConfirmDialog } from '#/modules/shared/ui'
 import { listenForDocumentsChanged, notifyDocumentsChanged } from '#/modules/shared/ui/UploadMenu'
+import { useIsDesktop } from '#/modules/shared'
 import {
   deleteDocument,
   listDocuments,
@@ -51,16 +52,7 @@ function RAGIndexPage() {
   const [isAsking, setIsAsking] = useState(false)
 
   const [deleteTarget, setDeleteTarget] = useState<DocumentMetadata | null>(null)
-  const [isMobile, setIsMobile] = useState(false)
-
-  useEffect(() => {
-    function checkMobile() {
-      setIsMobile(window.innerWidth < 768)
-    }
-    checkMobile()
-    window.addEventListener('resize', checkMobile)
-    return () => window.removeEventListener('resize', checkMobile)
-  }, [])
+  const isMobile = !useIsDesktop()
 
   const loadDocuments = useCallback(async () => {
     setIsLoadingDocs(true)
@@ -332,6 +324,7 @@ function RAGIndexPage() {
             {/* Error Block */}
             {error ? (
               <div
+                role="alert"
                 style={{
                   marginBottom: 20,
                   padding: '12px 14px',
@@ -395,6 +388,10 @@ function RAGIndexPage() {
                             key={doc.id}
                             style={{ borderTop: '1px solid var(--border)', cursor: 'pointer' }}
                             onClick={() => setSelectedDoc(doc)}
+                            onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSelectedDoc(doc) } }}
+                            tabIndex={0}
+                            role="button"
+                            aria-label={`View details for ${doc.name}`}
                             className="hover:bg-zinc-50 dark:hover:bg-zinc-800/20 transition"
                           >
                             <td style={{ padding: '12px 16px' }}>
@@ -425,9 +422,10 @@ function RAGIndexPage() {
                               <button
                                 onClick={(e) => void handleDelete(doc, e)}
                                 disabled={deletingDocumentId === doc.id}
+                                aria-label={`Delete ${doc.name}`}
                                 style={{
-                                  width: 26,
-                                  height: 26,
+                                  width: 36,
+                                  height: 36,
                                   display: 'inline-flex',
                                   alignItems: 'center',
                                   justifyContent: 'center',
@@ -470,6 +468,10 @@ function RAGIndexPage() {
                     <div
                       key={p.page_id}
                       onClick={() => setSelectedPage(p)}
+                      onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSelectedPage(p) } }}
+                      tabIndex={0}
+                      role="button"
+                      aria-label={`View page ${p.page_number + 1} of ${p.document_name}`}
                       style={{
                         padding: '16px',
                         border: '1px solid var(--border)',
@@ -515,8 +517,9 @@ function RAGIndexPage() {
               >
                 <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 240px 120px', gap: 10 }}>
                   <div>
-                    <label style={{ fontSize: '0.8rem', fontWeight: 500, color: 'var(--fg-muted)', marginBottom: 4, display: 'block' }}>Search query</label>
+                    <label htmlFor="search-query" style={{ fontSize: '0.8rem', fontWeight: 500, color: 'var(--fg-muted)', marginBottom: 4, display: 'block' }}>Search query</label>
                     <input
+                      id="search-query"
                       style={inputStyle}
                       placeholder="e.g. bahan bumbu soto banjar"
                       value={searchQuery}
@@ -524,8 +527,9 @@ function RAGIndexPage() {
                     />
                   </div>
                   <div>
-                    <label style={{ fontSize: '0.8rem', fontWeight: 500, color: 'var(--fg-muted)', marginBottom: 4, display: 'block' }}>Source document</label>
+                    <label htmlFor="search-doc" style={{ fontSize: '0.8rem', fontWeight: 500, color: 'var(--fg-muted)', marginBottom: 4, display: 'block' }}>Source document</label>
                     <select
+                      id="search-doc"
                       style={inputStyle}
                       value={searchDocId}
                       onChange={(e) => setSearchDocId(e.target.value)}
@@ -537,8 +541,9 @@ function RAGIndexPage() {
                     </select>
                   </div>
                   <div>
-                    <label style={{ fontSize: '0.8rem', fontWeight: 500, color: 'var(--fg-muted)', marginBottom: 4, display: 'block' }}>Limit</label>
+                    <label htmlFor="search-limit" style={{ fontSize: '0.8rem', fontWeight: 500, color: 'var(--fg-muted)', marginBottom: 4, display: 'block' }}>Limit</label>
                     <input
+                      id="search-limit"
                       style={inputStyle}
                       type="number"
                       min={1}
@@ -585,6 +590,10 @@ function RAGIndexPage() {
                     <div
                       key={h.page_id}
                       onClick={() => setSelectedPage(h)}
+                      onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSelectedPage(h) } }}
+                      tabIndex={0}
+                      role="button"
+                      aria-label={`View page ${h.page_number + 1} from ${h.document_name}`}
                       style={{
                         padding: '16px',
                         border: '1px solid var(--border)',
@@ -637,8 +646,9 @@ function RAGIndexPage() {
               >
                 <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 240px', gap: 10 }}>
                   <div>
-                    <label style={{ fontSize: '0.8rem', fontWeight: 500, color: 'var(--fg-muted)', marginBottom: 4, display: 'block' }}>Your question</label>
+                    <label htmlFor="chat-query" style={{ fontSize: '0.8rem', fontWeight: 500, color: 'var(--fg-muted)', marginBottom: 4, display: 'block' }}>Your question</label>
                     <input
+                      id="chat-query"
                       style={inputStyle}
                       placeholder="e.g. ada resep apa saja yang menggunakan ketan putih?"
                       value={chatQuery}
@@ -646,8 +656,9 @@ function RAGIndexPage() {
                     />
                   </div>
                   <div>
-                    <label style={{ fontSize: '0.8rem', fontWeight: 500, color: 'var(--fg-muted)', marginBottom: 4, display: 'block' }}>Context document</label>
+                    <label htmlFor="chat-doc" style={{ fontSize: '0.8rem', fontWeight: 500, color: 'var(--fg-muted)', marginBottom: 4, display: 'block' }}>Context document</label>
                     <select
+                      id="chat-doc"
                       style={inputStyle}
                       value={chatDocId}
                       onChange={(e) => setChatDocId(e.target.value)}
@@ -736,6 +747,10 @@ function RAGIndexPage() {
                           <div
                             key={h.page_id}
                             onClick={() => setSelectedPage(h)}
+                            onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSelectedPage(h) } }}
+                            tabIndex={0}
+                            role="button"
+                            aria-label={`View source: page ${h.page_number + 1} from ${h.document_name}`}
                             style={{
                               padding: '16px',
                               border: '1px solid var(--border)',
@@ -745,7 +760,7 @@ function RAGIndexPage() {
                             }}
                             className="hover:border-zinc-300 dark:hover:border-zinc-700 transition"
                           >
-                            <div style={{ display: 'flex', justifyBetween: 'space-between', fontSize: '0.75rem', color: 'var(--fg-muted)', marginBottom: 8 }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', color: 'var(--fg-muted)', marginBottom: 8 }}>
                               <span style={{ fontWeight: 600, color: 'var(--fg)' }}>{h.document_name}</span>
                               <span>Page {h.page_number + 1} of {h.total_pages}</span>
                             </div>
@@ -780,11 +795,13 @@ function RAGIndexPage() {
                 backdropFilter: 'blur(4px)',
                 padding: '16px',
               }}
-              onClick={(e) => {
-                if (e.target === e.currentTarget) setSelectedDoc(null)
-              }}
+              onClick={(e) => { if (e.target === e.currentTarget) setSelectedDoc(null) }}
+              onKeyDown={(e) => { if (e.key === 'Escape') setSelectedDoc(null) }}
             >
               <div
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="doc-modal-title"
                 style={{
                   background: 'var(--bg)',
                   border: '1px solid var(--border)',
@@ -801,7 +818,7 @@ function RAGIndexPage() {
                 {/* Modal Header */}
                 <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                   <div style={{ minWidth: 0, flex: 1, marginRight: 16 }}>
-                    <h3 style={{ margin: 0, fontWeight: 700, fontSize: '1.1rem', color: 'var(--fg)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontFamily: 'var(--font-heading)' }}>
+                    <h3 id="doc-modal-title" style={{ margin: 0, fontWeight: 700, fontSize: '1.1rem', color: 'var(--fg)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontFamily: 'var(--font-heading)' }}>
                       {selectedDoc.name}
                     </h3>
                     <p style={{ margin: '2px 0 0', fontSize: '0.75rem', color: 'var(--fg-subtle)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
@@ -810,7 +827,8 @@ function RAGIndexPage() {
                   </div>
                   <button
                     onClick={() => setSelectedDoc(null)}
-                    style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--fg-muted)' }}
+                    aria-label="Close document details"
+                    style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--fg-muted)', padding: 8, display: 'flex', alignItems: 'center' }}
                   >
                     <X size={18} />
                   </button>
@@ -844,9 +862,11 @@ function RAGIndexPage() {
                         {selectedDocPages.map((page) => (
                           <div
                             key={page.page_id}
-                            onClick={() => {
-                              setSelectedPage(page)
-                            }}
+                            onClick={() => setSelectedPage(page)}
+                            onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSelectedPage(page) } }}
+                            tabIndex={0}
+                            role="button"
+                            aria-label={`View page ${page.page_number + 1}`}
                             style={{
                               display: 'flex',
                               alignItems: 'center',
@@ -897,7 +917,7 @@ function RAGIndexPage() {
               style={{
                 position: 'fixed',
                 inset: 0,
-                zIndex: 1100, // Show above selectedDoc modal
+                zIndex: 1100,
                 background: 'rgba(0,0,0,0.5)',
                 display: 'flex',
                 alignItems: 'center',
@@ -905,11 +925,13 @@ function RAGIndexPage() {
                 backdropFilter: 'blur(4px)',
                 padding: '16px',
               }}
-              onClick={(e) => {
-                if (e.target === e.currentTarget) setSelectedPage(null)
-              }}
+              onClick={(e) => { if (e.target === e.currentTarget) setSelectedPage(null) }}
+              onKeyDown={(e) => { if (e.key === 'Escape') setSelectedPage(null) }}
             >
               <div
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="page-modal-title"
                 style={{
                   background: 'var(--bg)',
                   border: '1px solid var(--border)',
@@ -926,7 +948,7 @@ function RAGIndexPage() {
                 {/* Modal Header */}
                 <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                   <div style={{ minWidth: 0, flex: 1, marginRight: 16 }}>
-                    <h3 style={{ margin: 0, fontWeight: 700, fontSize: '1.1rem', color: 'var(--fg)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontFamily: 'var(--font-heading)' }}>
+                    <h3 id="page-modal-title" style={{ margin: 0, fontWeight: 700, fontSize: '1.1rem', color: 'var(--fg)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontFamily: 'var(--font-heading)' }}>
                       Page {selectedPage.page_number + 1}
                     </h3>
                     <p style={{ margin: '2px 0 0', fontSize: '0.75rem', color: 'var(--fg-subtle)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
@@ -935,7 +957,8 @@ function RAGIndexPage() {
                   </div>
                   <button
                     onClick={() => setSelectedPage(null)}
-                    style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--fg-muted)' }}
+                    aria-label="Close page details"
+                    style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--fg-muted)', padding: 8, display: 'flex', alignItems: 'center' }}
                   >
                     <X size={18} />
                   </button>

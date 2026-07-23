@@ -30,5 +30,12 @@ dependencies = [
     "python-multipart>=0.0.20",
     "python-pptx>=1.0.2",
     "python-docx>=1.1.2",
+    "langfuse>=2.0.0",
+    "openinference-instrumentation-openai-agents>=0.1.0",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
 ]
 

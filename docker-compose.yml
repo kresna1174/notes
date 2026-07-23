@@ -20,6 +20,24 @@ services:
       timeout: 5s
       retries: 5
 
+  # ChromaDB vector store server
+  chromadb:
+    image: chromadb/chroma:latest
+    container_name: notes-chromadb
+    restart: always
+    ports:
+      - "127.0.0.1:8001:8000"
+    volumes:
+      - chroma_data:/chroma/chroma
+    networks:
+      - notes-network
+    healthcheck:
+      test: ["CMD-SHELL", "true"]
+      interval: 5s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+
   # Redis service used as message broker for Celery sub-agent tasks
   redis:
     image: redis:7-alpine
@@ -51,11 +69,18 @@ services:
       - OPENROUTER_BASE_URL=${OPENROUTER_BASE_URL:-https://openrouter.ai/api/v1}
       - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
       - LOG_DIR=/app/data
+      - CHROMA_HOST=chromadb
+      - CHROMA_PORT=8000
+      - LANGFUSE_PUBLIC_KEY=${LANGFUSE_PUBLIC_KEY:-}
+      - LANGFUSE_SECRET_KEY=${LANGFUSE_SECRET_KEY:-}
+      - LANGFUSE_HOST=${LANGFUSE_HOST:-https://cloud.langfuse.com}
     depends_on:
       postgres:
         condition: service_healthy
       redis:
         condition: service_started
+      chromadb:
+        condition: service_healthy
     networks:
       - notes-network
 
@@ -77,11 +102,18 @@ services:
       - OPENROUTER_MODEL=${OPENROUTER_MODEL:-google/gemini-2.5-flash:free}
       - OPENROUTER_BASE_URL=${OPENROUTER_BASE_URL:-https://openrouter.ai/api/v1}
       - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
+      - CHROMA_HOST=chromadb
+      - CHROMA_PORT=8000
+      - LANGFUSE_PUBLIC_KEY=${LANGFUSE_PUBLIC_KEY:-}
+      - LANGFUSE_SECRET_KEY=${LANGFUSE_SECRET_KEY:-}
+      - LANGFUSE_HOST=${LANGFUSE_HOST:-https://cloud.langfuse.com}
     depends_on:
       postgres:
         condition: service_healthy
       redis:
         condition: service_started
+      chromadb:
+        condition: service_healthy
       ai-agent:
         condition: service_started
     networks:
@@ -127,6 +159,7 @@ services:
 volumes:
   postgres_data:
   redis_data:
+  chroma_data:
   notes_data:
   notes_uploads:
 

@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from 'react'
 import { Sparkles, Check, RefreshCw, Trash2, ArrowRight, Loader2, X, BookOpen, FileText, Paperclip } from 'lucide-react'
 import { marked } from 'marked'
 import { listDocuments } from '#/modules/shared/ragApi'
+import { ClarifyFlow, parseClarifyBlocks, stripClarifyBlocks } from '#/modules/shared/ui/ClarifyFlow'
 
 function AiDraftNodeView({ node, updateAttributes, getPos, editor }: any) {
   const { prompt, status, result, id } = node.attrs
@@ -38,6 +39,8 @@ function AiDraftNodeView({ node, updateAttributes, getPos, editor }: any) {
   const [attachments, setAttachments] = useState<{ filename: string; mimeType: string; filePath: string }[]>([])
   const [isUploadingFile, setIsUploadingFile] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const [clarifyBlocks, setClarifyBlocks] = useState<ReturnType<typeof parseClarifyBlocks>>([])
+  const [pendingPrompt, setPendingPrompt] = useState<string>('')
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files
@@ -252,6 +255,20 @@ function AiDraftNodeView({ node, updateAttributes, getPos, editor }: any) {
         }
       }
 
+      // Check if the streamed text is actually a clarify question
+      const detectedClarify = parseClarifyBlocks(fullText)
+      if (detectedClarify.length > 0 && !pendingToolContent) {
+        const prose = stripClarifyBlocks(fullText)
+        setClarifyBlocks(detectedClarify)
+        setPendingPrompt(activePrompt)
+        updateAttributes({
+          status: 'completed',
+          result: prose ? `<p>${prose}</p>` : ''
+        })
+        setLoading(false)
+        return
+      }
+
       // Final compilation of Markdown to HTML
       let htmlContent = ''
       if (fullText) {
@@ -267,6 +284,7 @@ function AiDraftNodeView({ node, updateAttributes, getPos, editor }: any) {
         throw new Error(streamError)
       }
 
+      setClarifyBlocks([])
       updateAttributes({
         status: 'completed',
         result: htmlContent
@@ -673,7 +691,23 @@ function AiDraftNodeView({ node, updateAttributes, getPos, editor }: any) {
         {/* Generating / Completed Output Area */}
         {status !== 'idle' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-            {/* Render Output */}
+            {/* Clarify flow — shown instead of output when AI needs more info */}
+            {clarifyBlocks.length > 0 && status === 'completed' && (
+              <ClarifyFlow
+                blocks={clarifyBlocks}
+                onComplete={answers => {
+                  const details = clarifyBlocks
+                    .map(b => `${b.question}: ${answers[b.question]}`)
+                    .join('\n')
+                  setClarifyBlocks([])
+                  updateAttributes({ status: 'idle', result: '' })
+                  handleGenerate(`${pendingPrompt}\n\n${details}`)
+                }}
+              />
+            )}
+
+            {/* Render Output — hide when only showing clarify */}
+            {(clarifyBlocks.length === 0 || result) && (
             <div
               className="markdown-content"
               style={{
@@ -693,6 +727,7 @@ function AiDraftNodeView({ node, updateAttributes, getPos, editor }: any) {
                   : result
               }}
             />
+            )}
 
             {/* Generating Footer */}
             {status === 'generating' && (
@@ -702,8 +737,8 @@ function AiDraftNodeView({ node, updateAttributes, getPos, editor }: any) {
               </div>
             )}
 
-            {/* Completed Toolbar */}
-            {status === 'completed' && (
+            {/* Completed Toolbar — hidden while clarify is active */}
+            {status === 'completed' && clarifyBlocks.length === 0 && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', borderTop: '1px solid var(--border)', paddingTop: '12px' }}>
                 {/* Refinement input */}
                 <div style={{ display: 'flex', gap: '8px' }}>

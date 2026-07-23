@@ -21,6 +21,8 @@ class Settings(BaseSettings):
     upload_dir: Path = PROJECT_ROOT / "data/uploads"
     ocr_dir: Path = PROJECT_ROOT / "data/ocr"
     chroma_dir: Path = PROJECT_ROOT / "data/chroma"
+    chroma_host: str = "localhost"
+    chroma_port: int = 8001
 
     mistralai_api_key: str = "Q5XQQHiClhzTDVDvGy3dtZpbuoFq6z4N"
     mistral_ocr_model: str = "mistral-ocr-2512"
@@ -33,6 +35,11 @@ class Settings(BaseSettings):
     openrouter_api_key: str = ""
     openrouter_base_url: str = "https://openrouter.ai/api/v1"
     openrouter_chat_model: str = "google/gemini-2.5-flash"
+
+    # Langfuse observability
+    langfuse_public_key: str = ""
+    langfuse_secret_key: str = ""
+    langfuse_host: str = "https://cloud.langfuse.com"
 
     model_config: ClassVar[SettingsConfigDict] = SettingsConfigDict(
         env_prefix="",
