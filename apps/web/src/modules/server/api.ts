@@ -496,6 +496,25 @@ app.delete('/api/organizations/:id/members/:userId', adminMiddleware, async (c) 
 
 // --- AI SKILLS ENDPOINTS (admin only) ---
 
+function slugify(name: string): string {
+  return name
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    || 'skill'
+}
+
+// Turn a name into a slug that's unique across ai_skills, appending -2, -3, … on collision.
+async function uniqueSkillSlug(name: string): Promise<string> {
+  const base = slugify(name)
+  const existing = await db.select({ slug: aiSkills.slug }).from(aiSkills)
+  const taken = new Set(existing.map(r => r.slug).filter((s): s is string => !!s))
+  if (!taken.has(base)) return base
+  let n = 2
+  while (taken.has(`${base}-${n}`)) n++
+  return `${base}-${n}`
+}
+
 app.get('/api/admin/skills', adminMiddleware, async (c) => {
   const all = await db.select().from(aiSkills).orderBy(desc(aiSkills.updatedAt))
   return c.json(all)
@@ -510,6 +529,7 @@ app.post('/api/admin/skills', adminMiddleware, async (c) => {
   await db.insert(aiSkills).values({
     id,
     name,
+    slug: await uniqueSkillSlug(name),
     description: body.description?.trim() ?? null,
     content: body.content ?? '',
     enabled: body.enabled ?? true,

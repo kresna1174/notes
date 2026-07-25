@@ -117,7 +117,17 @@ async def _build_agent_with_memory(agent_key: str | None, message: str, user_id:
         except Exception as e:
             logger.warning(f"Failed to load user memory: {e}")
 
-    final_instructions = f"{memory_block}\n\n{fresh_instructions}" if memory_block else fresh_instructions
+    # Build skills catalog block (progressive disclosure — content loaded via load_skill)
+    skills_block = ""
+    try:
+        from modules.skills.methods import get_skills_catalog, format_skills_catalog
+        catalog = await get_skills_catalog()
+        skills_block = format_skills_catalog(catalog)
+    except Exception as e:
+        logger.warning(f"Failed to load skills catalog: {e}")
+
+    parts = [p for p in (skills_block, memory_block, fresh_instructions) if p]
+    final_instructions = "\n\n".join(parts)
 
     # Only clone if something changed
     if final_instructions == base_agent.instructions:

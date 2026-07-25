@@ -29,6 +29,7 @@ from modules.chat.tools import (
     query_wiki, ingest_note_to_wiki, read_wiki_index,
     search_knowledge,
     remember_user_fact, forget_user_fact,
+    load_skill,
 )
 
 # ── Shared toolsets ──────────────────────────────────────────────────────────
@@ -146,6 +147,8 @@ parent_agent = Agent(
         *MEMORY_TOOLS,
         search_knowledge,
         execute_python_code,
+        # Progressive-disclosure skills — orchestrator reads the catalog & loads on demand
+        load_skill,
     ],
 )
 

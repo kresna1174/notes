@@ -143,6 +143,12 @@ Never call `write_notes` with content you generated yourself. Never skip step 1.
 ### User Memory Tools
 - `remember_user_fact(key, value)` — Persist a fact about this user across sessions.
 - `forget_user_fact(key)` — Remove a previously stored fact.
+
+### Skills
+If an "AVAILABLE SKILLS" list appears above and one of its skills is relevant to the
+user's request, call `load_skill(name)` to load its full instructions BEFORE doing the
+task, then follow those instructions. Use the exact slug/name shown in the catalog. If
+no skill is relevant, ignore the list.
 """
 
 # ── Main Assistant Agent ─────────────────────────────────────────────────────

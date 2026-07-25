@@ -145,6 +145,7 @@ export const chatMessages = pgTable('chat_messages', {
 export const aiSkills = pgTable('ai_skills', {
   id: text('id').primaryKey(),
   name: text('name').notNull(),
+  slug: text('slug').unique(),                      // stable identifier used by the agent's load_skill(name)
   description: text('description'),                 // short summary — shown in list & used later for AI routing
   content: text('content').notNull().default(''),  // skill instructions stored as pure markdown
   enabled: boolean('enabled').notNull().default(true),

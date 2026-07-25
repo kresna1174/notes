@@ -644,6 +644,25 @@ async def forget_user_fact(ctx: RunContextWrapper[dict], key: str) -> str:
         return tool_error("memory_delete_failed", str(e))
 
 
+# ── Skill tools ───────────────────────────────────────────────────────────────
+
+@function_tool
+async def load_skill(name: str) -> str:
+    """Muat instruksi lengkap sebuah skill dari katalog "AVAILABLE SKILLS".
+
+    Panggil ini SETELAH melihat skill yang relevan di katalog dan SEBELUM
+    mengerjakan tugas, lalu ikuti instruksi skill tersebut.
+
+    Args:
+        name: slug/nama skill persis seperti tertera di katalog "AVAILABLE SKILLS".
+    """
+    from modules.skills.methods import get_skill_content
+    content = await get_skill_content(name)
+    if not content:
+        return tool_error("skill_not_found", f"Skill '{name}' tidak ditemukan atau nonaktif.")
+    return content
+
+
 # ── Wiki tools ────────────────────────────────────────────────────────────────
 
 @function_tool
