@@ -418,7 +418,7 @@ function NotePageComponent() {
           </div>
         ) : isContentVisible ? (
           <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-            <div style={{ flex: 1, overflow: 'hidden', display: 'flex', minHeight: 0 }}>
+            <div style={{ flex: 1, overflow: 'hidden', display: 'flex', minHeight: 0, position: 'relative' }}>
               <Editor
                 key={note.id}
                 note={note}
