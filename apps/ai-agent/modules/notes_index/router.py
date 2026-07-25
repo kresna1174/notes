@@ -1,6 +1,6 @@
 from fastapi import APIRouter
 from pydantic import BaseModel
-from sqlmodel import Session
+from sqlmodel import Session, select
 
 from models.engine import engine
 from modules.notes_index.methods import delete_note_index, hash_content
@@ -14,6 +14,14 @@ class IndexNoteRequest(BaseModel):
     title: str
     content: str
     user_id: str = ""
+
+
+@router.get("")
+def list_indexed_notes():
+    """Return all indexed note_ids."""
+    with Session(engine) as session:
+        rows = session.exec(select(NoteIndex.note_id)).all()
+    return {"note_ids": list(rows)}
 
 
 @router.post("/{note_id}")

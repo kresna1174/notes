@@ -63,21 +63,33 @@ export function ChangePasswordModal({ open, onOpenChange }: ChangePasswordModalP
   const inputStyle: React.CSSProperties = {
     width: '100%',
     boxSizing: 'border-box',
-    padding: '8px 12px',
+    padding: '10px 14px',
     fontSize: '0.875rem',
     fontFamily: 'var(--font-body)',
-    border: '1px solid var(--border)',
-    borderRadius: 7,
+    border: '1px solid rgba(255, 255, 255, 0.08)',
+    borderRadius: 8,
     outline: 'none',
     color: 'var(--fg)',
-    background: 'var(--input-bg)',
+    background: 'var(--bg)',
     marginTop: 4,
+    transition: 'all 0.15s ease',
   }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md p-6 bg-card border">
-        <DialogHeader className="flex flex-row items-center gap-2 border-b pb-4 shrink-0">
+      <DialogContent
+        className="max-w-md"
+        style={{
+          background: 'var(--card-bg)',
+          border: '1px solid rgba(255, 255, 255, 0.1)',
+          borderRadius: 14,
+          padding: 24,
+        }}
+      >
+        <DialogHeader
+          className="flex flex-row items-center gap-2 shrink-0"
+          style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.1)', paddingBottom: 16 }}
+        >
           <div className="w-8 h-8 rounded-lg bg-accent flex items-center justify-center text-primary">
             <KeyRound className="h-4 w-4" />
           </div>
@@ -97,6 +109,8 @@ export function ChangePasswordModal({ open, onOpenChange }: ChangePasswordModalP
               value={oldPassword}
               onChange={e => setOldPassword(e.target.value)}
               placeholder="Enter old password"
+              onFocus={e => e.currentTarget.style.borderColor = 'var(--primary)'}
+              onBlur={e => e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.08)'}
             />
           </div>
 
@@ -109,6 +123,8 @@ export function ChangePasswordModal({ open, onOpenChange }: ChangePasswordModalP
               value={newPassword}
               onChange={e => setNewPassword(e.target.value)}
               placeholder="Enter new password (min 4 characters)"
+              onFocus={e => e.currentTarget.style.borderColor = 'var(--primary)'}
+              onBlur={e => e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.08)'}
             />
           </div>
 
@@ -121,6 +137,8 @@ export function ChangePasswordModal({ open, onOpenChange }: ChangePasswordModalP
               value={confirmPassword}
               onChange={e => setConfirmPassword(e.target.value)}
               placeholder="Repeat new password"
+              onFocus={e => e.currentTarget.style.borderColor = 'var(--primary)'}
+              onBlur={e => e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.08)'}
             />
           </div>
 
@@ -147,9 +165,18 @@ export function ChangePasswordModal({ open, onOpenChange }: ChangePasswordModalP
                 fontFamily: 'var(--font-body)',
                 background: 'var(--bg)',
                 color: 'var(--fg-muted)',
-                border: '1px solid var(--border)',
+                border: '1px solid rgba(255, 255, 255, 0.08)',
                 borderRadius: 7,
                 cursor: 'pointer',
+                transition: 'all 0.15s',
+              }}
+              onMouseEnter={e => {
+                e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.15)'
+                e.currentTarget.style.background = 'var(--muted)'
+              }}
+              onMouseLeave={e => {
+                e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.08)'
+                e.currentTarget.style.background = 'var(--bg)'
               }}
             >
               Cancel

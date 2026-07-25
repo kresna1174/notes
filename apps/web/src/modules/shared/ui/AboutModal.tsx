@@ -18,7 +18,7 @@ export function AboutModal({ open, onOpenChange }: AboutModalProps) {
         showCloseButton={false}
         style={{
           background: 'var(--card-bg)',
-          border: '1px solid var(--border)',
+          border: '1px solid rgba(255, 255, 255, 0.1)',
           borderRadius: 14,
           padding: 24,
         }}
@@ -39,7 +39,7 @@ export function AboutModal({ open, onOpenChange }: AboutModalProps) {
         </button>
         <DialogHeader 
           className="flex flex-row items-center gap-2 shrink-0"
-          style={{ borderBottom: '1px solid var(--border)', paddingBottom: 16 }}
+          style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.1)', paddingBottom: 16 }}
         >
           <div style={{ 
             width: 36, height: 36, borderRadius: 8, 

@@ -84,6 +84,8 @@ async def run_judge(
     try:
         from modules.chat.agent_defs import judge_agent
         from core.prompt import JUDGE_PROMPT
+        from core.langfuse_client import get_prompt
+        from agents import Agent
 
         context_str = _format_context(tool_results or [])
 
@@ -96,8 +98,19 @@ async def run_judge(
         if meta_lines:
             context_str = context_str + "\n\n" + "\n".join(meta_lines)
 
-        prompt = JUDGE_PROMPT.format(question=question, answer=answer, context=context_str)
-        result = await Runner.run(judge_agent, prompt, max_turns=5)
+        fresh_instructions = get_prompt("judge_prompt", fallback=JUDGE_PROMPT)
+        active_judge = judge_agent
+        if fresh_instructions != judge_agent.instructions:
+            active_judge = Agent(
+                name=judge_agent.name,
+                instructions=fresh_instructions,
+                model=judge_agent.model,
+                model_settings=judge_agent.model_settings,
+                tools=judge_agent.tools,
+            )
+
+        prompt = fresh_instructions.format(question=question, answer=answer, context=context_str)
+        result = await Runner.run(active_judge, prompt, max_turns=5)
         raw = result.final_output or ""
 
         scores = _parse_scores(raw)

@@ -3,7 +3,7 @@ import {
   Loader2, RotateCcw, ChevronRight, X, ArrowUp, Paperclip, BookOpen, FileText,
   Image as ImageIcon, Brain, PenLine, FilePlus, Search, Globe, Link, AlignLeft,
   Tag, Code2, List, FileSearch, Youtube, Database, Cpu, Check,
-  NotebookPen, BookMarked, ScrollText, Trash2, MessageCircle,
+  NotebookPen, BookMarked, ScrollText, Trash2, MessageCircle, Maximize2, Minimize2, Minus,
 } from 'lucide-react'
 import { ConfirmDialog } from '#/modules/shared/ui'
 import { useChat } from '@ai-sdk/react'
@@ -28,9 +28,9 @@ interface ChatBotProps {
 // ── Live metrics while streaming ────────────────────────────
 function LiveMetrics() {
   return (
-    <div style={{ marginTop: 6, display: 'flex', alignItems: 'center', gap: 5 }}>
-      <Loader2 className="animate-spin" size={11} color="var(--fg-subtle)" />
-      <span style={{ fontSize: '0.65rem', color: 'var(--fg-subtle)' }}>Thinking...</span>
+    <div style={{ marginTop: 6, display: 'flex', alignItems: 'center', gap: 6 }}>
+      <Loader2 className="animate-spin" size={12} style={{ color: '#ffffff', opacity: 0.8 }} />
+      <span className="animate-pulse" style={{ fontSize: '0.72rem', color: '#ffffff', fontWeight: 500 }}>Thinking...</span>
     </div>
   )
 }
@@ -93,6 +93,7 @@ function ToggleBlock({
   isActive = false,
   children,
   accentColor,
+  noBorder = false,
 }: {
   icon: React.ReactNode
   label: string
@@ -101,6 +102,7 @@ function ToggleBlock({
   isActive?: boolean
   children: React.ReactNode
   accentColor?: string
+  noBorder?: boolean
 }) {
   const [open, setOpen] = useState(defaultOpen)
 
@@ -113,7 +115,7 @@ function ToggleBlock({
         margin: '4px 0',
         borderRadius: 6,
         overflow: 'hidden',
-        border: `1px solid ${borderColor}`,
+        border: noBorder ? 'none' : `1px solid ${borderColor}`,
         transition: 'border-color 0.2s',
       }}
     >
@@ -355,10 +357,11 @@ function ToolCallBlock({ item, noteId, lastUserPrompt }: { item: any; noteId: st
       defaultOpen={isWriteTool}
       isActive={isAnyCallActive}
       accentColor={
-        approvalState === 'approved' ? '#22c55e' :
+        approvalState === 'approved' ? '#10b981' :
         approvalState === 'rejected' ? '#ef4444' :
-        undefined
+        'var(--primary)'
       }
+      noBorder={true}
     >
       {item.calls.map((call: any, callIdx: number) => (
         <div key={callIdx} style={{ marginTop: callIdx > 0 ? 8 : 0, borderTop: callIdx > 0 ? '1px dashed var(--border)' : 'none', paddingTop: callIdx > 0 ? 8 : 0 }}>
@@ -410,7 +413,7 @@ function ToolCallBlock({ item, noteId, lastUserPrompt }: { item: any; noteId: st
                   </button>
                 </div>
               ) : approvalState === 'approved' ? (
-                <span style={{ fontSize: '0.7rem', color: '#22c55e', fontWeight: 500, display: 'flex', alignItems: 'center', gap: 4 }}>
+                <span style={{ fontSize: '0.7rem', color: '#10b981', fontWeight: 500, display: 'flex', alignItems: 'center', gap: 4 }}>
                   <Check size={11} strokeWidth={2.5} />
                   {item.toolName === 'update_note_direct' ? 'Applied directly' : `Applied ${isAuto ? 'automatically' : ''}`}
                 </span>
@@ -442,6 +445,7 @@ export function ChatBot({
   const sessionId = chatSessionId ?? (isRagMode ? 'rag-global' : (noteId ?? 'default'))
   const [fetchingHistory, setFetchingHistory] = useState(true)
   const [inputValue, setInputValue] = useState('')
+  const [isMaximize, setIsMaximize] = useState(fullWidth)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const noteStateRef = useRef({ noteId, noteTitle, noteContent })
@@ -460,6 +464,7 @@ export function ChatBot({
   const [mentionIndex, setMentionIndex] = useState<number>(0)
   const [mentionTriggerIndex, setMentionTriggerIndex] = useState<number>(-1)
   const [showClearConfirm, setShowClearConfirm] = useState(false)
+  const [isInputFocused, setIsInputFocused] = useState(false)
 
 
   useEffect(() => {
@@ -758,18 +763,68 @@ export function ChatBot({
 
   return (
     <>
-    <div
-      style={{
-        ...(fullWidth ? { flex: 1 } : { width: '360px', borderLeft: '1px solid var(--border)', flexShrink: 0 }),
-        background: 'var(--bg)',
-        display: 'flex',
-        flexDirection: 'column',
-        height: '100%',
-        minHeight: 0,
-        overflow: 'hidden',
-        fontFamily: 'var(--font-body)',
-      }}
-    >
+      {isMaximize && !fullWidth && (
+        <div
+          onClick={() => setIsMaximize(false)}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0,0,0,0.6)',
+            backdropFilter: 'blur(8px)',
+            WebkitBackdropFilter: 'blur(8px)',
+            zIndex: 9998,
+          }}
+        />
+      )}
+      <div
+        style={{
+          ...(isMaximize ? (
+            fullWidth ? {
+              flex: 1,
+              zIndex: 40,
+              background: isRagMode ? '#121214' : 'var(--bg)',
+            } : {
+              position: 'fixed',
+              top: '50%',
+              left: '50%',
+              transform: 'translate(-50%, -50%)',
+              width: '900px',
+              maxWidth: '92vw',
+              height: '80vh',
+              maxHeight: '90vh',
+              borderRadius: '20px',
+              border: '1px solid var(--border)',
+              boxShadow: '0 30px 80px rgba(0,0,0,0.65)',
+              background: 'color-mix(in srgb, var(--card-bg) 85%, transparent)',
+              backdropFilter: 'blur(30px)',
+              WebkitBackdropFilter: 'blur(30px)',
+              zIndex: 9999,
+              flexShrink: 0,
+            }
+          ) : {
+            position: 'absolute',
+            right: '16px',
+            top: '76px',
+            bottom: '16px',
+            width: '380px',
+            borderRadius: '16px',
+            border: '1px solid var(--border)',
+            boxShadow: '0 20px 50px rgba(0,0,0,0.5)',
+            background: 'color-mix(in srgb, var(--card-bg) 85%, transparent)',
+            backdropFilter: 'blur(20px)',
+            WebkitBackdropFilter: 'blur(20px)',
+            zIndex: 40,
+            flexShrink: 0,
+          }),
+          display: 'flex',
+          flexDirection: 'column',
+          height: isMaximize ? (fullWidth ? '100%' : '80vh') : 'calc(100% - 92px)',
+          minHeight: 0,
+          overflow: 'hidden',
+          fontFamily: 'var(--font-body)',
+          transition: 'width 0.2s ease, height 0.2s ease, transform 0.2s ease',
+        }}
+      >
       {/* ── Header ── */}
       <div
         style={{
@@ -806,15 +861,24 @@ export function ChatBot({
           >
             <RotateCcw size={13} />
           </button>
-          {!isRagMode && onClose && (
+          <button
+            onClick={() => setIsMaximize(!isMaximize)}
+            title={isMaximize ? "Exit full screen" : "Full screen"}
+            style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--fg-subtle)', padding: '4px', borderRadius: 4, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+            onMouseEnter={e => { e.currentTarget.style.color = 'var(--fg-muted)'; e.currentTarget.style.background = 'var(--muted)' }}
+            onMouseLeave={e => { e.currentTarget.style.color = 'var(--fg-subtle)'; e.currentTarget.style.background = 'none' }}
+          >
+            {isMaximize ? <Minimize2 size={13} /> : <Maximize2 size={13} />}
+          </button>
+          {onClose && (
             <button
               onClick={onClose}
-              title="Close"
+              title="Minimize to side"
               style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--fg-subtle)', padding: '4px', borderRadius: 4, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
               onMouseEnter={e => { e.currentTarget.style.color = 'var(--fg-muted)'; e.currentTarget.style.background = 'var(--muted)' }}
               onMouseLeave={e => { e.currentTarget.style.color = 'var(--fg-subtle)'; e.currentTarget.style.background = 'none' }}
             >
-              <X size={13} />
+              <Minus size={13} />
             </button>
           )}
         </div>
@@ -900,8 +964,8 @@ export function ChatBot({
                             gap: 8,
                             padding: '8px 12px',
                             borderRadius: 8,
-                            background: 'rgba(59, 130, 246, 0.08)',
-                            border: '1px solid rgba(59, 130, 246, 0.2)',
+                            background: 'rgba(16, 185, 129, 0.08)',
+                            border: '1px solid rgba(16, 185, 129, 0.15)',
                             fontSize: '0.74rem',
                             color: 'var(--primary)',
                             alignSelf: 'flex-end',
@@ -1057,19 +1121,8 @@ export function ChatBot({
                 {/* Thinking indicator */}
                 {!hasText && isMessageLoading && (
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
-                    {hasReasoning ? (
-                      <span style={{ fontSize: '0.78rem', color: 'var(--fg-subtle)', fontStyle: 'italic' }}>Formulating answer…</span>
-                    ) : (
-                      <div style={{ display: 'flex', gap: 3, alignItems: 'center' }}>
-                        {[0, 0.18, 0.36].map((delay, i) => (
-                          <span
-                            key={i}
-                            className="dot-blink"
-                            style={{ width: 5, height: 5, borderRadius: '50%', background: 'var(--fg-subtle)', display: 'inline-block', animationDelay: `${delay}s` }}
-                          />
-                        ))}
-                      </div>
-                    )}
+                    <Loader2 className="animate-spin" size={14} style={{ color: '#ffffff', opacity: 0.8 }} />
+                    <span className="animate-pulse" style={{ fontSize: '0.78rem', color: '#ffffff', fontWeight: 500 }}>Thinking...</span>
                   </div>
                 )}
 
@@ -1090,7 +1143,8 @@ export function ChatBot({
                       label={isMessageLoading && !hasText ? 'Thinking…' : 'Reasoning'}
                       defaultOpen={false}
                       isActive={isMessageLoading && !hasText}
-                      accentColor={isMessageLoading && !hasText ? undefined : 'var(--fg-muted)'}
+                      accentColor="var(--primary)"
+                      noBorder={true}
                     >
                       <div style={{ whiteSpace: 'pre-wrap', fontSize: '0.7rem', lineHeight: 1.55, color: 'var(--fg)', maxHeight: 220, overflowY: 'auto' }}>
                         {reasoningParts.map((p: any) => (p.text || '').replace(/^\[Subagent:[^\]]+\]\n/, '').trim()).filter(Boolean).join('\n\n') || 'Starting thinking process…'}
@@ -1147,10 +1201,9 @@ export function ChatBot({
 
         {/* Loading spinner when no assistant message yet */}
         {isLoading && (messages.length === 0 || messages[messages.length - 1].role === 'user') && (
-          <div style={{ display: 'flex', gap: 3, alignItems: 'center', marginBottom: 16 }}>
-            {[0, 0.18, 0.36].map((delay, i) => (
-              <span key={i} className="dot-blink" style={{ width: 5, height: 5, borderRadius: '50%', background: 'var(--fg-subtle)', display: 'inline-block', animationDelay: `${delay}s` }} />
-            ))}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 16 }}>
+            <Loader2 className="animate-spin" size={14} style={{ color: '#ffffff', opacity: 0.8 }} />
+            <span className="animate-pulse" style={{ fontSize: '0.78rem', color: '#ffffff', fontWeight: 500 }}>Thinking...</span>
           </div>
         )}
 
@@ -1264,7 +1317,7 @@ export function ChatBot({
                       padding: '6px 8px',
                       fontSize: '0.74rem',
                       color: isReferenced ? 'var(--fg-subtle)' : 'var(--fg)',
-                      background: isSelected ? 'rgba(59, 130, 246, 0.08)' : 'none',
+                      background: isSelected ? 'rgba(16, 185, 129, 0.1)' : 'none',
                       border: 'none',
                       borderRadius: 4,
                       cursor: isReferenced ? 'default' : 'pointer',
@@ -1395,8 +1448,8 @@ export function ChatBot({
                   gap: 4,
                   padding: '4px 8px',
                   borderRadius: 6,
-                  background: 'rgba(59, 130, 246, 0.08)',
-                  border: '1px solid rgba(59, 130, 246, 0.2)',
+                  background: 'rgba(16, 185, 129, 0.08)',
+                  border: '1px solid rgba(16, 185, 129, 0.15)',
                   fontSize: '0.72rem',
                   color: 'var(--primary)',
                 }}
@@ -1425,18 +1478,22 @@ export function ChatBot({
 
         <div
           style={{
-            border: '1px solid var(--border)',
+            border: isInputFocused ? '1px solid var(--primary)' : '1px solid var(--border)',
+            boxShadow: isInputFocused ? '0 0 0 2px var(--accent)' : 'none',
             borderRadius: 8,
             background: 'var(--input-bg)',
             display: 'flex',
             flexDirection: 'column',
             overflow: 'hidden',
+            transition: 'border-color 0.15s ease, box-shadow 0.15s ease',
           }}
         >
           <textarea
             ref={textareaRef}
             value={inputValue}
             onChange={e => handleTextareaChange(e.target.value, e.target.selectionStart)}
+            onFocus={() => setIsInputFocused(true)}
+            onBlur={() => setIsInputFocused(false)}
             onPaste={async (e) => {
               const files = e.clipboardData.files
               if (files && files.length > 0) {

@@ -528,9 +528,10 @@ async def chat_event_generator(message: str, session_id: str, user_id: str | Non
         if text_open:
             yield sse({"type": "text-end", "id": current_text_id})
 
-        # Dispatch LLM-as-judge in background
+        # Dispatch LLM-as-judge in background (skip utility agents — no conversational Q&A to score)
+        _JUDGE_SKIP_AGENTS = {"SummarizerSubAgent", "TaggerSubAgent", "TranslatorSubAgent"}
         final_answer = "".join(final_output_parts)
-        if final_answer:
+        if final_answer and agent.name not in _JUDGE_SKIP_AGENTS:
             from modules.judge.methods import run_judge
             asyncio.create_task(run_judge(message, final_answer, trace_id, judge_tool_results, note_id, session_id))
 

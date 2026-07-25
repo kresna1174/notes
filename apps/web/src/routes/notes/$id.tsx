@@ -3,7 +3,7 @@ import { Sidebar } from '#/modules/sidebar'
 import { Editor, PinLockModal, VersionHistory, SearchPalette } from '#/modules/editor'
 import { ChatBot } from '#/modules/chat'
 import { useState, useEffect } from 'react'
-import { Check, Loader2, Circle, PanelLeftClose, PanelLeftOpen, Database } from 'lucide-react'
+import { Check, Loader2, Circle, PanelLeftClose, PanelLeftOpen, Database, AlertTriangle } from 'lucide-react'
 
 export const Route = createFileRoute('/notes/$id')({
   loader: async ({ params }) => {
@@ -80,6 +80,9 @@ function IndexButton({
   sidebarOpen,
   isMobile,
   historyOpen,
+  onIndexSuccess,
+  setNotification,
+  setIndexingNoteIds,
 }: {
   noteId: string
   noteTitle: string
@@ -88,6 +91,9 @@ function IndexButton({
   sidebarOpen: boolean
   isMobile: boolean
   historyOpen: boolean
+  onIndexSuccess?: () => void
+  setNotification: (notif: any) => void
+  setIndexingNoteIds: React.Dispatch<React.SetStateAction<Set<string>>>
 }) {
   const [status, setStatus] = useState<IndexStatus>('idle')
 
@@ -99,6 +105,19 @@ function IndexButton({
   const handleIndex = async () => {
     if (isDisabled) return
     setStatus('indexing')
+    setIndexingNoteIds(prev => {
+      const next = new Set(prev)
+      next.add(noteId)
+      return next
+    })
+    
+    setNotification({
+      id: noteId,
+      title: 'Indexing Note',
+      message: `Extracting knowledge points from "${noteTitle}"...`,
+      type: 'loading'
+    })
+
     try {
       const res = await fetch(`/api/ai/notes-index/${noteId}`, {
         method: 'POST',
@@ -106,11 +125,103 @@ function IndexButton({
         body: JSON.stringify({ title: noteTitle, content: noteContent, user_id: '' }),
       })
       if (!res.ok) throw new Error('Failed')
-      setStatus('indexed')
+      const data = await res.json()
+
+      if (data.status === 'already_indexed') {
+        setStatus('indexed')
+        setIndexingNoteIds(prev => {
+          const next = new Set(prev)
+          next.delete(noteId)
+          return next
+        })
+        setNotification({
+          id: noteId,
+          title: 'Indexed Successfully',
+          message: `"${noteTitle}" is already indexed.`,
+          type: 'success'
+        })
+        onIndexSuccess?.()
+        setTimeout(() => {
+          setStatus('idle')
+          setNotification(prev => prev?.id === noteId ? null : prev)
+        }, 3000)
+        return
+      }
+
+      // Poll note status from database
+      let attempts = 0
+      const maxAttempts = 30 // 60s max
+      const pollInterval = setInterval(async () => {
+        attempts++
+        try {
+          const checkRes = await fetch('/api/ai/notes-index')
+          if (checkRes.ok) {
+            const checkData = await checkRes.json()
+            const indexedIds = Array.isArray(checkData?.note_ids) ? checkData.note_ids : []
+            if (indexedIds.includes(noteId)) {
+              clearInterval(pollInterval)
+              setStatus('indexed')
+              setIndexingNoteIds(prev => {
+                const next = new Set(prev)
+                next.delete(noteId)
+                return next
+              })
+              setNotification({
+                id: noteId,
+                title: 'Indexing Complete',
+                message: `"${noteTitle}" has been successfully added to RAG database.`,
+                type: 'success'
+              })
+              onIndexSuccess?.()
+              setTimeout(() => {
+                setStatus('idle')
+                setNotification(prev => prev?.id === noteId ? null : prev)
+              }, 4000)
+              return
+            }
+          }
+        } catch (e) {
+          console.error('Error polling note index status:', e)
+        }
+
+        if (attempts >= maxAttempts) {
+          clearInterval(pollInterval)
+          setStatus('error')
+          setIndexingNoteIds(prev => {
+            const next = new Set(prev)
+            next.delete(noteId)
+            return next
+          })
+          setNotification({
+            id: noteId,
+            title: 'Indexing Failed',
+            message: `Timeout indexing "${noteTitle}". Please try again.`,
+            type: 'error'
+          })
+          setTimeout(() => {
+            setStatus('idle')
+            setNotification(prev => prev?.id === noteId ? null : prev)
+          }, 4000)
+        }
+      }, 2000)
+
     } catch {
       setStatus('error')
-    } finally {
-      setTimeout(() => setStatus('idle'), 3000)
+      setIndexingNoteIds(prev => {
+        const next = new Set(prev)
+        next.delete(noteId)
+        return next
+      })
+      setNotification({
+        id: noteId,
+        title: 'Indexing Failed',
+        message: `Could not index "${noteTitle}".`,
+        type: 'error'
+      })
+      setTimeout(() => {
+        setStatus('idle')
+        setNotification(prev => prev?.id === noteId ? null : prev)
+      }, 4000)
     }
   }
 
@@ -179,6 +290,13 @@ function NotePageComponent() {
   const [chatOpen, setChatOpen] = useState(false)
   const [historyOpen, setHistoryOpen] = useState(false)
   const [showSearchPalette, setShowSearchPalette] = useState(false)
+  const [indexingNoteIds, setIndexingNoteIds] = useState<Set<string>>(new Set())
+  const [notification, setNotification] = useState<{
+    id: string
+    title: string
+    message: string
+    type: 'loading' | 'success' | 'error'
+  } | null>(null)
 
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
@@ -252,6 +370,7 @@ function NotePageComponent() {
         <Sidebar
           activeNoteId={id}
           notesUpdateTrigger={notesUpdateTrigger}
+          indexingNoteIds={indexingNoteIds}
           onShareNote={(noteId) => {
             if (noteId === id) {
               setShareTrigger(prev => prev + 1)
@@ -299,7 +418,7 @@ function NotePageComponent() {
           </div>
         ) : isContentVisible ? (
           <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-            <div style={{ flex: 1, overflow: 'hidden', display: 'flex', minHeight: 0 }}>
+            <div style={{ flex: 1, overflow: 'hidden', display: 'flex', minHeight: 0, position: 'relative' }}>
               <Editor
                 key={note.id}
                 note={note}
@@ -368,10 +487,91 @@ function NotePageComponent() {
               sidebarOpen={chatOpen}
               isMobile={isMobile}
               historyOpen={historyOpen}
+              onIndexSuccess={() => setNotesUpdateTrigger(prev => prev + 1)}
+              setNotification={setNotification}
+              setIndexingNoteIds={setIndexingNoteIds}
             />
           </>
         )}
       </main>
+
+      <style>{`
+        @keyframes slideIn {
+          from { transform: translateX(120%); opacity: 0; }
+          to { transform: translateX(0); opacity: 1; }
+        }
+        @keyframes loadingProgress {
+          from { width: 0%; }
+          to { width: 90%; }
+        }
+      `}</style>
+
+      {notification && (
+        <div
+          style={{
+            position: 'absolute',
+            top: 24,
+            right: 24,
+            zIndex: 100,
+            width: 320,
+            background: 'var(--save-bg)',
+            backdropFilter: 'blur(12px)',
+            WebkitBackdropFilter: 'blur(12px)',
+            border: '1px solid var(--border)',
+            borderRadius: 12,
+            padding: '14px 16px',
+            boxShadow: '0 10px 25px -5px rgba(0,0,0,0.1), 0 8px 10px -6px rgba(0,0,0,0.1)',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 8,
+            animation: 'slideIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards',
+            fontFamily: 'var(--font-body)',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'start', gap: 10 }}>
+            {notification.type === 'loading' && (
+              <Loader2 size={18} className="animate-spin" style={{ color: 'var(--primary)', marginTop: 2 }} />
+            )}
+            {notification.type === 'success' && (
+              <Check size={18} style={{ color: '#22c55e', marginTop: 2 }} />
+            )}
+            {notification.type === 'error' && (
+              <AlertTriangle size={18} style={{ color: '#ef4444', marginTop: 2 }} />
+            )}
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <h4 style={{ margin: 0, fontSize: '0.85rem', fontWeight: 600, color: 'var(--fg)' }}>{notification.title}</h4>
+              <p style={{ margin: '2px 0 0 0', fontSize: '0.75rem', color: 'var(--fg-muted)', lineHeight: 1.3 }}>{notification.message}</p>
+            </div>
+            <button
+              onClick={() => setNotification(null)}
+              style={{
+                background: 'transparent',
+                border: 'none',
+                color: 'var(--fg-subtle)',
+                cursor: 'pointer',
+                padding: 0,
+                lineHeight: 1,
+                fontSize: '0.85rem'
+              }}
+            >
+              ×
+            </button>
+          </div>
+          
+          {/* Progress Bar */}
+          <div style={{ width: '100%', height: 3, background: 'var(--border)', borderRadius: 2, overflow: 'hidden', marginTop: 4 }}>
+            <div
+              style={{
+                height: '100%',
+                background: notification.type === 'success' ? '#22c55e' : notification.type === 'error' ? '#ef4444' : 'var(--primary)',
+                width: notification.type === 'success' ? '100%' : notification.type === 'error' ? '100%' : 'initial',
+                animation: notification.type === 'loading' ? 'loadingProgress 6s linear forwards' : 'none',
+                transition: 'width 0.3s ease, background-color 0.3s ease',
+              }}
+            />
+          </div>
+        </div>
+      )}
 
       {showUnlockModal && (
         <PinLockModal
