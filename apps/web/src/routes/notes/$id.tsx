@@ -92,7 +92,7 @@ function IndexButton({
   isMobile: boolean
   historyOpen: boolean
   onIndexSuccess?: () => void
-  setNotification: (notif: any) => void
+  setNotification: React.Dispatch<React.SetStateAction<{ id: string; title: string; message: string; type: 'error' | 'success' | 'loading' } | null>>
   setIndexingNoteIds: React.Dispatch<React.SetStateAction<Set<string>>>
 }) {
   const [status, setStatus] = useState<IndexStatus>('idle')
@@ -110,7 +110,7 @@ function IndexButton({
       next.add(noteId)
       return next
     })
-    
+
     setNotification({
       id: noteId,
       title: 'Indexing Note',
@@ -148,62 +148,86 @@ function IndexButton({
         return
       }
 
-      // Poll note status from database
-      let attempts = 0
-      const maxAttempts = 30 // 60s max
+      // Poll Celery task status directly — no arbitrary timeout, truly async
+      const taskId: string | undefined = data.task_id
+      if (!taskId) {
+        // Fallback: no task_id returned, assume queued and done after a delay
+        setTimeout(() => {
+          setStatus('indexed')
+          setIndexingNoteIds(prev => { const next = new Set(prev); next.delete(noteId); return next })
+          setNotification({ id: noteId, title: 'Indexing Complete', message: `"${noteTitle}" queued for indexing.`, type: 'success' })
+          onIndexSuccess?.()
+          setTimeout(() => { setStatus('idle'); setNotification(prev => prev?.id === noteId ? null : prev) }, 4000)
+        }, 5000)
+        return
+      }
+
       const pollInterval = setInterval(async () => {
-        attempts++
         try {
-          const checkRes = await fetch('/api/ai/notes-index')
-          if (checkRes.ok) {
-            const checkData = await checkRes.json()
-            const indexedIds = Array.isArray(checkData?.note_ids) ? checkData.note_ids : []
-            if (indexedIds.includes(noteId)) {
-              clearInterval(pollInterval)
-              setStatus('indexed')
-              setIndexingNoteIds(prev => {
-                const next = new Set(prev)
-                next.delete(noteId)
-                return next
-              })
-              setNotification({
-                id: noteId,
-                title: 'Indexing Complete',
-                message: `"${noteTitle}" has been successfully added to RAG database.`,
-                type: 'success'
-              })
-              onIndexSuccess?.()
-              setTimeout(() => {
-                setStatus('idle')
-                setNotification(prev => prev?.id === noteId ? null : prev)
-              }, 4000)
-              return
-            }
+          const statusRes = await fetch(`/api/ai/notes-index/task-status/${taskId}`)
+          if (!statusRes.ok) return // transient error, keep polling
+
+          const statusData = await statusRes.json()
+          const state: string = statusData.state ?? 'PENDING'
+
+          if (state === 'SUCCESS') {
+            clearInterval(pollInterval)
+            setStatus('indexed')
+            setIndexingNoteIds(prev => {
+              const next = new Set(prev)
+              next.delete(noteId)
+              return next
+            })
+            const chunks: number = statusData.result?.chunks ?? 0
+            setNotification({
+              id: noteId,
+              title: 'Indexing Complete',
+              message: `"${noteTitle}" indexed — ${chunks} knowledge chunk${chunks !== 1 ? 's' : ''} stored.`,
+              type: 'success'
+            })
+            onIndexSuccess?.()
+            setTimeout(() => {
+              setStatus('idle')
+              setNotification(prev => prev?.id === noteId ? null : prev)
+            }, 4000)
+            return
+          }
+
+          if (state === 'FAILURE') {
+            clearInterval(pollInterval)
+            setStatus('error')
+            setIndexingNoteIds(prev => {
+              const next = new Set(prev)
+              next.delete(noteId)
+              return next
+            })
+            setNotification({
+              id: noteId,
+              title: 'Indexing Failed',
+              message: `Failed to index "${noteTitle}". ${statusData.error ?? ''}`.trim(),
+              type: 'error'
+            })
+            setTimeout(() => {
+              setStatus('idle')
+              setNotification(prev => prev?.id === noteId ? null : prev)
+            }, 5000)
+            return
+          }
+
+          // PENDING / STARTED / RETRY — still running, update message
+          if (state === 'STARTED') {
+            setNotification({
+              id: noteId,
+              title: 'Indexing Note',
+              message: `Processing "${noteTitle}"...`,
+              type: 'loading'
+            })
           }
         } catch (e) {
-          console.error('Error polling note index status:', e)
+          console.error('Error polling task status:', e)
+          // Keep polling — transient network error
         }
-
-        if (attempts >= maxAttempts) {
-          clearInterval(pollInterval)
-          setStatus('error')
-          setIndexingNoteIds(prev => {
-            const next = new Set(prev)
-            next.delete(noteId)
-            return next
-          })
-          setNotification({
-            id: noteId,
-            title: 'Indexing Failed',
-            message: `Timeout indexing "${noteTitle}". Please try again.`,
-            type: 'error'
-          })
-          setTimeout(() => {
-            setStatus('idle')
-            setNotification(prev => prev?.id === noteId ? null : prev)
-          }, 4000)
-        }
-      }, 2000)
+      }, 3000)
 
     } catch {
       setStatus('error')
@@ -224,6 +248,7 @@ function IndexButton({
       }, 4000)
     }
   }
+
 
   const color =
     status === 'indexed' ? '#22c55e' :
