@@ -5,7 +5,6 @@ import { NoteTree } from './NoteTree'
 import { SearchBar } from './SearchBar'
 import { Plus, LogOut, Users, Shield, Eye, Info, Menu, X, KeyRound, Brain, ChevronDown, Check, FileStack, Settings } from 'lucide-react'
 import { FontPicker } from './FontPicker'
-import { ThemeToggle } from './ThemeToggle'
 import { useAuth } from '../shared/auth'
 import { useIsDesktop } from '../shared'
 import { AboutModal } from '../auth'
@@ -238,7 +237,6 @@ export function Sidebar({ activeNoteId, onShareNote, notesUpdateTrigger, indexin
             <span className="text-sm font-semibold" style={{ color: C.fg, letterSpacing: '-0.01em', fontFamily: 'var(--font-heading)' }}>Mindspace</span>
           </div>
           <div className="flex items-center gap-1">
-            <ThemeToggle />
             <FontPicker />
             {isMobile && (
               <button

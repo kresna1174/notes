@@ -2,7 +2,7 @@ import { createFileRoute, useNavigate, useSearch } from '@tanstack/react-router'
 import { useState } from 'react'
 import { useAuth } from '#/modules/shared/auth'
 import { useTheme } from '#/modules/shared/theme'
-import { Eye, EyeOff, Sun, Moon, Brain, Check, AlertTriangle, Loader2 } from 'lucide-react'
+import { Eye, EyeOff, Brain, Check, AlertTriangle, Loader2 } from 'lucide-react'
 import { AboutModal } from '#/modules/auth'
 import { authClient } from '#/modules/shared/auth-client'
 
@@ -17,7 +17,7 @@ function LoginPage() {
   const { login, user } = useAuth()
   const navigate = useNavigate()
   const search = useSearch({ from: '/login/' })
-  const { theme, toggle } = useTheme()
+  const { theme } = useTheme()
   const [isRegister, setIsRegister] = useState(false)
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
@@ -113,39 +113,6 @@ function LoginPage() {
         background: 'var(--bg-app)',
       }}
     >
-      {/* Floating Theme Toggle */}
-      <button
-        onClick={toggle}
-        aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
-        style={{
-          position: 'absolute',
-          top: 20,
-          right: 20,
-          zIndex: 100,
-          background: 'color-mix(in srgb, var(--card-bg) 80%, transparent)',
-          backdropFilter: 'blur(8px)',
-          border: '1px solid var(--border)',
-          borderRadius: 10,
-          padding: 10,
-          cursor: 'pointer',
-          color: 'var(--fg)',
-          boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          transition: 'transform 0.15s, background-color 0.15s',
-        }}
-        onMouseEnter={e => {
-          e.currentTarget.style.transform = 'scale(1.05)'
-          e.currentTarget.style.background = 'var(--muted)'
-        }}
-        onMouseLeave={e => {
-          e.currentTarget.style.transform = 'scale(1)'
-          e.currentTarget.style.background = 'color-mix(in srgb, var(--card-bg) 80%, transparent)'
-        }}
-      >
-        {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
-      </button>
 
       {/* Left Panel — Image with overlay */}
       <div
