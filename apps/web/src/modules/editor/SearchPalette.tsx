@@ -126,11 +126,12 @@ export function SearchPalette({ onClose, onSelectNote }: SearchPaletteProps) {
         style={{
           width: '600px',
           maxWidth: '90%',
-          background: 'rgba(30, 30, 50, 0.85)',
-          backdropFilter: 'blur(20px)',
-          border: '1px solid rgba(255, 255, 255, 0.08)',
+          background: 'color-mix(in srgb, var(--card-bg) 75%, transparent)',
+          backdropFilter: 'blur(35px) saturate(1.8)',
+          WebkitBackdropFilter: 'blur(35px) saturate(1.8)',
+          border: '1px solid var(--border)',
           borderRadius: '16px',
-          boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.1)',
+          boxShadow: '0 30px 60px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.08)',
           display: 'flex',
           flexDirection: 'column',
           overflow: 'hidden',
@@ -140,8 +141,8 @@ export function SearchPalette({ onClose, onSelectNote }: SearchPaletteProps) {
         }}
       >
         {/* Search Input Area */}
-        <div style={{ display: 'flex', alignItems: 'center', padding: '16px 20px', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-          <Search size={18} style={{ color: 'var(--fg-muted)', marginRight: 12 }} />
+        <div style={{ display: 'flex', alignItems: 'center', padding: '18px 24px', borderBottom: '1px solid var(--border)' }}>
+          <Search size={22} style={{ color: 'var(--fg-muted)', marginRight: 16 }} />
           <input
             ref={inputRef}
             value={query}
@@ -152,11 +153,23 @@ export function SearchPalette({ onClose, onSelectNote }: SearchPaletteProps) {
               background: 'transparent',
               border: 'none',
               outline: 'none',
-              color: '#ffffff',
-              fontSize: '1.05rem',
+              color: 'var(--fg)',
+              fontSize: '1.25rem',
+              fontWeight: 400,
+              letterSpacing: '-0.015em',
             }}
           />
-          <div style={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.4)', background: 'rgba(255,255,255,0.08)', padding: '2px 6px', borderRadius: 4 }}>
+          <div style={{
+            fontSize: '0.65rem',
+            fontWeight: 600,
+            color: 'var(--fg-muted)',
+            background: 'var(--muted)',
+            border: '1px solid var(--border)',
+            borderRadius: '6px',
+            padding: '3px 8px',
+            boxShadow: '0 1px 1px rgba(0,0,0,0.05)',
+            letterSpacing: '0.02em',
+          }}>
             ESC
           </div>
         </div>
@@ -166,7 +179,7 @@ export function SearchPalette({ onClose, onSelectNote }: SearchPaletteProps) {
           {itemsToShow.length > 0 ? (
             <>
               {!query.trim() && (
-                <div style={{ padding: '8px 12px 4px 12px', fontSize: '0.725rem', fontWeight: 600, color: '#a855f7', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                <div style={{ padding: '8px 12px 4px 12px', fontSize: '0.725rem', fontWeight: 600, color: '#10b981', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                   Recent Notes
                 </div>
               )}
@@ -184,29 +197,29 @@ export function SearchPalette({ onClose, onSelectNote }: SearchPaletteProps) {
                       padding: '10px 14px',
                       borderRadius: '10px',
                       cursor: 'pointer',
-                      background: isActive ? 'rgba(168, 85, 247, 0.15)' : 'transparent',
-                      border: isActive ? '1px solid rgba(168, 85, 247, 0.3)' : '1px solid transparent',
+                      background: isActive ? 'rgba(16, 185, 129, 0.12)' : 'transparent',
+                      border: isActive ? '1px solid rgba(16, 185, 129, 0.25)' : '1px solid transparent',
                       transition: 'all 0.15s ease',
                       marginBottom: 4,
                     }}
                   >
                     <div style={{ marginRight: 12, display: 'flex', alignItems: 'center', width: 16, height: 16, justifyContent: 'center' }}>
-                      {item.icon ? <NoteIcon icon={item.icon} size={16} /> : <FileText size={16} style={{ color: isActive ? '#c084fc' : 'var(--fg-muted)' }} />}
+                      {item.icon ? <NoteIcon icon={item.icon} size={16} /> : <FileText size={16} style={{ color: isActive ? '#10b981' : 'var(--fg-muted)' }} />}
                     </div>
                     
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontWeight: 500, color: isActive ? '#ffffff' : 'rgba(255,255,255,0.9)', fontSize: '0.875rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      <div style={{ fontWeight: 500, color: 'var(--fg)', fontSize: '0.875rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                         {item.title || 'Untitled'}
                       </div>
                       {item.snippet && (
-                        <div style={{ fontSize: '0.75rem', color: isActive ? 'rgba(255,255,255,0.6)' : 'rgba(255,255,255,0.4)', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        <div style={{ fontSize: '0.75rem', color: 'var(--fg-muted)', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                           {item.snippet}
                         </div>
                       )}
                     </div>
 
                     {isActive && (
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 4, color: '#c084fc', fontSize: '0.7rem' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 4, color: '#10b981', fontSize: '0.7rem' }}>
                         <CornerDownLeft size={10} />
                         <span>Open</span>
                       </div>
@@ -216,7 +229,7 @@ export function SearchPalette({ onClose, onSelectNote }: SearchPaletteProps) {
               })}
             </>
           ) : (
-            <div style={{ padding: '32px 16px', textAlign: 'center', color: 'rgba(255,255,255,0.4)', fontSize: '0.85rem' }}>
+            <div style={{ padding: '32px 16px', textAlign: 'center', color: 'var(--fg-muted)', fontSize: '0.85rem' }}>
               {loading ? 'Searching...' : 'No results found.'}
             </div>
           )}
