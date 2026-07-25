@@ -1,7 +1,7 @@
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { createReadStream } from 'node:fs'
 import { db, initDb } from '../shared/db'
-import { notes, attachments, users, organizations, userOrganizations, noteHistory, chatSessions, chatMessages, betterAuthAccount, passwordResetTokens } from '../../../drizzle/schema'
+import { notes, attachments, users, organizations, userOrganizations, noteHistory, chatSessions, chatMessages, betterAuthAccount, passwordResetTokens, aiSkills } from '../../../drizzle/schema'
 import { desc, eq, and, sql, or, inArray } from 'drizzle-orm'
 import { randomUUID } from 'crypto'
 import { saveFile, getFilePath, deleteFile } from '../shared/storage'
@@ -491,6 +491,53 @@ app.delete('/api/organizations/:id/members/:userId', adminMiddleware, async (c) 
   const orgId = c.req.param('id')
   const userId = c.req.param('userId')
   await db.delete(userOrganizations).where(and(eq(userOrganizations.organizationId, orgId), eq(userOrganizations.userId, userId)))
+  return c.json({ ok: true })
+})
+
+// --- AI SKILLS ENDPOINTS (admin only) ---
+
+app.get('/api/admin/skills', adminMiddleware, async (c) => {
+  const all = await db.select().from(aiSkills).orderBy(desc(aiSkills.updatedAt))
+  return c.json(all)
+})
+
+app.post('/api/admin/skills', adminMiddleware, async (c) => {
+  const body = await c.req.json().catch(() => ({})) as { name?: string; description?: string; content?: string; enabled?: boolean }
+  const name = body.name?.trim()
+  if (!name) return c.json({ error: 'name required' }, 400)
+  const now = Date.now()
+  const id = randomUUID()
+  await db.insert(aiSkills).values({
+    id,
+    name,
+    description: body.description?.trim() ?? null,
+    content: body.content ?? '',
+    enabled: body.enabled ?? true,
+    createdAt: now,
+    updatedAt: now,
+  })
+  return c.json({ id }, 201)
+})
+
+app.put('/api/admin/skills/:id', adminMiddleware, async (c) => {
+  const id = c.req.param('id')
+  const body = await c.req.json().catch(() => ({})) as { name?: string; description?: string; content?: string; enabled?: boolean }
+  const patch: Record<string, unknown> = { updatedAt: Date.now() }
+  if (body.name !== undefined) {
+    const name = body.name.trim()
+    if (!name) return c.json({ error: 'name required' }, 400)
+    patch.name = name
+  }
+  if (body.description !== undefined) patch.description = body.description?.trim() ?? null
+  if (body.content !== undefined) patch.content = body.content
+  if (body.enabled !== undefined) patch.enabled = body.enabled
+  await db.update(aiSkills).set(patch).where(eq(aiSkills.id, id))
+  return c.json({ ok: true })
+})
+
+app.delete('/api/admin/skills/:id', adminMiddleware, async (c) => {
+  const id = c.req.param('id')
+  await db.delete(aiSkills).where(eq(aiSkills.id, id))
   return c.json({ ok: true })
 })
 

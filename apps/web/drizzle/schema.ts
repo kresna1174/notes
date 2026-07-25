@@ -142,6 +142,16 @@ export const chatMessages = pgTable('chat_messages', {
   createdAt: bigint('created_at', { mode: 'number' }).notNull(),
 })
 
+export const aiSkills = pgTable('ai_skills', {
+  id: text('id').primaryKey(),
+  name: text('name').notNull(),
+  description: text('description'),                 // short summary — shown in list & used later for AI routing
+  content: text('content').notNull().default(''),  // skill instructions stored as pure markdown
+  enabled: boolean('enabled').notNull().default(true),
+  createdAt: bigint('created_at', { mode: 'number' }).notNull(),
+  updatedAt: bigint('updated_at', { mode: 'number' }).notNull(),
+})
+
 export const passwordResetTokens = pgTable('password_reset_tokens', {
   id: text('id').primaryKey(),
   userId: text('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),

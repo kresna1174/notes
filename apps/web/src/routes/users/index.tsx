@@ -2,13 +2,16 @@ import { createFileRoute, redirect, useRouter } from '@tanstack/react-router'
 import { useAuth } from '#/modules/shared/auth'
 import { Sidebar } from '#/modules/sidebar'
 import React, { useState, useEffect, useRef } from 'react'
-import { Trash2, UserPlus, Shield, Eye, KeyRound, Lock, LockOpen, X, AlertTriangle, Check, Users as UsersIcon, RefreshCw, Sparkles, Pencil, Plus, UsersRound, UserMinus } from 'lucide-react'
+import { Trash2, UserPlus, Shield, Eye, KeyRound, Lock, LockOpen, X, AlertTriangle, Check, Users as UsersIcon, RefreshCw, Sparkles, Pencil, Plus, UsersRound, UserMinus, BookOpen, Zap, FileUp, Code2, Download } from 'lucide-react'
+import { SkillEditor } from '#/modules/editor'
+import { ConfirmDialog } from '#/modules/shared/ui'
 
 interface User { id: string; username: string; role: 'admin' | 'viewer'; status: string; createdAt: number }
 interface LockedNote { id: string; title: string; createdAt: number; updatedAt: number; ownerUsername: string; ownerId: string; type: string; organizationId: string | null }
 interface AiSession { session_id: string; user_id: string | null; username: string | null; note_title: string | null; created_at: string; updated_at: string; message_count: number; user_message_count: number; tool_call_count: number; prompt_preview: string; has_error: boolean; error_message: string | null; prompt_tokens: number; completion_tokens: number; messages: { role: string; type: string; content: string; name: string | null; tool_call_id: string | null }[] }
 interface AiStats { total_sessions: number; total_messages: number; total_user_messages: number; total_tool_calls: number; total_prompt_tokens: number; total_completion_tokens: number }
 interface Organization { id: string; name: string; description: string | null; createdAt: number }
+interface Skill { id: string; name: string; description: string | null; content: string; enabled: boolean; createdAt: number; updatedAt: number }
 
 export const Route = createFileRoute('/users/')({
   beforeLoad: ({ context }) => {
@@ -415,7 +418,7 @@ function UsersPage() {
   const [error, setError] = useState<string | null>(null)
   const [adding, setAdding] = useState(false)
   const [showForm, setShowForm] = useState(false)
-  const [activeTab, setActiveTab] = useState<'users' | 'pins' | 'ai-history' | 'organizations'>('users')
+  const [activeTab, setActiveTab] = useState<'users' | 'pins' | 'ai-history' | 'organizations' | 'skills'>('users')
   const [lockedNotes, setLockedNotes] = useState<LockedNote[]>([])
   const [loadingLocked, setLoadingLocked] = useState(false)
   const [resetTarget, setResetTarget] = useState<LockedNote | null>(null)
@@ -437,6 +440,17 @@ function UsersPage() {
   const [editOrgForm, setEditOrgForm] = useState({ name: '', description: '' })
   const [expandedOrg, setExpandedOrg] = useState<string | null>(null)
 
+  // ── AI Skills state ──
+  const [skills, setSkills] = useState<Skill[]>([])
+  const [loadingSkills, setLoadingSkills] = useState(false)
+  const [skillEditor, setSkillEditor] = useState<{ skill: Skill | null } | null>(null) // null = closed; { skill: null } = new
+  const [skillForm, setSkillForm] = useState({ name: '', description: '', content: '', enabled: true })
+  const [savingSkill, setSavingSkill] = useState(false)
+  const [deleteSkillTarget, setDeleteSkillTarget] = useState<Skill | null>(null)
+  const [skillEditorNonce, setSkillEditorNonce] = useState(0) // bump to remount SkillEditor after an .md upload
+  const [skillMode, setSkillMode] = useState<'rich' | 'code'>('rich') // rich = WYSIWYG, code = raw markdown
+  const skillFileRef = useRef<HTMLInputElement>(null)
+
   const [isMobile, setIsMobile] = useState(false)
 
   useEffect(() => {
@@ -450,6 +464,7 @@ function UsersPage() {
     if (activeTab === 'pins') loadLockedNotes()
     if (activeTab === 'ai-history') loadAiLogs()
     if (activeTab === 'organizations') loadOrganizations()
+    if (activeTab === 'skills') loadSkills()
   }, [activeTab, aiLogFilterUser, aiLogsPage])
 
   async function loadAiLogs() {
@@ -551,6 +566,94 @@ function UsersPage() {
     await fetch(`/api/organizations/${orgId}/members/${userId}`, { method: 'DELETE' }); loadOrganizations()
   }
 
+  // ── AI Skills handlers ──
+  async function loadSkills() {
+    setLoadingSkills(true)
+    try {
+      const res = await fetch('/api/admin/skills')
+      if (res.ok) setSkills(await res.json())
+    } finally { setLoadingSkills(false) }
+  }
+  function openSkillEditor(skill: Skill | null) {
+    setSkillForm({
+      name: skill?.name ?? '',
+      description: skill?.description ?? '',
+      content: skill?.content ?? '',
+      enabled: skill?.enabled ?? true,
+    })
+    setSkillEditorNonce(n => n + 1)
+    setSkillMode('rich')
+    setSkillEditor({ skill })
+  }
+  function switchSkillMode(mode: 'rich' | 'code') {
+    // Leaving code → rich: remount the WYSIWYG editor so it reloads the edited markdown.
+    if (mode === 'rich') setSkillEditorNonce(n => n + 1)
+    setSkillMode(mode)
+  }
+  async function handleSkillFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    e.target.value = '' // allow re-uploading the same file
+    if (!file) return
+    if (!/\.(md|markdown|txt)$/i.test(file.name)) { showToast('Please select a .md/.markdown/.txt file', 'error'); return }
+    try {
+      const text = await file.text()
+      const derivedName = file.name.replace(/\.(md|markdown|txt)$/i, '').replace(/[-_]+/g, ' ').trim()
+      setSkillForm(f => ({ ...f, content: text, name: f.name.trim() || derivedName }))
+      setSkillEditorNonce(n => n + 1) // remount editor so it loads the uploaded markdown
+      showToast('Markdown loaded from file')
+    } catch {
+      showToast('Failed to read file', 'error')
+    }
+  }
+  async function handleSaveSkill(e: React.FormEvent) {
+    e.preventDefault()
+    if (!skillForm.name.trim()) { showToast('Skill name is required', 'error'); return }
+    setSavingSkill(true)
+    try {
+      const editing = skillEditor?.skill
+      const res = await fetch(editing ? `/api/admin/skills/${editing.id}` : '/api/admin/skills', {
+        method: editing ? 'PUT' : 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(skillForm),
+      })
+      if (res.ok) {
+        setSkillEditor(null)
+        showToast(editing ? 'Skill updated' : 'Skill created')
+        loadSkills()
+      } else {
+        const d = await res.json().catch(() => ({}))
+        showToast(d.error || 'Failed to save skill', 'error')
+      }
+    } finally { setSavingSkill(false) }
+  }
+  async function toggleSkillEnabled(skill: Skill) {
+    setSkills(prev => prev.map(s => s.id === skill.id ? { ...s, enabled: !s.enabled } : s))
+    await fetch(`/api/admin/skills/${skill.id}`, {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ enabled: !skill.enabled }),
+    })
+  }
+  async function handleDeleteSkill(skill: Skill) {
+    await fetch(`/api/admin/skills/${skill.id}`, { method: 'DELETE' })
+    setSkills(prev => prev.filter(s => s.id !== skill.id))
+    showToast('Skill deleted')
+  }
+  function downloadSkill(skill: Skill) {
+    const slug = skill.name.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '') || 'skill'
+    const heading = `# ${skill.name}\n\n`
+    const body = skill.content.trim()
+    const md = body.startsWith('#') ? skill.content : heading + skill.content
+    const blob = new Blob([md], { type: 'text/markdown;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `${slug}.md`
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+  }
+
   const inputBase: React.CSSProperties = {
     width: '100%', boxSizing: 'border-box', padding: '8px 12px', fontSize: '0.875rem',
     fontFamily: 'var(--font-body)', border: '1px solid var(--border)', borderRadius: 7,
@@ -560,6 +663,7 @@ function UsersPage() {
   const tabs = [
     { id: 'users' as const, label: 'Users', icon: <UsersIcon size={14} /> },
     { id: 'organizations' as const, label: 'Organization', icon: <UsersRound size={14} /> },
+    { id: 'skills' as const, label: 'AI Skills', icon: <BookOpen size={14} /> },
     { id: 'pins' as const, label: 'Reset Note PIN', icon: <Lock size={14} />, badge: activeTab === 'pins' ? lockedNotes.length : undefined },
     { id: 'ai-history' as const, label: 'AI History', icon: <Sparkles size={14} /> },
   ]
@@ -639,6 +743,20 @@ function UsersPage() {
               onMouseLeave={e => (e.currentTarget.style.opacity = '1')}
             >
               <UserPlus size={13} /> Add User
+            </button>
+          ) : activeTab === 'skills' ? (
+            <button
+              onClick={() => openSkillEditor(null)}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 6, padding: '6px 12px',
+                fontSize: '0.75rem', fontWeight: 600, fontFamily: 'var(--font-body)',
+                background: 'var(--primary)', color: 'var(--primary-fg)', border: 'none',
+                borderRadius: 6, cursor: 'pointer', transition: 'opacity 0.15s',
+              }}
+              onMouseEnter={e => (e.currentTarget.style.opacity = '0.9')}
+              onMouseLeave={e => (e.currentTarget.style.opacity = '1')}
+            >
+              <Plus size={13} /> New Skill
             </button>
           ) : <div style={{ width: 88 }} />}
         </header>
@@ -902,6 +1020,78 @@ function UsersPage() {
             </div>
           )}
 
+           {/* ── Tab: AI Skills ── */}
+          {activeTab === 'skills' && (
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+                <div>
+                  <h2 style={{ fontFamily: 'var(--font-heading)', fontWeight: 600, fontSize: '1.1rem', color: 'var(--fg)', margin: 0 }}>AI Skills</h2>
+                  <p style={{ fontSize: '0.8125rem', color: 'var(--fg-muted)', margin: '4px 0 0', fontFamily: 'var(--font-body)' }}>Manage reusable instruction skills (markdown) for the AI assistant.</p>
+                </div>
+                <button onClick={loadSkills} disabled={loadingSkills} style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '6px 12px', fontSize: '0.8rem', fontWeight: 500, fontFamily: 'var(--font-body)', background: 'var(--muted)', color: 'var(--fg-muted)', border: '1px solid var(--border)', borderRadius: 7, cursor: 'pointer', opacity: loadingSkills ? 0.6 : 1 }}>
+                  <RefreshCw size={12} style={loadingSkills ? { animation: 'spin 0.8s linear infinite' } : {}} />
+                </button>
+              </div>
+
+              {loadingSkills ? (
+                <div style={{ textAlign: 'center', padding: '48px 0', color: 'var(--fg-muted)', fontSize: '0.875rem', fontFamily: 'var(--font-body)' }}>Loading…</div>
+              ) : skills.length === 0 ? (
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '48px 24px', textAlign: 'center', border: '1px dashed var(--border)', borderRadius: 12, gap: 12 }}>
+                  <div style={{ width: 48, height: 48, borderRadius: 12, background: 'var(--accent)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--primary)' }}>
+                    <BookOpen size={22} />
+                  </div>
+                  <div>
+                    <p style={{ margin: 0, fontWeight: 600, color: 'var(--fg)', fontFamily: 'var(--font-body)' }}>No skills yet</p>
+                    <p style={{ margin: '4px 0 0', fontSize: '0.8125rem', color: 'var(--fg-muted)', fontFamily: 'var(--font-body)' }}>Create your first AI skill to get started</p>
+                  </div>
+                </div>
+              ) : (
+                <div style={{ border: '1px solid var(--border)', borderRadius: 10, overflow: 'hidden' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.875rem', fontFamily: 'var(--font-body)' }}>
+                    <thead>
+                      <tr style={{ background: 'var(--muted)' }}>
+                        <th style={{ padding: '10px 16px', fontWeight: 600, fontSize: '0.8125rem', color: 'var(--fg-muted)', textAlign: 'left' }}>Skill</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {skills.map(skill => (
+                        <tr key={skill.id} style={{ borderTop: '1px solid var(--border)' }}>
+                          <td style={{ padding: '10px 16px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                              <div style={{ width: 30, height: 30, borderRadius: 7, background: skill.enabled ? 'var(--accent)' : 'var(--muted)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: skill.enabled ? 'var(--primary)' : 'var(--fg-subtle)', flexShrink: 0 }}>
+                                <Zap size={14} />
+                              </div>
+                              <div style={{ minWidth: 0, flex: 1 }}>
+                                <div style={{ fontWeight: 600, color: 'var(--fg)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{skill.name}</div>
+                                {skill.description && <div style={{ fontSize: '0.75rem', color: 'var(--fg-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{skill.description}</div>}
+                              </div>
+                              <button
+                                onClick={() => toggleSkillEnabled(skill)}
+                                title={skill.enabled ? 'Enabled — click to disable' : 'Disabled — click to enable'}
+                                style={{ fontSize: '0.68rem', fontWeight: 600, padding: '2px 9px', borderRadius: 20, cursor: 'pointer', border: '1px solid', fontFamily: 'var(--font-body)', background: skill.enabled ? 'var(--accent)' : 'var(--muted)', borderColor: skill.enabled ? 'var(--primary)' : 'var(--border)', color: skill.enabled ? 'var(--primary)' : 'var(--fg-subtle)' }}
+                              >
+                                {skill.enabled ? 'Enabled' : 'Disabled'}
+                              </button>
+                              <button onClick={() => downloadSkill(skill)} title="Download as .md" style={{ width: 26, height: 26, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: 'transparent', border: 'none', borderRadius: 5, cursor: 'pointer', color: 'var(--fg-subtle)' }} onMouseEnter={e => { e.currentTarget.style.background = 'var(--accent)'; e.currentTarget.style.color = 'var(--primary)' }} onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--fg-subtle)' }}>
+                                <Download size={12} />
+                              </button>
+                              <button onClick={() => openSkillEditor(skill)} title="Edit skill" style={{ width: 26, height: 26, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: 'transparent', border: 'none', borderRadius: 5, cursor: 'pointer', color: 'var(--fg-subtle)' }} onMouseEnter={e => { e.currentTarget.style.background = 'var(--accent)'; e.currentTarget.style.color = 'var(--primary)' }} onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--fg-subtle)' }}>
+                                <Pencil size={12} />
+                              </button>
+                              <button onClick={() => setDeleteSkillTarget(skill)} title="Delete skill" style={{ width: 26, height: 26, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: 'transparent', border: 'none', borderRadius: 5, cursor: 'pointer', color: 'var(--fg-subtle)' }} onMouseEnter={e => { e.currentTarget.style.background = 'rgba(224,49,49,0.1)'; e.currentTarget.style.color = '#e03131' }} onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--fg-subtle)' }}>
+                                <Trash2 size={12} />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          )}
+
            {/* ── Tab: AI History ── */}
           {activeTab === 'ai-history' && (
             <div>
@@ -1082,6 +1272,114 @@ function UsersPage() {
           onDone={() => { setUserModal(null); showToast(userModal.action === 'delete' ? 'User deleted' : userModal.action === 'password' ? 'Password changed' : 'User updated'); router.invalidate() }}
         />
       )}
+
+      {/* Skill Editor Modal */}
+      {skillEditor && (
+        <div
+          style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', backdropFilter: 'blur(4px)', padding: 16 }}
+          onClick={e => { if (e.target === e.currentTarget) setSkillEditor(null) }}
+        >
+          <div style={{ background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 16, width: '100%', maxWidth: 820, height: '88vh', display: 'flex', flexDirection: 'column', boxShadow: '0 20px 60px rgba(0,0,0,0.25)', overflow: 'hidden' }}>
+            <form onSubmit={handleSaveSkill} style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+              {/* Header */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '18px 24px', borderBottom: '1px solid var(--border)' }}>
+                <h3 style={{ margin: 0, fontWeight: 700, fontSize: '1.05rem', color: 'var(--fg)', fontFamily: 'var(--font-heading)' }}>
+                  {skillEditor.skill ? 'Edit Skill' : 'New Skill'}
+                </h3>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <input ref={skillFileRef} type="file" accept=".md,.markdown,.txt" style={{ display: 'none' }} onChange={handleSkillFileUpload} />
+                  <button
+                    type="button"
+                    onClick={() => skillFileRef.current?.click()}
+                    title="Load instructions from a markdown file"
+                    style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 12px', fontSize: '0.78rem', fontWeight: 500, fontFamily: 'var(--font-body)', background: 'var(--muted)', color: 'var(--fg-muted)', border: '1px solid var(--border)', borderRadius: 7, cursor: 'pointer' }}
+                    onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--primary)'; e.currentTarget.style.color = 'var(--primary)' }}
+                    onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.color = 'var(--fg-muted)' }}
+                  >
+                    <FileUp size={14} /> Upload .md
+                  </button>
+                  <button type="button" onClick={() => setSkillEditor(null)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--fg-muted)', display: 'flex', alignItems: 'center' }}><X size={18} /></button>
+                </div>
+              </div>
+
+              {/* Body */}
+              <div style={{ flex: 1, overflowY: 'auto', padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: 14 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 12 }}>
+                  <div>
+                    <label style={{ fontSize: '0.8rem', fontWeight: 500, color: 'var(--fg-muted)', marginBottom: 4, display: 'block' }}>Name</label>
+                    <input style={inputBase} placeholder="e.g. Formal Email Writer" value={skillForm.name} onChange={e => setSkillForm(f => ({ ...f, name: e.target.value }))} autoFocus />
+                  </div>
+                  <div>
+                    <label style={{ fontSize: '0.8rem', fontWeight: 500, color: 'var(--fg-muted)', marginBottom: 4, display: 'block' }}>Description (optional)</label>
+                    <input style={inputBase} placeholder="Short summary" value={skillForm.description} onChange={e => setSkillForm(f => ({ ...f, description: e.target.value }))} />
+                  </div>
+                </div>
+
+                <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: '0.82rem', color: 'var(--fg)', fontFamily: 'var(--font-body)' }}>
+                  <input type="checkbox" checked={skillForm.enabled} onChange={e => setSkillForm(f => ({ ...f, enabled: e.target.checked }))} />
+                  Enabled
+                </label>
+
+                <div style={{ display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+                    <label style={{ fontSize: '0.8rem', fontWeight: 500, color: 'var(--fg-muted)' }}>Instructions (markdown)</label>
+                    <div style={{ display: 'flex', gap: 2, padding: 2, background: 'var(--input-bg)', border: '1px solid var(--border)', borderRadius: 7 }}>
+                      {([['rich', 'Editor', <Eye size={12} key="e" />], ['code', 'Code', <Code2 size={12} key="c" />]] as const).map(([mode, label, icon]) => (
+                        <button
+                          key={mode}
+                          type="button"
+                          onClick={() => switchSkillMode(mode)}
+                          style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '4px 10px', fontSize: '0.72rem', fontWeight: 600, fontFamily: 'var(--font-body)', border: 'none', borderRadius: 5, cursor: 'pointer', background: skillMode === mode ? 'var(--bg)' : 'transparent', color: skillMode === mode ? 'var(--fg)' : 'var(--fg-muted)', boxShadow: skillMode === mode ? '0 1px 2px rgba(0,0,0,0.06)' : 'none' }}
+                        >
+                          {icon} {label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  {skillMode === 'rich' ? (
+                    <div style={{ border: '1px solid var(--border)', borderRadius: 10, padding: '14px 16px', background: 'var(--input-bg)' }}>
+                      <SkillEditor
+                        key={skillEditorNonce}
+                        value={skillForm.content}
+                        onChange={md => setSkillForm(f => ({ ...f, content: md }))}
+                      />
+                    </div>
+                  ) : (
+                    <textarea
+                      value={skillForm.content}
+                      onChange={e => setSkillForm(f => ({ ...f, content: e.target.value }))}
+                      spellCheck={false}
+                      placeholder="# Skill instructions in markdown…"
+                      style={{
+                        width: '100%', boxSizing: 'border-box', minHeight: 300, resize: 'vertical',
+                        padding: '14px 16px', border: '1px solid var(--border)', borderRadius: 10,
+                        background: 'var(--input-bg)', color: 'var(--fg)', outline: 'none',
+                        fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Consolas, monospace',
+                        fontSize: '0.82rem', lineHeight: 1.6, tabSize: 2,
+                      }}
+                    />
+                  )}
+                </div>
+              </div>
+
+              {/* Footer */}
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, padding: '14px 24px', borderTop: '1px solid var(--border)' }}>
+                <button type="button" onClick={() => setSkillEditor(null)} style={{ padding: '8px 18px', fontSize: '0.875rem', fontFamily: 'var(--font-body)', background: 'var(--muted)', color: 'var(--fg-muted)', border: '1px solid var(--border)', borderRadius: 7, cursor: 'pointer' }}>Cancel</button>
+                <button type="submit" disabled={savingSkill} style={{ padding: '8px 20px', fontSize: '0.875rem', fontWeight: 600, fontFamily: 'var(--font-body)', background: 'var(--primary)', color: 'var(--primary-fg)', border: 'none', borderRadius: 7, cursor: 'pointer', opacity: savingSkill ? 0.7 : 1 }}>{savingSkill ? 'Saving…' : 'Save'}</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Skill Confirm */}
+      <ConfirmDialog
+        open={!!deleteSkillTarget}
+        title="Delete Skill"
+        description={<>Delete skill <strong>{deleteSkillTarget?.name}</strong>? This cannot be undone.</>}
+        onConfirm={() => { if (deleteSkillTarget) handleDeleteSkill(deleteSkillTarget) }}
+        onCancel={() => setDeleteSkillTarget(null)}
+      />
 
       {/* Toast notification */}
       {toastMsg && (

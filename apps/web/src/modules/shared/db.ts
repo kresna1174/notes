@@ -220,6 +220,18 @@ export async function initDb() {
   await db.execute(sql`ALTER TABLE better_auth_account ADD COLUMN IF NOT EXISTS password TEXT`).catch(() => {})
 
   await db.execute(sql`
+    CREATE TABLE IF NOT EXISTS ai_skills (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      description TEXT,
+      content TEXT NOT NULL DEFAULT '',
+      enabled BOOLEAN NOT NULL DEFAULT TRUE,
+      created_at BIGINT NOT NULL,
+      updated_at BIGINT NOT NULL
+    )
+  `)
+
+  await db.execute(sql`
     CREATE TABLE IF NOT EXISTS password_reset_tokens (
       id TEXT PRIMARY KEY,
       user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
