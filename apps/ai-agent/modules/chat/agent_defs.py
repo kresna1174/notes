@@ -8,6 +8,7 @@ Architecture:
 """
 
 from agents import Agent
+from pydantic import BaseModel, Field
 
 from core.llm import get_model, default_model_settings
 from core.prompt import (
@@ -20,6 +21,7 @@ from core.prompt import (
     CODE_ANALYST_PROMPT,
     EDITOR_PROMPT,
     JUDGE_PROMPT,
+    QUERY_ANALYZER_PROMPT,
 )
 from modules.chat.tools import (
     write_notes, update_note_direct,
@@ -27,7 +29,7 @@ from modules.chat.tools import (
     execute_python_code, find_web_photos, find_youtube_videos,
     list_rag_documents, search_rag_documents,
     query_wiki, ingest_note_to_wiki, read_wiki_index,
-    search_knowledge,
+    search_knowledge, deep_document_search,
     remember_user_fact, forget_user_fact,
     load_skill,
 )
@@ -101,6 +103,24 @@ editor_agent = Agent(
 )
 
 
+# ── Query Analyzer Sub-Agent (structured output, used by deep_document_search) ──
+
+class SearchQueries(BaseModel):
+    """Structured output: adaptive set of 1–5 RAG search queries."""
+
+    queries: list[str] = Field(default_factory=list)
+
+
+query_analyzer_agent = Agent(
+    name="QueryAnalyzerSubAgent",
+    instructions=QUERY_ANALYZER_PROMPT,
+    model=get_model(),
+    model_settings=default_model_settings,
+    output_type=SearchQueries,
+    tools=[],
+)
+
+
 # ── Parent Agent (Orchestrator) ──────────────────────────────────────────────
 
 parent_agent = Agent(
@@ -145,6 +165,7 @@ parent_agent = Agent(
         *RAG_TOOLS,
         *WIKI_TOOLS,
         *MEMORY_TOOLS,
+        deep_document_search,
         search_knowledge,
         execute_python_code,
         # Progressive-disclosure skills — orchestrator reads the catalog & loads on demand
@@ -177,6 +198,7 @@ AGENT_REGISTRY: dict[str, Agent] = {
     "translator": translator_agent,
     "code_analyst": code_analyst_agent,
     "editor": editor_agent,
+    "query_analyzer": query_analyzer_agent,
 }
 
 # Agents that can be selected directly by the user (exposed in UI).

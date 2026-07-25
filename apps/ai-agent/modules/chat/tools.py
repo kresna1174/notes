@@ -5,6 +5,8 @@ import subprocess
 import sys
 import uuid
 import ast
+from collections import defaultdict
+from dataclasses import dataclass
 from urllib.parse import urljoin, urlparse
 
 import httpx
@@ -505,15 +507,33 @@ def search_rag_documents(query: str, document_id: str | None = None, n_results: 
         return tool_error("rag_search_failed", str(e))
 
 
+def _distance_to_cosine(dist: float | None) -> float | None:
+    """Convert Chroma L2² distance to cosine similarity for unit-normalized embeddings.
+
+    squared_L2 = 2·(1 − cosine)  ⟹  cosine = 1 − distance/2.
+    Returns None when the distance is unavailable.
+    """
+    if dist is None:
+        return None
+    return 1.0 - dist / 2.0
+
+
 def _rrf_fuse(
     semantic_hits: list[tuple[str, dict, float]],
     bm25_hits: list[tuple[str, float]],
     top_k: int,
     k: int = 60,
-) -> list[tuple[str, dict, float]]:
-    """Reciprocal Rank Fusion: combine semantic + BM25 rankings into one ranked list."""
-    # Build lookup: text → metadata (from semantic hits)
+) -> list[tuple[str, dict, float, float | None]]:
+    """Reciprocal Rank Fusion: combine semantic + BM25 rankings into one ranked list.
+
+    Returns 4-tuples ``(text, meta, rrf_score, cosine)`` — the cosine similarity
+    (derived from the semantic distance) is carried through so callers can apply a
+    relevance gate. It is ``None`` for BM25-only hits that never appeared in the
+    semantic candidate set.
+    """
+    # Build lookups keyed by text (from semantic hits).
     meta_map: dict[str, dict] = {text: meta for text, meta, _ in semantic_hits}
+    dist_map: dict[str, float] = {text: dist for text, _, dist in semantic_hits}
 
     # Semantic rank scores
     sem_rank: dict[str, float] = {text: 1.0 / (k + i + 1) for i, (text, _, _) in enumerate(semantic_hits)}
@@ -526,11 +546,19 @@ def _rrf_fuse(
     fused = {t: sem_rank.get(t, 0.0) + bm25_rank.get(t, 0.0) for t in all_texts}
 
     ranked = sorted(fused.items(), key=lambda x: x[1], reverse=True)[:top_k]
-    return [(text, meta_map.get(text, {}), score) for text, score in ranked]
+    return [
+        (text, meta_map.get(text, {}), score, _distance_to_cosine(dist_map.get(text)))
+        for text, score in ranked
+    ]
 
 
-def _hybrid_search_collection(collection, query: str, n_results: int) -> list[tuple[str, dict, float]]:
-    """Pull candidates from ChromaDB then re-rank with BM25, fuse via RRF."""
+def _hybrid_search_collection(
+    collection, query: str, n_results: int
+) -> list[tuple[str, dict, float, float | None]]:
+    """Pull candidates from ChromaDB then re-rank with BM25, fuse via RRF.
+
+    Returns 4-tuples ``(text, meta, rrf_score, cosine)``.
+    """
     from modules.rag.methods import BM25Retriever
 
     candidate_k = min(n_results * 4, 50)
@@ -577,10 +605,11 @@ def search_knowledge(query: str, n_results: int = 5) -> str:
     try:
         with chroma_lock:
             doc_hits = _hybrid_search_collection(get_collection(), query, n_results)
-        for text, meta, score in doc_hits:
+        for text, meta, score, cosine in doc_hits:
+            rel = f", Relevance: {cosine * 100:.0f}%" if cosine is not None else ""
             output.append(
                 f"[Source: Document — {meta.get('document_name', 'Unknown')}, "
-                f"Page {meta.get('page_number', 0) + 1}, Score: {score:.4f}]\n{text}"
+                f"Page {meta.get('page_number', 0) + 1}, Score: {score:.4f}{rel}]\n{text}"
             )
     except Exception as e:
         output.append(f"[Document search error: {e}]")
@@ -589,10 +618,11 @@ def search_knowledge(query: str, n_results: int = 5) -> str:
     try:
         with chroma_lock:
             note_hits = _hybrid_search_collection(get_notes_collection(), query, n_results)
-        for text, meta, score in note_hits:
+        for text, meta, score, cosine in note_hits:
+            rel = f", Relevance: {cosine * 100:.0f}%" if cosine is not None else ""
             output.append(
                 f"[Source: Note — \"{meta.get('note_title', 'Untitled')}\", "
-                f"Score: {score:.4f}]\n{text}"
+                f"Score: {score:.4f}{rel}]\n{text}"
             )
     except Exception as e:
         output.append(f"[Note search error: {e}]")
@@ -601,6 +631,276 @@ def search_knowledge(query: str, n_results: int = 5) -> str:
         return tool_error("no_results", "No relevant results found in documents or notes.")
 
     return "\n\n---\n\n".join(output)
+
+
+# ── Deep document search (Query Analyzer → Multi-Query RAG → Researcher) ──────
+#
+# Deterministic Python orchestration of the 7-step answering flow. The numeric
+# rules (top-5 queries, top-3 per query, cosine ≥ threshold, frequency ranking)
+# run here — not inside an LLM — so they execute reliably. The LLM is used only
+# for the generative parts: query generation (QueryAnalyzer) and answer synthesis
+# (Researcher).
+
+
+@dataclass
+class RagHit:
+    """A single gated hybrid-search hit, carrying its cosine relevance."""
+
+    text: str
+    meta: dict
+    rrf: float
+    cosine: float | None
+    source: str  # "document" | "note"
+
+    @property
+    def doc_key(self) -> str | None:
+        """Aggregation key: document_id for docs, note_id for notes."""
+        if self.source == "document":
+            return self.meta.get("document_id")
+        return self.meta.get("note_id")
+
+    @property
+    def name(self) -> str:
+        if self.source == "document":
+            return self.meta.get("document_name") or "Unknown"
+        return self.meta.get("note_title") or "Untitled"
+
+    @property
+    def page_number(self) -> int | None:
+        pn = self.meta.get("page_number")
+        try:
+            return int(pn) if pn is not None else None
+        except (TypeError, ValueError):
+            return None
+
+
+def _hybrid_search_structured(
+    query: str,
+    sim_threshold: float,
+    per_query_k: int,
+    candidate_k: int = 8,
+) -> list[RagHit]:
+    """Hybrid-search documents + notes for one query, gate by cosine, keep top-k.
+
+    Synchronous (ChromaDB) — call via ``asyncio.to_thread`` from async code.
+    """
+    from utils.chroma import chroma_lock, get_collection, get_notes_collection
+
+    hits: list[RagHit] = []
+    try:
+        with chroma_lock:
+            doc_raw = _hybrid_search_collection(get_collection(), query, candidate_k)
+            note_raw = _hybrid_search_collection(get_notes_collection(), query, candidate_k)
+    except Exception:
+        return []
+
+    for text, meta, rrf, cosine in doc_raw:
+        hits.append(RagHit(text=text, meta=meta or {}, rrf=rrf, cosine=cosine, source="document"))
+    for text, meta, rrf, cosine in note_raw:
+        hits.append(RagHit(text=text, meta=meta or {}, rrf=rrf, cosine=cosine, source="note"))
+
+    gated = [h for h in hits if h.cosine is not None and h.cosine >= sim_threshold]
+    gated.sort(key=lambda h: h.rrf, reverse=True)
+    return gated[:per_query_k]
+
+
+def _load_document_context(document_id: str, hits: list[RagHit]) -> str:
+    """Load matched pages + neighbours (±radius) for a selected document (DECISION 5.1)."""
+    from core.settings import settings
+    from models.engine import engine
+    from sqlmodel import Session
+    from modules.documents import methods as doc_methods
+
+    radius = settings.page_neighbor_radius
+    pages: set[int] = set()
+    for h in hits:
+        pn = h.page_number
+        if pn is None:
+            continue
+        for p in range(pn - radius, pn + radius + 1):
+            if p >= 0:
+                pages.add(p)
+
+    parts: list[str] = []
+    total_chars = 0
+    try:
+        with Session(engine) as session:
+            for p in sorted(pages):
+                page = doc_methods.get_page(session, document_id, p)
+                if page is None:
+                    continue
+                text = (page.text or "").strip()
+                if not text:
+                    continue
+                snippet = f"[hlm. {p + 1}]\n{text}"
+                parts.append(snippet)
+                total_chars += len(snippet)
+                if total_chars >= settings.doc_context_char_cap:
+                    break
+    except Exception:
+        parts = []
+
+    if not parts:
+        # Fallback: use the matched chunk texts directly.
+        return "\n\n".join(h.text for h in hits)[: settings.doc_context_char_cap]
+    return "\n\n".join(parts)
+
+
+def _load_note_context(note_id: str, hits: list[RagHit]) -> str:
+    """Reconstruct a note's text from its indexed chunks (ordered by chunk_index)."""
+    from core.settings import settings
+    from utils.chroma import chroma_lock, get_notes_collection
+
+    text = ""
+    try:
+        with chroma_lock:
+            res = get_notes_collection().get(where={"note_id": note_id})
+        docs = res.get("documents") or []
+        metas = res.get("metadatas") or []
+        paired = sorted(
+            zip(docs, metas),
+            key=lambda x: (x[1] or {}).get("chunk_index", 0),
+        )
+        text = "\n\n".join(d for d, _ in paired if d)
+    except Exception:
+        text = ""
+
+    if not text:
+        text = "\n\n".join(h.text for h in hits)
+    return text[: settings.doc_context_char_cap]
+
+
+async def _run_researcher(question: str, context_block: str | None, ctx_context: dict | None) -> str:
+    """Invoke the Researcher agent to synthesize the final answer."""
+    from agents import Runner
+    from modules.chat.agent_defs import researcher_agent
+
+    if context_block:
+        researcher_input = (
+            f"Pertanyaan user:\n{question}\n\n"
+            "Konteks dokumen berikut SUDAH diambil dari knowledge base user. "
+            "JANGAN panggil `search_knowledge` lagi. Susun jawaban paling relevan "
+            "HANYA dari konteks ini dan sertakan sitasi "
+            "`[Dokumen: nama, hlm. X]` atau `[Catatan: \"judul\"]`.\n"
+            "Jika konteks di bawah TIDAK cukup menjawab pertanyaan, barulah cari ke "
+            "internet (`search_web`/`extract_web`) dan WAJIB sertakan URL sumbernya.\n\n"
+            f"## KONTEKS DOKUMEN\n\n{context_block}"
+        )
+    else:
+        researcher_input = (
+            f"Pertanyaan user:\n{question}\n\n"
+            "Knowledge base user TIDAK memuat dokumen yang cukup relevan untuk pertanyaan "
+            "ini. Langsung cari jawaban ke internet menggunakan `search_web`/`extract_web`, "
+            "lalu jawab dengan WAJIB menyertakan URL sumbernya."
+        )
+
+    try:
+        result = await Runner.run(
+            researcher_agent,
+            researcher_input,
+            context=ctx_context,
+            max_turns=12,
+        )
+        return result.final_output or "Tidak ada jawaban yang bisa disusun."
+    except Exception as e:
+        return tool_error("researcher_failed", str(e))
+
+
+@function_tool
+async def deep_document_search(ctx: RunContextWrapper[dict], question: str) -> str:
+    """Jawab pertanyaan faktual berbasis notes/dokumen user dengan pipeline mendalam.
+
+    Alur: buat beberapa query pencarian → cari ke knowledge base (hybrid RAG,
+    di-gate relevansi) → pilih dokumen paling relevan → baca isinya → susun jawaban
+    bersitasi. Jatuh ke pencarian internet bila dokumen tidak menjawab.
+
+    Gunakan ini untuk pertanyaan yang butuh ketelitian dari catatan/dokumen user.
+    Untuk lookup cepat, pakai `search_knowledge`.
+
+    Args:
+        question: Pertanyaan asli user (verbatim), sertakan konteks bila relevan.
+    """
+    from core.settings import settings
+    from modules.chat.agent_defs import query_analyzer_agent
+
+    ctx_context = ctx.context if ctx else None
+
+    # Step 2 — Query Analyzer produces adaptive search queries.
+    queries: list[str] = []
+    try:
+        from agents import Runner
+
+        qa_result = await Runner.run(query_analyzer_agent, question, max_turns=2)
+        queries = list(getattr(qa_result.final_output, "queries", None) or [])
+    except Exception:
+        queries = []
+    queries = [q.strip() for q in queries if q and q.strip()][: settings.top_queries]
+    if not queries:
+        queries = [question]
+
+    # Steps 3–4 — Multi-query RAG with cosine gate, run in parallel.
+    async def _run_one(q: str) -> tuple[str, list[RagHit]]:
+        hits = await asyncio.to_thread(
+            _hybrid_search_structured,
+            q,
+            settings.rag_sim_threshold,
+            settings.per_query_k,
+        )
+        return q, hits
+
+    per_query = await asyncio.gather(*[_run_one(q) for q in queries])
+
+    # Step 5 — Aggregate frequency + average cosine across queries.
+    freq: dict[str, int] = defaultdict(int)
+    scores: dict[str, list[float]] = defaultdict(list)
+    hits_by_key: dict[str, list[RagHit]] = defaultdict(list)
+    sample_by_key: dict[str, RagHit] = {}
+
+    for _q, hits in per_query:
+        seen_keys: set[str] = set()
+        for h in hits:
+            key = h.doc_key
+            if not key:
+                continue
+            hits_by_key[key].append(h)
+            sample_by_key[key] = h
+            if key not in seen_keys:
+                freq[key] += 1
+                seen_keys.add(key)
+            if h.cosine is not None:
+                scores[key].append(h.cosine)
+
+    def _avg(key: str) -> float:
+        vals = scores[key]
+        return sum(vals) / len(vals) if vals else 0.0
+
+    # Step 5 (cont.) — rank by frequency, tie-break avg cosine; gate avg ≥ threshold.
+    ranked = sorted(freq.keys(), key=lambda k: (freq[k], _avg(k)), reverse=True)
+    selected = [k for k in ranked if _avg(k) >= settings.rag_sim_threshold][: settings.top_docs]
+
+    # Step 7 (early) — nothing relevant → straight to web.
+    if not selected:
+        return await _run_researcher(question, None, ctx_context)
+
+    # Step 5 (cont.) — load full context for each selected source.
+    context_blocks: list[str] = []
+    for key in selected:
+        sample = sample_by_key[key]
+        if sample.source == "note":
+            body = await asyncio.to_thread(_load_note_context, key, hits_by_key[key])
+            label = f'Catatan: "{sample.name}"'
+        else:
+            body = await asyncio.to_thread(_load_document_context, key, hits_by_key[key])
+            label = f"Dokumen: {sample.name}"
+        context_blocks.append(
+            f"### {label} "
+            f"(relevansi rata-rata {_avg(key) * 100:.0f}%, muncul di {freq[key]} query)\n\n{body}"
+        )
+
+    context_block = "\n\n---\n\n".join(context_blocks)
+
+    # Step 6 — Researcher synthesizes the answer from the loaded context.
+    return await _run_researcher(question, context_block, ctx_context)
 
 
 # ── User memory tools ────────────────────────────────────────────────────────
