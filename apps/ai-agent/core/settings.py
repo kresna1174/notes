@@ -41,6 +41,9 @@ class Settings(BaseSettings):
     langfuse_secret_key: str = ""
     langfuse_host: str = "https://cloud.langfuse.com"
 
+    # Internal service URLs (Docker service names in production)
+    internal_web_base: str = "http://notes-app:3000"
+
     model_config: ClassVar[SettingsConfigDict] = SettingsConfigDict(
         env_prefix="",
         env_file=PROJECT_ROOT / ".env",

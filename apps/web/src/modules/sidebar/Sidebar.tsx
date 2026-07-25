@@ -17,10 +17,12 @@ interface SidebarProps {
   activeNoteId: string | null
   onShareNote?: (id: string) => void
   notesUpdateTrigger?: number
+  indexingNoteIds?: Set<string>
 }
 
-export function Sidebar({ activeNoteId, onShareNote, notesUpdateTrigger }: SidebarProps) {
+export function Sidebar({ activeNoteId, onShareNote, notesUpdateTrigger, indexingNoteIds }: SidebarProps) {
   const [notes, setNotes] = useState<Note[]>([])
+  const [indexedNoteIds, setIndexedNoteIds] = useState<Set<string>>(new Set())
   const [searchResults, setSearchResults] = useState<SearchResult[] | null>(null)
   const [activeScope, setActiveScope] = useState<string>('personal')
   const [scopeDropdownOpen, setScopeDropdownOpen] = useState(false)
@@ -74,10 +76,18 @@ export function Sidebar({ activeNoteId, onShareNote, notesUpdateTrigger }: Sideb
     if (activeScope !== 'personal') {
       url = `/api/notes?scope=organization&organizationId=${activeScope}`
     }
-    const res = await fetch(url)
-    if (!res.ok) return
-    const data = await res.json()
-    setNotes(Array.isArray(data) ? data : [])
+    const [notesRes, indexRes] = await Promise.all([
+      fetch(url),
+      fetch('/api/ai/notes-index'),
+    ])
+    if (notesRes.ok) {
+      const data = await notesRes.json()
+      setNotes(Array.isArray(data) ? data : [])
+    }
+    if (indexRes.ok) {
+      const data = await indexRes.json()
+      setIndexedNoteIds(new Set(Array.isArray(data?.note_ids) ? data.note_ids : []))
+    }
   }
 
   useEffect(() => {
@@ -418,6 +428,8 @@ export function Sidebar({ activeNoteId, onShareNote, notesUpdateTrigger }: Sideb
                 <NoteTree
                   notes={notes}
                   activeNoteId={activeNoteId}
+                  indexedNoteIds={indexedNoteIds}
+                  indexingNoteIds={indexingNoteIds}
                   onSelect={id => navigateAndClose({ to: '/notes/$id', params: { id } })}
                   onRename={renameNote}
                   onDelete={deleteNote}

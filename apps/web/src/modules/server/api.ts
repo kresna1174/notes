@@ -1922,6 +1922,20 @@ app.post('/api/ai/notes-index/:noteId', authMiddleware, async (c) => {
   }
 })
 
+// GET /api/ai/notes-index — list all indexed note IDs
+app.get('/api/ai/notes-index', authMiddleware, async (c) => {
+  try {
+    const forwardRes = await fetch(`${AI_AGENT_URL}/api/notes-index`)
+    if (!forwardRes.ok) {
+      const errText = await forwardRes.text()
+      return c.json({ error: `AI service error: ${errText}` }, forwardRes.status as any)
+    }
+    return c.json(await forwardRes.json())
+  } catch (err) {
+    return c.json({ error: `Failed to list indexed notes: ${String(err)}` }, 500)
+  }
+})
+
 // DELETE /api/ai/notes-index/:noteId — remove note from index
 app.delete('/api/ai/notes-index/:noteId', authMiddleware, async (c) => {
   try {

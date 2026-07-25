@@ -589,10 +589,45 @@ def search_knowledge(query: str, n_results: int = 5) -> str:
     try:
         with chroma_lock:
             note_hits = _hybrid_search_collection(get_notes_collection(), query, n_results)
-        for text, meta, score in note_hits:
+        
+        # Group matched knowledge points by note_id to refer back to the parent note's full content
+        from sqlmodel import Session, text as sql_text
+        from models.engine import engine
+        from modules.notes_index.methods import strip_tiptap_json
+        
+        seen_notes = {}
+        for kp, meta, score in note_hits:
+            note_id = meta.get("note_id")
+            if not note_id:
+                continue
+            if note_id not in seen_notes:
+                # Fetch note content
+                title, content = "", ""
+                try:
+                    with Session(engine) as session:
+                        row = session.execute(
+                            sql_text("SELECT title, content FROM notes WHERE id = :id"),
+                            {"id": note_id}
+                        ).fetchone()
+                        if row:
+                            title, raw_content = row
+                            content = strip_tiptap_json(raw_content)
+                except Exception as db_err:
+                    pass
+                
+                seen_notes[note_id] = {
+                    "title": title or meta.get("note_title", "Untitled"),
+                    "content": content,
+                    "kps": []
+                }
+            seen_notes[note_id]["kps"].append((kp, score))
+            
+        for note_id, note_data in seen_notes.items():
+            kps_str = "\n".join([f"- {kp} (Score: {score:.4f})" for kp, score in note_data["kps"]])
             output.append(
-                f"[Source: Note — \"{meta.get('note_title', 'Untitled')}\", "
-                f"Score: {score:.4f}]\n{text}"
+                f"[Source: Note — \"{note_data['title']}\"]\n"
+                f"Matched Key Points:\n{kps_str}\n\n"
+                f"Full Content:\n{note_data['content']}"
             )
     except Exception as e:
         output.append(f"[Note search error: {e}]")

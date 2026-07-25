@@ -20,6 +20,8 @@ interface NoteTreeNode extends Note {
 interface NoteTreeProps {
   notes: Note[]
   activeNoteId: string | null
+  indexedNoteIds?: Set<string>
+  indexingNoteIds?: Set<string>
   onSelect: (id: string) => void
   onRename: (id: string, title: string) => void
   onDelete: (id: string) => void
@@ -59,6 +61,8 @@ function buildNoteTree(notes: Note[]): NoteTreeNode[] {
 export function NoteTree({
   notes,
   activeNoteId,
+  indexedNoteIds,
+  indexingNoteIds,
   onSelect,
   onRename,
   onDelete,
@@ -158,6 +162,8 @@ export function NoteTree({
     const hasChildren = node.children.length > 0
     const isExpanded = !!expanded[node.id]
     const isActive = activeNoteId === node.id
+    const isIndexed = indexedNoteIds?.has(node.id) ?? false
+    const isIndexing = indexingNoteIds?.has(node.id) ?? false
 
     return (
       <div key={node.id} className="flex flex-col">
@@ -202,6 +208,17 @@ export function NoteTree({
             <NoteIcon icon={node.icon} size={14} style={{ marginRight: '2px', flexShrink: 0 }} />
           ) : (
             <FileText className="h-3.5 w-3.5 shrink-0" style={{ color: isActive ? 'var(--primary)' : 'var(--fg-subtle)' }} />
+          )}
+
+          {/* RAG indexed indicator */}
+          {indexedNoteIds && (
+            <span
+              title={isIndexing ? 'Indexing to RAG...' : isIndexed ? 'Indexed to RAG' : 'Not indexed'}
+              className={cn(
+                "w-1.5 h-1.5 rounded-full shrink-0 inline-block",
+                isIndexing ? "bg-blue-500 animate-pulse" : isIndexed ? "bg-green-500" : "bg-red-500"
+              )}
+            />
           )}
 
           {/* Title / Editor */}
