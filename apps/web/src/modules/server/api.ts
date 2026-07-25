@@ -1953,6 +1953,21 @@ app.delete('/api/ai/notes-index/:noteId', authMiddleware, async (c) => {
   }
 })
 
+// GET /api/ai/notes-index/task-status/:taskId — poll Celery task status
+app.get('/api/ai/notes-index/task-status/:taskId', authMiddleware, async (c) => {
+  try {
+    const taskId = c.req.param('taskId')
+    const forwardRes = await fetch(`${AI_AGENT_URL}/api/notes-index/task-status/${taskId}`)
+    if (!forwardRes.ok) {
+      const errText = await forwardRes.text()
+      return c.json({ error: `AI service error: ${errText}` }, forwardRes.status as any)
+    }
+    return c.json(await forwardRes.json())
+  } catch (err) {
+    return c.json({ error: `Failed to get task status: ${String(err)}` }, 500)
+  }
+})
+
 // Hono handler wrapper for backward compatibility with Vite middleware and server.ts
 const nodeHandler = getRequestListener(app.fetch)
 
