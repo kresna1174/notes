@@ -731,9 +731,9 @@ function AiDraftNodeView({ node, updateAttributes, getPos, editor }: any) {
 
             {/* Generating Footer */}
             {status === 'generating' && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.75rem', color: 'var(--fg-subtle)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.75rem', color: '#ffffff', opacity: 0.8 }}>
                 <Loader2 size={13} className="animate-spin" />
-                <span>AI is writing your draft...</span>
+                <span className="animate-pulse" style={{ fontWeight: 500 }}>Thinking...</span>
               </div>
             )}
 
@@ -788,7 +788,7 @@ function AiDraftNodeView({ node, updateAttributes, getPos, editor }: any) {
                       onClick={handleAccept}
                       style={{
                         padding: '6px 14px',
-                        background: '#22c55e',
+                        background: 'var(--primary)',
                         color: '#ffffff',
                         border: 'none',
                         borderRadius: '6px',
@@ -798,7 +798,10 @@ function AiDraftNodeView({ node, updateAttributes, getPos, editor }: any) {
                         display: 'flex',
                         alignItems: 'center',
                         gap: '6px',
+                        transition: 'opacity 0.15s',
                       }}
+                      onMouseEnter={e => (e.currentTarget.style.opacity = '0.85')}
+                      onMouseLeave={e => (e.currentTarget.style.opacity = '1')}
                     >
                       <Check size={14} /> Accept Draft
                     </button>

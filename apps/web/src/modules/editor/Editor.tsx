@@ -1295,9 +1295,10 @@ export function Editor({ note, onUpdate, onSaveStatusChange, onLockChange, share
           {/* Content Wrapper */}
           <div
             style={{
-              padding: isMobile ? '64px 16px 20px' : '40px 60px',
+              padding: isMobile ? '64px 16px 20px' : `40px ${chatOpen ? '412px' : '60px'} 40px 60px`,
               width: '100%',
               position: 'relative',
+              transition: 'padding 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
             }}
           >
             {/* Top-right action buttons (Sticky Action Bar) */}
@@ -1310,9 +1311,10 @@ export function Editor({ note, onUpdate, onSaveStatusChange, onLockChange, share
               gap: isMobile ? 6 : 8,
               zIndex: 30,
               background: 'var(--bg)',
-              padding: isMobile ? '12px 16px' : '16px 60px',
-              margin: isMobile ? '-64px -16px 24px' : '-40px -60px 32px',
+              padding: isMobile ? '12px 16px' : `16px ${chatOpen ? '412px' : '60px'} 16px 60px`,
+              margin: isMobile ? '-64px -16px 24px' : `-40px ${chatOpen ? '-412px' : '-60px'} 32px -60px`,
               borderBottom: '1px solid var(--border)',
+              transition: 'padding 0.2s cubic-bezier(0.16, 1, 0.3, 1), margin 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
             }}>
               {/* Add Icon (if not present) */}
               {!icon && (

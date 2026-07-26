@@ -1,5 +1,6 @@
 import { createFileRoute, redirect, useRouter } from '@tanstack/react-router'
 import { useAuth } from '#/modules/shared/auth'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '#/modules/shared/ui/dialog'
 import { Sidebar } from '#/modules/sidebar'
 import React, { useState, useEffect, useRef } from 'react'
 import { Trash2, UserPlus, Shield, Eye, KeyRound, Lock, LockOpen, X, AlertTriangle, Check, Users as UsersIcon, RefreshCw, Sparkles, Pencil, Plus, UsersRound, UserMinus, BookOpen, Zap, FileUp, Code2, Download } from 'lucide-react'
@@ -41,7 +42,6 @@ function ResetPinModal({ note, onClose, onSuccess }: ResetPinModalProps) {
   const [pinError, setPinError] = useState('')
   const [shake, setShake] = useState(false)
   const [loading, setLoading] = useState(false)
-  const [confirmed, setConfirmed] = useState(false)
   const digitRefs = [
     useRef<HTMLInputElement>(null),
     useRef<HTMLInputElement>(null),
@@ -49,7 +49,6 @@ function ResetPinModal({ note, onClose, onSuccess }: ResetPinModalProps) {
     useRef<HTMLInputElement>(null),
   ]
 
-  // Focus first digit when entering change mode
   useEffect(() => {
     if (mode === 'change') {
       setTimeout(() => digitRefs[0].current?.focus(), 50)
@@ -62,9 +61,7 @@ function ResetPinModal({ note, onClose, onSuccess }: ResetPinModalProps) {
     next[i] = ch
     setDigits(next)
     setPinError('')
-    // Auto-advance
     if (ch && i < 3) digitRefs[i + 1].current?.focus()
-    // Auto-submit on last digit
     if (ch && i === 3) {
       const pin = next.join('')
       if (pin.length === 4) submitNewPin(pin)
@@ -132,40 +129,51 @@ function ResetPinModal({ note, onClose, onSuccess }: ResetPinModalProps) {
   }
 
   return (
-    <div
-      style={{
-        position: 'fixed', inset: 0, zIndex: 1000,
-        background: 'rgba(0,0,0,0.5)',
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        backdropFilter: 'blur(4px)',
-        padding: '16px',
-      }}
-      onClick={e => { if (e.target === e.currentTarget) onClose() }}
-    >
-      <div style={{
-        background: 'var(--bg)',
-        border: '1px solid var(--border)',
-        borderRadius: 16,
-        width: '100%', maxWidth: 420,
-        boxShadow: '0 20px 60px rgba(0,0,0,0.25)',
-        overflow: 'hidden',
-        animation: 'modalIn 0.2s cubic-bezier(0.34, 1.56, 0.64, 1)',
-      }}>
-        <div style={{ padding: 24 }}>
-          {/* Header */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-            <h3 style={{ margin: 0, fontWeight: 700, fontSize: '1.15rem', color: 'var(--fg)', fontFamily: 'var(--font-heading)' }}>Security Manager</h3>
-            <button onClick={onClose} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--fg-muted)', display: 'flex', alignItems: 'center' }}><X size={18} /></button>
-          </div>
+    <Dialog open={true} onOpenChange={(open) => { if (!open) onClose() }}>
+      <DialogContent
+        showCloseButton={false}
+        style={{
+          background: 'var(--card-bg)',
+          border: '1px solid rgba(255, 255, 255, 0.1)',
+          borderRadius: 14,
+          padding: 24,
+          maxWidth: 420,
+        }}
+      >
+        <button
+          onClick={onClose}
+          style={{
+            position: 'absolute', top: 16, right: 16,
+            width: 30, height: 30,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            background: 'transparent', border: 'none', borderRadius: 6,
+            cursor: 'pointer', color: 'var(--fg-muted)',
+          }}
+          onMouseEnter={e => { e.currentTarget.style.background = 'var(--muted)'; e.currentTarget.style.color = 'var(--fg)' }}
+          onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--fg-muted)' }}
+        >
+          <X size={16} />
+        </button>
 
-          {/* Step 1: Choose Action */}
+        <DialogHeader className="flex flex-row items-center gap-3 shrink-0" style={{ borderBottom: '1px solid var(--border)', paddingBottom: 16 }}>
+          <div style={{ width: 36, height: 36, borderRadius: 8, background: 'var(--accent)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--primary)', flexShrink: 0 }}>
+            <KeyRound size={18} />
+          </div>
+          <div>
+            <DialogTitle className="text-md font-bold" style={{ fontFamily: 'var(--font-heading)', color: 'var(--fg)' }}>
+              Security Manager
+            </DialogTitle>
+            <p style={{ fontSize: '0.75rem', color: 'var(--fg-muted)', margin: 0 }}>Manage note PIN</p>
+          </div>
+        </DialogHeader>
+
+        <div style={{ marginTop: 16 }}>
           {mode === 'choose' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
               <div style={{ padding: '12px 14px', background: 'rgba(240,140,0,0.06)', borderRadius: 8, border: '1px solid rgba(240,140,0,0.15)', display: 'flex', gap: 10, alignItems: 'flex-start' }}>
                 <AlertTriangle size={18} color="#f08c00" style={{ flexShrink: 0, marginTop: 1 }} />
                 <p style={{ margin: 0, fontSize: '0.8125rem', color: 'var(--fg-muted)', lineHeight: 1.4 }}>
                   Managing PIN for note: <strong style={{ color: 'var(--fg)' }}>"{note.title || 'Untitled'}"</strong>.
-                  Removing the PIN will make the note immediately readable to all team members.
                 </p>
               </div>
 
@@ -197,50 +205,44 @@ function ResetPinModal({ note, onClose, onSuccess }: ResetPinModalProps) {
             </div>
           )}
 
-          {/* Step 2b: Set new PIN */}
           {mode === 'change' && (
             <>
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, marginBottom: 20 }}>
-                <div style={{ width: 52, height: 52, borderRadius: '50%', background: 'var(--accent)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <KeyRound size={24} color="var(--primary)" />
-                </div>
-                 <p style={{ margin: 0, fontWeight: 700, fontSize: '1rem', color: 'var(--fg)', fontFamily: 'var(--font-heading)' }}>Create New PIN</p>
-                <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--fg-muted)', fontFamily: 'var(--font-body)', textAlign: 'center' }}>
-                  4 digits to lock note
-                  <strong style={{ color: 'var(--fg)' }}> "{note.title || 'Untitled'}"</strong>
-                </p>
+                <p style={{ margin: 0, fontSize: '0.875rem', fontWeight: 600, color: 'var(--fg)', fontFamily: 'var(--font-body)' }}>Set New 4-Digit PIN</p>
+                <p style={{ margin: 0, fontSize: '0.78rem', color: 'var(--fg-muted)', textAlign: 'center', fontFamily: 'var(--font-body)' }}>This PIN will lock note "{note.title || 'Untitled'}"</p>
               </div>
 
-              <div style={{
-                display: 'flex', gap: 12, justifyContent: 'center', marginBottom: 8,
-                animation: shake ? 'pin-shake 0.4s ease' : undefined,
-              }}>
-                {digits.map((d, i) => (
+              <div
+                className={shake ? 'shake-anim' : ''}
+                style={{ display: 'flex', justifyContent: 'center', gap: 12, marginBottom: 24 }}
+              >
+                {digits.map((digit, i) => (
                   <input
                     key={i}
                     ref={digitRefs[i]}
                     type="password"
                     inputMode="numeric"
                     maxLength={1}
-                    value={d}
+                    value={digit}
                     onChange={e => handleDigitChange(i, e.target.value)}
                     onKeyDown={e => handleDigitKeyDown(i, e)}
                     disabled={loading}
                     style={{
-                      width: 56, height: 64,
-                      textAlign: 'center', fontSize: '1.75rem', fontWeight: 700,
-                      fontFamily: 'var(--font-heading)',
-                      border: `2px solid ${pinError ? '#e03131' : d ? 'var(--primary)' : 'var(--border)'}`,
-                      borderRadius: 12,
+                      width: 48, height: 48,
+                      borderRadius: 8,
+                      border: '1.5px solid rgba(255, 255, 255, 0.08)',
                       background: 'var(--input-bg)',
                       color: 'var(--fg)',
+                      fontSize: '1.25rem',
+                      fontWeight: 600,
+                      textAlign: 'center',
                       outline: 'none',
                       transition: 'border-color 0.15s, transform 0.1s',
                       caretColor: 'transparent',
-                      transform: d ? 'scale(1.04)' : 'scale(1)',
+                      transform: digit ? 'scale(1.04)' : 'scale(1)',
                     }}
                     onFocus={e => { if (!pinError) e.currentTarget.style.borderColor = 'var(--primary)' }}
-                    onBlur={e => { if (!d && !pinError) e.currentTarget.style.borderColor = 'var(--border)' }}
+                    onBlur={e => { if (!digit && !pinError) e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.08)' }}
                   />
                 ))}
               </div>
@@ -277,9 +279,9 @@ function ResetPinModal({ note, onClose, onSuccess }: ResetPinModalProps) {
             </>
           )}
         </div>
-      </div>
+      </DialogContent>
       <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
-    </div>
+    </Dialog>
   )
 }
 
@@ -326,86 +328,106 @@ function UserActionModal({ user: target, action, onClose, onDone }: UserActionMo
     if (res.ok) { onDone() } else { const d = await res.json(); setError(d.error || 'Failed') }
   }
 
-  const overlayStyle: React.CSSProperties = { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999 }
-  const boxStyle: React.CSSProperties = { background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 14, padding: 24, width: '100%', maxWidth: 400, boxShadow: '0 16px 48px rgba(0,0,0,0.18)' }
-  const inputStyle: React.CSSProperties = { width: '100%', boxSizing: 'border-box', padding: '8px 12px', fontSize: '0.875rem', fontFamily: 'var(--font-body)', border: '1px solid var(--border)', borderRadius: 7, outline: 'none', color: 'var(--fg)', background: 'var(--input-bg)' }
-  const btnPrimary: React.CSSProperties = { padding: '8px 18px', fontSize: '0.875rem', fontWeight: 600, fontFamily: 'var(--font-body)', background: 'var(--primary)', color: 'var(--primary-fg)', border: 'none', borderRadius: 7, cursor: 'pointer' }
+  const inputStyle: React.CSSProperties = { width: '100%', boxSizing: 'border-box', padding: '10px 14px', fontSize: '0.875rem', fontFamily: 'var(--font-body)', border: '1px solid rgba(255, 255, 255, 0.08)', borderRadius: 8, outline: 'none', color: 'var(--fg)', background: 'var(--bg)', transition: 'all 0.15s ease' }
+  const btnPrimary: React.CSSProperties = { padding: '8px 18px', fontSize: '0.875rem', fontWeight: 600, fontFamily: 'var(--font-body)', background: 'var(--primary)', color: 'var(--primary-fg)', border: 'none', borderRadius: 7, cursor: 'pointer', transition: 'opacity 0.15s' }
   const btnDanger: React.CSSProperties = { ...btnPrimary, background: '#e03131' }
-  const btnGhost: React.CSSProperties = { padding: '8px 18px', fontSize: '0.875rem', fontFamily: 'var(--font-body)', background: 'var(--muted)', color: 'var(--fg-muted)', border: '1px solid var(--border)', borderRadius: 7, cursor: 'pointer' }
+  const btnGhost: React.CSSProperties = { padding: '8px 18px', fontSize: '0.875rem', fontFamily: 'var(--font-body)', background: 'var(--muted)', color: 'var(--fg-muted)', border: '1px solid rgba(255, 255, 255, 0.08)', borderRadius: 7, cursor: 'pointer', transition: 'all 0.15s' }
 
   return (
-    <div style={overlayStyle} onClick={onClose}>
-      <div style={boxStyle} onClick={e => e.stopPropagation()}>
-        {/* Header */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <div style={{ width: 36, height: 36, borderRadius: 8, background: 'var(--muted)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--fg-subtle)' }}>
-              {action === 'edit' ? <Pencil size={16} /> : action === 'password' ? <KeyRound size={16} /> : <Trash2 size={16} />}
-            </div>
-            <div>
-              <p style={{ margin: 0, fontWeight: 600, fontSize: '0.95rem', color: 'var(--fg)' }}>
-                {action === 'edit' ? 'Edit User' : action === 'password' ? 'Change Password' : 'Delete User'}
-              </p>
-              <p style={{ margin: 0, fontSize: '0.78rem', color: 'var(--fg-muted)' }}>@{target.username}</p>
-            </div>
+    <Dialog open={true} onOpenChange={(open) => { if (!open) onClose() }}>
+      <DialogContent
+        showCloseButton={false}
+        style={{
+          background: 'var(--card-bg)',
+          border: '1px solid rgba(255, 255, 255, 0.1)',
+          borderRadius: 14,
+          padding: 24,
+          maxWidth: 400,
+        }}
+      >
+        <button
+          onClick={onClose}
+          style={{
+            position: 'absolute', top: 16, right: 16,
+            width: 30, height: 30,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            background: 'transparent', border: 'none', borderRadius: 6,
+            cursor: 'pointer', color: 'var(--fg-muted)',
+          }}
+          onMouseEnter={e => { e.currentTarget.style.background = 'var(--muted)'; e.currentTarget.style.color = 'var(--fg)' }}
+          onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--fg-muted)' }}
+        >
+          <X size={16} />
+        </button>
+
+        <DialogHeader className="flex flex-row items-center gap-3 shrink-0" style={{ borderBottom: '1px solid var(--border)', paddingBottom: 16 }}>
+          <div style={{ width: 36, height: 36, borderRadius: 8, background: 'var(--accent)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--primary)', flexShrink: 0 }}>
+            {action === 'edit' ? <Pencil size={18} /> : action === 'password' ? <KeyRound size={18} /> : <Trash2 size={18} />}
           </div>
-          <button onClick={onClose} style={{ width: 30, height: 30, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'transparent', border: 'none', borderRadius: 6, cursor: 'pointer', color: 'var(--fg-muted)' }}><X size={16} /></button>
-        </div>
+          <div>
+            <DialogTitle className="text-md font-bold" style={{ fontFamily: 'var(--font-heading)', color: 'var(--fg)' }}>
+              {action === 'edit' ? 'Edit User' : action === 'password' ? 'Change Password' : 'Delete User'}
+            </DialogTitle>
+            <p style={{ fontSize: '0.75rem', color: 'var(--fg-muted)', margin: 0 }}>@{target.username}</p>
+          </div>
+        </DialogHeader>
 
         {/* Body */}
-        {action === 'edit' && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-            <div>
-              <label style={{ fontSize: '0.8rem', fontWeight: 500, color: 'var(--fg-muted)', marginBottom: 4, display: 'block' }}>Username</label>
-              <input style={inputStyle} value={username} onChange={e => setUsername(e.target.value)} />
-            </div>
-            <div>
-              <label style={{ fontSize: '0.8rem', fontWeight: 500, color: 'var(--fg-muted)', marginBottom: 4, display: 'block' }}>Role</label>
-              <div style={{ display: 'flex', gap: 8 }}>
-                {(['viewer', 'admin'] as const).map(r => (
-                  <button key={r} type="button" onClick={() => setRole(r)} style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5, padding: '8px 0', fontSize: '0.8125rem', borderRadius: 7, border: '1px solid', cursor: 'pointer', fontFamily: 'var(--font-body)', background: role === r ? 'var(--accent)' : 'var(--bg)', borderColor: role === r ? 'var(--primary)' : 'var(--border)', color: role === r ? 'var(--primary)' : 'var(--fg-muted)', fontWeight: role === r ? 600 : 400 }}>
-                    {r === 'admin' ? <Shield size={13} /> : <Eye size={13} />} {r === 'admin' ? 'Admin' : 'Viewer'}
-                  </button>
-                ))}
+        <div style={{ marginTop: 16 }}>
+          {action === 'edit' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <div>
+                <label style={{ fontSize: '0.8rem', fontWeight: 500, color: 'var(--fg-muted)', marginBottom: 4, display: 'block' }}>Username</label>
+                <input style={inputStyle} value={username} onChange={e => setUsername(e.target.value)} />
+              </div>
+              <div>
+                <label style={{ fontSize: '0.8rem', fontWeight: 500, color: 'var(--fg-muted)', marginBottom: 4, display: 'block' }}>Role</label>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  {(['viewer', 'admin'] as const).map(r => (
+                    <button key={r} type="button" onClick={() => setRole(r)} style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5, padding: '8px 0', fontSize: '0.8125rem', borderRadius: 7, border: role === r ? '1px solid var(--primary)' : '1px solid rgba(255, 255, 255, 0.08)', cursor: 'pointer', fontFamily: 'var(--font-body)', background: role === r ? 'var(--accent)' : 'var(--bg)', color: role === r ? 'var(--primary)' : 'var(--fg-muted)', fontWeight: role === r ? 600 : 400 }}>
+                      {r === 'admin' ? <Shield size={13} /> : <Eye size={13} />} {r === 'admin' ? 'Admin' : 'Viewer'}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              {error && <p style={{ margin: 0, fontSize: '0.8rem', color: '#e03131' }}>{error}</p>}
+              <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+                <button onClick={handleEdit} disabled={loading} style={{ ...btnPrimary, opacity: loading ? 0.6 : 1 }}>{loading ? 'Saving…' : 'Save'}</button>
+                <button onClick={onClose} style={btnGhost}>Cancel</button>
               </div>
             </div>
-            {error && <p style={{ margin: 0, fontSize: '0.8rem', color: '#e03131' }}>{error}</p>}
-            <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
-              <button onClick={handleEdit} disabled={loading} style={{ ...btnPrimary, opacity: loading ? 0.6 : 1 }}>{loading ? 'Saving…' : 'Save'}</button>
-              <button onClick={onClose} style={btnGhost}>Cancel</button>
-            </div>
-          </div>
-        )}
+          )}
 
-        {action === 'password' && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-            <div>
-              <label style={{ fontSize: '0.8rem', fontWeight: 500, color: 'var(--fg-muted)', marginBottom: 4, display: 'block' }}>New Password (min 4 characters)</label>
-              <input style={inputStyle} type="password" value={password} onChange={e => { setPassword(e.target.value); setError('') }} autoFocus onKeyDown={e => e.key === 'Enter' && handlePassword()} />
+          {action === 'password' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <div>
+                <label style={{ fontSize: '0.8rem', fontWeight: 500, color: 'var(--fg-muted)', marginBottom: 4, display: 'block' }}>New Password (min 4 characters)</label>
+                <input style={inputStyle} type="password" value={password} onChange={e => { setPassword(e.target.value); setError('') }} autoFocus onKeyDown={e => e.key === 'Enter' && handlePassword()} />
+              </div>
+              {error && <p style={{ margin: 0, fontSize: '0.8rem', color: '#e03131' }}>{error}</p>}
+              <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+                <button onClick={handlePassword} disabled={loading} style={{ ...btnPrimary, opacity: loading ? 0.6 : 1 }}>{loading ? 'Saving…' : 'Save'}</button>
+                <button onClick={onClose} style={btnGhost}>Cancel</button>
+              </div>
             </div>
-            {error && <p style={{ margin: 0, fontSize: '0.8rem', color: '#e03131' }}>{error}</p>}
-            <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
-              <button onClick={handlePassword} disabled={loading} style={{ ...btnPrimary, opacity: loading ? 0.6 : 1 }}>{loading ? 'Saving…' : 'Save'}</button>
-              <button onClick={onClose} style={btnGhost}>Cancel</button>
-            </div>
-          </div>
-        )}
+          )}
 
-        {action === 'delete' && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 14px', background: 'rgba(224,49,49,0.06)', borderRadius: 8, border: '1px solid rgba(224,49,49,0.15)' }}>
-              <AlertTriangle size={18} color="#e03131" />
-              <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--fg)' }}>Are you sure you want to delete user <strong>@{target.username}</strong>? This action cannot be undone.</p>
+          {action === 'delete' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 14px', background: 'rgba(224,49,49,0.06)', borderRadius: 8, border: '1px solid rgba(224,49,49,0.15)' }}>
+                <AlertTriangle size={18} color="#e03131" style={{ flexShrink: 0 }} />
+                <p style={{ margin: 0, fontSize: '0.8125rem', color: 'var(--fg-muted)', lineHeight: 1.45 }}>Are you sure you want to delete user <strong style={{ color: 'var(--fg)' }}>@{target.username}</strong>? This action cannot be undone.</p>
+              </div>
+              {error && <p style={{ margin: 0, fontSize: '0.8rem', color: '#e03131' }}>{error}</p>}
+              <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+                <button onClick={handleDelete} disabled={loading} style={{ ...btnDanger, opacity: loading ? 0.6 : 1 }}>{loading ? 'Deleting…' : 'Remove'}</button>
+                <button onClick={onClose} style={btnGhost}>Cancel</button>
+              </div>
             </div>
-            {error && <p style={{ margin: 0, fontSize: '0.8rem', color: '#e03131' }}>{error}</p>}
-            <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
-              <button onClick={handleDelete} disabled={loading} style={{ ...btnDanger, opacity: loading ? 0.6 : 1 }}>{loading ? 'Deleting…' : 'Remove'}</button>
-              <button onClick={onClose} style={btnGhost}>Cancel</button>
-            </div>
-          </div>
-        )}
-      </div>
-    </div>
+          )}
+        </div>
+      </DialogContent>
+    </Dialog>
   )
 }
 
@@ -841,13 +863,40 @@ function UsersPage() {
            {/* ── Tab: Reset Note PIN ── */}
           {activeTab === 'pins' && (
             <div>
-              <div style={{ display: 'flex', alignItems: 'center', justifyBetween: 'space-between', marginBottom: 16 }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
                 <div>
                   <h2 style={{ fontFamily: 'var(--font-heading)', fontWeight: 600, fontSize: '1.1rem', color: 'var(--fg)', margin: 0 }}>PIN-Locked Notes</h2>
                   <p style={{ fontSize: '0.8125rem', color: 'var(--fg-muted)', margin: '4px 0 0', fontFamily: 'var(--font-body)' }}>Delete or change any note's PIN as admin.</p>
                 </div>
-                <button onClick={loadLockedNotes} disabled={loadingLocked} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 14px', fontSize: '0.8125rem', fontWeight: 500, fontFamily: 'var(--font-body)', background: 'var(--muted)', color: 'var(--fg-muted)', border: '1px solid var(--border)', borderRadius: 7, cursor: 'pointer', opacity: loadingLocked ? 0.6 : 1 }}>
-                  <RefreshCw size={13} style={loadingLocked ? { animation: 'spin 0.8s linear infinite' } : {}} />
+                <button
+                  onClick={loadLockedNotes}
+                  disabled={loadingLocked}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 6,
+                    padding: '6px 12px',
+                    fontSize: '0.78rem',
+                    fontWeight: 500,
+                    fontFamily: 'var(--font-body)',
+                    background: 'var(--muted)',
+                    color: 'var(--fg)',
+                    border: '1px solid var(--border)',
+                    borderRadius: 6,
+                    cursor: 'pointer',
+                    opacity: loadingLocked ? 0.6 : 1,
+                    transition: 'all 0.15s ease',
+                  }}
+                  onMouseEnter={e => {
+                    e.currentTarget.style.borderColor = 'var(--primary)'
+                    e.currentTarget.style.background = 'color-mix(in srgb, var(--primary) 10%, var(--muted))'
+                  }}
+                  onMouseLeave={e => {
+                    e.currentTarget.style.borderColor = 'var(--border)'
+                    e.currentTarget.style.background = 'var(--muted)'
+                  }}
+                >
+                  <RefreshCw size={12} style={loadingLocked ? { animation: 'spin 0.8s linear infinite' } : {}} />
                   Refresh
                 </button>
               </div>

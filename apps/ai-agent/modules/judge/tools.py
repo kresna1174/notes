@@ -2,14 +2,17 @@
 
 import json
 import logging
-import os
 
 import httpx
 from agents import function_tool, RunContextWrapper
 
+from core.settings import settings
+
 logger = logging.getLogger("ai-agent")
 
-_INTERNAL_WEB_BASE = os.getenv("INTERNAL_WEB_BASE", "http://localhost:3000")
+
+def _web_base() -> str:
+    return settings.internal_web_base
 
 
 @function_tool
@@ -26,7 +29,7 @@ async def get_note_content(ctx: RunContextWrapper[dict], note_id: str) -> str:
 
     try:
         async with httpx.AsyncClient(timeout=8) as client:
-            resp = await client.get(f"{_INTERNAL_WEB_BASE}/api/notes/{note_id}")
+            resp = await client.get(f"{_web_base()}/api/notes/{note_id}")
             if not resp.is_success:
                 return json.dumps({"error": True, "message": f"Note not found (HTTP {resp.status_code})"})
             data = resp.json()

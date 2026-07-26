@@ -254,7 +254,7 @@ function RagChatPage() {
         <div style={{
           width: 240,
           borderRight: '1px solid var(--border)',
-          background: 'var(--card-bg)',
+          background: '#0a0a0c',
           display: 'flex',
           flexDirection: 'column',
           flexShrink: 0,
@@ -382,7 +382,7 @@ function RagChatPage() {
             <div style={{
               display: 'flex', alignItems: 'center', justifyContent: 'space-between',
               padding: '10px 16px', borderBottom: '1px solid var(--border)',
-              background: 'var(--card-bg)', flexShrink: 0
+              background: '#121214', flexShrink: 0
             }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, position: 'relative' }} ref={noteDropdownRef}>
                 <span style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--fg-muted)' }}>

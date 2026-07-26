@@ -55,6 +55,8 @@ class Settings(BaseSettings):
     page_neighbor_radius: int = 1
     # Character cap per document when assembling researcher context (token guard).
     doc_context_char_cap: int = 12000
+    # Internal service URLs (Docker service names in production)
+    internal_web_base: str = "http://notes-app:3000"
 
     model_config: ClassVar[SettingsConfigDict] = SettingsConfigDict(
         env_prefix="",
