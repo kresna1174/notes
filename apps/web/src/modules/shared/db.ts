@@ -220,6 +220,41 @@ export async function initDb() {
   await db.execute(sql`ALTER TABLE better_auth_account ADD COLUMN IF NOT EXISTS password TEXT`).catch(() => {})
 
   await db.execute(sql`
+    CREATE TABLE IF NOT EXISTS ai_skills (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      description TEXT,
+      content TEXT NOT NULL DEFAULT '',
+      enabled BOOLEAN NOT NULL DEFAULT TRUE,
+      created_at BIGINT NOT NULL,
+      updated_at BIGINT NOT NULL
+    )
+  `)
+
+  // ai_skills.slug — stable identifier the AI agent resolves via load_skill(name).
+  await db.execute(sql`ALTER TABLE ai_skills ADD COLUMN IF NOT EXISTS slug TEXT`).catch(() => {})
+  // Backfill any pre-existing rows: slugify the name, de-duplicating collisions with a
+  // row-number suffix so the unique index below can be created without conflicts.
+  await db.execute(sql`
+    UPDATE ai_skills a SET slug = s.new_slug
+    FROM (
+      SELECT id,
+        CASE WHEN rn = 1 THEN base ELSE base || '-' || rn END AS new_slug
+      FROM (
+        SELECT id,
+          COALESCE(NULLIF(trim(both '-' from regexp_replace(lower(name), '[^a-z0-9]+', '-', 'g')), ''), 'skill') AS base,
+          row_number() OVER (
+            PARTITION BY COALESCE(NULLIF(trim(both '-' from regexp_replace(lower(name), '[^a-z0-9]+', '-', 'g')), ''), 'skill')
+            ORDER BY created_at, id
+          ) AS rn
+        FROM ai_skills WHERE slug IS NULL
+      ) t
+    ) s
+    WHERE a.id = s.id
+  `).catch(() => {})
+  await db.execute(sql`CREATE UNIQUE INDEX IF NOT EXISTS ux_ai_skills_slug ON ai_skills (slug)`).catch(() => {})
+
+  await db.execute(sql`
     CREATE TABLE IF NOT EXISTS password_reset_tokens (
       id TEXT PRIMARY KEY,
       user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,

@@ -41,6 +41,20 @@ class Settings(BaseSettings):
     langfuse_secret_key: str = ""
     langfuse_host: str = "https://cloud.langfuse.com"
 
+    # Deep document search (Query Analyzer → Multi-Query RAG → Researcher)
+    # Cosine similarity gate. cosine = 1 - distance/2 (unit-normalized embeddings).
+    # Start loose (0.60 ≈ distance ≤ 0.80), tighten to 0.70 as corpus quality allows.
+    rag_sim_threshold: float = 0.60
+    # Number of search queries the Query Analyzer may produce (adaptive 1..N).
+    top_queries: int = 5
+    # Number of documents to read fully in the aggregation step.
+    top_docs: int = 3
+    # Top hits kept per query after the cosine gate.
+    per_query_k: int = 3
+    # Page neighbourhood radius when loading document context (±N pages).
+    page_neighbor_radius: int = 1
+    # Character cap per document when assembling researcher context (token guard).
+    doc_context_char_cap: int = 12000
     # Internal service URLs (Docker service names in production)
     internal_web_base: str = "http://notes-app:3000"
 

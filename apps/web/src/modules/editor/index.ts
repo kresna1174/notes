@@ -1,4 +1,6 @@
 export { Editor } from './Editor';
+export { SkillEditor } from './SkillEditor';
+export { jsonToMarkdown, markdownToHtml } from './markdown';
 export { docToSegments, DocContent } from './DocRenderer';
 export { SlashCommandExtension } from './SlashCommand';
 export { BubbleToolbar } from './BubbleToolbar';
